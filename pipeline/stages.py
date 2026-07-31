@@ -9,9 +9,23 @@ import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 
-def _to_rgb(img: Image.Image, size: tuple[int, int]) -> Image.Image:
-    # 비율이 다른 이미지를 왜곡 없이 채우도록 중앙 크롭 후 리사이즈
-    return ImageOps.fit(img.convert("RGB"), size, Image.LANCZOS)
+def _to_rgb(img: Image.Image, size: tuple[int, int], fit: str = "contain") -> Image.Image:
+    """이미지를 목표 크기로 맞춘다.
+
+    fit="contain": 전체가 다 보이도록 비율 유지 후 여백(배경색)으로 채움(잘림 없음).
+    fit="cover":   화면을 꽉 채우되 넘치는 부분은 크롭(잘릴 수 있음).
+    """
+    img = img.convert("RGB")
+    if fit == "cover":
+        return ImageOps.fit(img, size, Image.LANCZOS)
+    # contain: 비율 유지로 안에 맞추고, 남는 여백은 그림의 모서리색으로 채움
+    fitted = ImageOps.contain(img, size, Image.LANCZOS)
+    bg = img.getpixel((2, 2)) if img.width > 4 and img.height > 4 else (255, 255, 255)
+    canvas = Image.new("RGB", size, bg)
+    x = (size[0] - fitted.width) // 2
+    y = (size[1] - fitted.height) // 2
+    canvas.paste(fitted, (x, y))
+    return canvas
 
 
 def _pencil_sketch(img: Image.Image) -> Image.Image:
@@ -52,9 +66,10 @@ def _detail(img: Image.Image) -> Image.Image:
 def build_stages(
     final_image_path: str,
     size: tuple[int, int],
+    fit: str = "contain",
 ) -> dict[str, Image.Image]:
     """완성본 경로에서 4단계 이미지를 만들어 dict로 반환."""
-    final = _to_rgb(Image.open(final_image_path), size)
+    final = _to_rgb(Image.open(final_image_path), size, fit)
     return {
         "sketch": _pencil_sketch(final),
         "color": _flat_color(final),

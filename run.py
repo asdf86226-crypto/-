@@ -111,7 +111,7 @@ def main() -> None:
 
     # [2] 4단계 역산
     print("[2/4] 스케치/색칠/묘사/완성 4단계 생성 중...")
-    stages = build_stages(str(final_path), size)
+    stages = build_stages(str(final_path), size, fit=vcfg.get("fit", "contain"))
     for name, img in stages.items():
         img.save(outdir / f"stage_{name}.png")
 
