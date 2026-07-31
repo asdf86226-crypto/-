@@ -40,6 +40,22 @@ def load_local_key() -> None:
                 return
 
 
+def find_user_track() -> str:
+    """폴더(및 홈)에서 내가 넣은 음원 파일을 찾는다. 있으면 경로 문자열, 없으면 "".
+
+    bgm/music 이름 + 흔한 오디오 확장자를 찾는다. (합성 결과 output/bgm.wav 는 제외)
+    """
+    names = ("bgm", "music", "song", "배경음악")
+    exts = (".mp3", ".m4a", ".wav", ".ogg", ".aac", ".flac")
+    for folder in (Path("."), Path.home()):
+        for name in names:
+            for ext in exts:
+                cand = folder / f"{name}{ext}"
+                if cand.exists():
+                    return str(cand)
+    return ""
+
+
 def load_config(path: str) -> dict:
     p = Path(path)
     if not p.exists():
@@ -93,22 +109,29 @@ def main() -> None:
     for name, img in stages.items():
         img.save(outdir / f"stage_{name}.png")
 
-    # BGM 결정: auto=코드로 생성 / file=지정 파일 / none=무음
+    # BGM 결정
+    #  - 폴더에 내 음원 파일(bgm.mp3 등)이 있으면 그걸 최우선으로 사용
+    #  - 없으면 mode 에 따라 auto(코드 생성) / file(지정) / none(무음)
     total_seconds = vcfg.get("total_seconds", 240)
     bgm_cfg = vcfg.get("bgm", {})
     bgm_path = ""
     mode = bgm_cfg.get("mode", "auto")
-    if mode == "auto":
+
+    user_track = find_user_track()
+    if bgm_cfg.get("file"):
+        bgm_path = bgm_cfg["file"]
+    elif user_track:
+        print(f"      내 음원 사용: {user_track}")
+        bgm_path = user_track
+    elif mode == "auto":
         from pipeline.bgm import generate_bgm
 
         print("      경쾌한 BGM 생성 중...")
         bgm_path = str(generate_bgm(
             outdir / "bgm.wav",
             seconds=total_seconds,
-            tempo_bpm=bgm_cfg.get("tempo_bpm", 100),
+            tempo_bpm=bgm_cfg.get("tempo_bpm", 104),
         ))
-    elif mode == "file":
-        bgm_path = bgm_cfg.get("file", "")
 
     # [3] 영상 합성
     print(f"[3/4] {total_seconds}초 타임랩스 영상 합성 중... (수 분 소요될 수 있음)")
