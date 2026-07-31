@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -160,8 +161,11 @@ def build_video(
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # 오디오 유무와 무관하게 먼저 무음 영상을 임시로 렌더
-    tmp_video = Path(tempfile.mkstemp(suffix=".mp4")[1])
+    # 오디오 유무와 무관하게 먼저 무음 영상을 임시로 렌더.
+    # mkstemp가 연 파일 핸들을 닫아야 윈도우에서 나중에 삭제/이동이 된다.
+    _fd, _tmp_name = tempfile.mkstemp(suffix=".mp4")
+    os.close(_fd)
+    tmp_video = Path(_tmp_name)
     writer = imageio.get_writer(
         tmp_video, fps=fps, codec="libx264",
         macro_block_size=1, pixelformat="yuv420p",
@@ -198,8 +202,17 @@ def build_video(
             str(out_path),
         ]
         subprocess.run(cmd, check=True, capture_output=True)
-        tmp_video.unlink(missing_ok=True)
+        # 임시파일 삭제 실패는 치명적이지 않으니 무시(윈도우 잠금 대비)
+        try:
+            tmp_video.unlink()
+        except OSError:
+            pass
     else:
-        tmp_video.replace(out_path)
+        try:
+            tmp_video.replace(out_path)
+        except OSError:
+            # 이동 실패 시 복사로 대체
+            import shutil
+            shutil.copyfile(tmp_video, out_path)
 
     return out_path
