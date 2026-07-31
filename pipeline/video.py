@@ -52,14 +52,19 @@ def _u8(a: np.ndarray) -> np.ndarray:
 # ---------- 세그먼트 렌더러 (numpy 프레임 제너레이터) ----------
 
 def _seg_reveal(prev: Image.Image, cur: Image.Image, n: int, size: Size,
-                fps: int, reveal_seconds: float = 2.0, direction: str = "h"):
+                fps: int, reveal_seconds: float = 2.0, direction: str = "h",
+                label: str = "", label_font: ImageFont.FreeTypeFont | None = None):
     """prev 위에 cur를 direction 방향으로 '빠르게 덧그리며' 채우고, 나머지는 홀드.
 
     디졸브(뭉개짐)가 아니라 각 단계가 또렷하게 얹히는 느낌을 준다.
     reveal_seconds 동안만 전환하고 그 뒤로는 완성된 현재 단계를 유지한다.
+    label 이 있으면(폰트 있을 때) 하단에 단계 자막을 표시한다.
     """
     w, h = size
     reveal_frames = max(1, min(n, int(reveal_seconds * fps)))
+    lab_rgb, lab_a = (None, None)
+    if label and label_font is not None:
+        lab_rgb, lab_a = _render_label(label, label_font, size)
     for i in range(n):
         z = 1.0 + 0.02 * (i / max(1, n - 1))   # 아주 옅은 줌(정지 화면 방지)
         base_prev = _arr(_kenburns(prev, size, z))
@@ -75,7 +80,25 @@ def _seg_reveal(prev: Image.Image, cur: Image.Image, n: int, size: Size,
                 frame[:, :col, :] = base_cur[:, :col, :]
         else:
             frame = base_cur
+        if lab_rgb is not None:
+            frame = frame * (1.0 - lab_a) + lab_rgb * lab_a
         yield _u8(frame)
+
+
+def _render_label(text: str, font: ImageFont.FreeTypeFont, size: Size):
+    """하단 중앙에 둥근 반투명 밴드 + 흰 글자 자막을 만들어 (rgb, alpha) 반환."""
+    w, h = size
+    overlay = Image.new("RGBA", size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(overlay)
+    bbox = d.textbbox((0, 0), text, font=font)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    cx, y = w // 2, int(h * 0.86)
+    px, py = int(th * 0.9), int(th * 0.45)
+    band = [cx - tw // 2 - px, y - py, cx + tw // 2 + px, y + th + py]
+    d.rounded_rectangle(band, radius=(th + 2 * py) // 2, fill=(0, 0, 0, 140))
+    d.text((cx - tw // 2 - bbox[0], y - bbox[1]), text, font=font, fill=(255, 255, 255, 255))
+    arr = np.asarray(overlay).astype(np.float32)
+    return arr[:, :, :3], arr[:, :, 3:4] / 255.0
 
 
 def _seg_intro(finish: Image.Image, n: int, size: Size, title: str, font: ImageFont.FreeTypeFont | None):
@@ -117,14 +140,26 @@ def _draw_caption(img: Image.Image, text: str, font: ImageFont.FreeTypeFont, siz
     return img
 
 
-def _load_font(font_path: str, size: Size) -> ImageFont.FreeTypeFont | None:
-    """지정 폰트를 로드. 없으면 None(텍스트 생략)."""
-    if not font_path:
-        return None
-    try:
-        return ImageFont.truetype(font_path, int(size[1] * 0.055))
-    except Exception:
-        return None
+# 한글 지원 폰트 자동 탐색 후보(윈도우/맥/리눅스). 지정 폰트가 없을 때 사용.
+_FONT_CANDIDATES = [
+    r"C:\Windows\Fonts\malgunbd.ttf",   # 맑은 고딕 Bold (윈도우)
+    r"C:\Windows\Fonts\malgun.ttf",     # 맑은 고딕 (윈도우)
+    "/System/Library/Fonts/AppleSDGothicNeo.ttc",          # 맥
+    "/System/Library/Fonts/Supplemental/AppleGothic.ttf",  # 맥
+    "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",  # 리눅스
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+]
+
+
+def _load_font(font_path: str, px: int) -> ImageFont.FreeTypeFont | None:
+    """지정 폰트(px 크기)를 로드. 없으면 시스템 한글 폰트를 자동 탐색."""
+    candidates = ([font_path] if font_path else []) + _FONT_CANDIDATES
+    for path in candidates:
+        try:
+            return ImageFont.truetype(path, px)
+        except Exception:
+            continue
+    return None
 
 
 # ---------- 메인 빌더 ----------
@@ -157,7 +192,11 @@ def build_video(
     total = sum(weights.get(k, 0) for k in order)
     frames_for = {k: max(1, int(total_seconds * fps * weights.get(k, 0) / total)) for k in order}
 
-    font = _load_font(font_path, size)
+    font = _load_font(font_path, int(height * 0.05))         # 인트로/아웃트로 큰 자막
+    label_font = _load_font(font_path, int(height * 0.042))  # 단계 자막(스케치/채색…)
+    stage_labels = {
+        "sketch": "스케치", "color": "채색", "detail": "묘사", "finish": "완성",
+    }
     white = Image.new("RGB", size, (250, 250, 248))  # 스케치 시작용 캔버스
 
     out_path = Path(out_path)
@@ -182,7 +221,9 @@ def build_video(
             ("sketch", "h"), ("color", "v"), ("detail", "h"), ("finish", "v"),
         ]:
             for frame in _seg_reveal(prev_img, stages[cur_key], frames_for[cur_key],
-                                     size, fps, transition_seconds, direction):
+                                     size, fps, transition_seconds, direction,
+                                     label=stage_labels.get(cur_key, ""),
+                                     label_font=label_font):
                 writer.append_data(frame)
             prev_img = stages[cur_key]
         for frame in _seg_outro(stages["finish"], frames_for["outro"], size, outro_text, font):
