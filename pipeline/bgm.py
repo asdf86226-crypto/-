@@ -1,13 +1,14 @@
-"""산뜻하고 가벼운 BGM을 코드로 직접 생성한다 (저작권/표시 의무 없음).
+"""산뜻하고 가벼운, 오케스트라풍 BGM을 코드로 직접 생성한다 (저작권/표시 의무 없음).
 
 무드 참고: Joe Hisaishi "Summer" — 밝은 장조, 세련된 7th 코드,
 가볍게 통통 튀는 스타카토 피아노. (실제 곡 멜로디는 쓰지 않고,
 그 분위기만 살린 오리지널 멜로디를 매번 생성한다.)
 
-구성(전부 피아노):
-- 오른손: 밝은 스타카토 멜로디(장음계 위 랜덤워크, 강박은 코드음에 안착)
-- 왼손: 부드러운 브로큰 코드(분산화음) 반주
-- 베이스: 근음 저음, 가볍게
+구성:
+- 현악 앙상블 패드: 코드를 두툼하게 지속(여러 음 디튠 겹침 = 섹션 느낌)
+- 첼로 베이스: 따뜻한 저음 지속
+- 피아노 오른손: 밝은 스타카토 멜로디(장음계 랜덤워크, 강박은 코드음 안착)
+- 피아노 왼손: 가벼운 브로큰 코드 반짝임
 출력: 16-bit PCM WAV (스테레오).
 """
 from __future__ import annotations
@@ -60,6 +61,31 @@ def _piano(freq: float, dur: float, amp: float = 0.5,
     return amp * sig * env
 
 
+def _strings(freq: float, dur: float, amp: float = 0.16,
+             attack: float = 0.18, release: float = 0.22) -> np.ndarray:
+    """현악 앙상블: 톱니파(배음 풍부) + 미세 디튠 3보이스 + 비브라토 + 부드러운 스웰."""
+    t = np.linspace(0, dur, int(SR * dur), endpoint=False)
+    vib = 1.0 + 0.005 * np.sin(2 * np.pi * 5.2 * t)   # 잔잔한 비브라토
+    detunes = (0.997, 1.0, 1.003)                     # ±약 5센트 = 합주 두께
+    sig = np.zeros_like(t)
+    harmonics = 9
+    hnorm = sum(1.0 / k for k in range(1, harmonics + 1))
+    for d in detunes:
+        phase = np.cumsum(2 * np.pi * freq * d * vib / SR)
+        for k in range(1, harmonics + 1):
+            sig += (1.0 / k) * np.sin(k * phase)
+    sig /= (len(detunes) * hnorm)
+    # 활 느낌 엔벨로프: 느린 어택 + 미세 스웰 + 릴리즈
+    a = max(1, int(SR * attack))
+    r = max(1, int(SR * release))
+    env = np.ones_like(t)
+    env[:a] = np.linspace(0, 1, a)
+    if r < len(env):
+        env[-r:] = np.linspace(1, 0, r)
+    env *= 0.9 + 0.1 * np.sin(2 * np.pi * 0.5 * t)
+    return amp * sig * env
+
+
 def _place(track: np.ndarray, start: int, chunk: np.ndarray) -> None:
     if start >= len(track) or start < 0:
         return
@@ -99,18 +125,22 @@ def generate_bgm(
     while pos < total:
         root, tones = _PROGRESSION[bar % len(_PROGRESSION)]
 
-        # 왼손 브로큰 코드(분산화음): 8분음표로 근음-5도-3도-5도 식으로 부드럽게
+        # 현악 앙상블 패드: 코드 3화음을 한 마디 내내 지속(두툼한 배경)
+        for n in tones[:3]:
+            _place(track, pos, _strings(_freq(n, 4), chord_dur, amp=0.14))
+
+        # 첼로 베이스: 따뜻한 저음 지속(반마디씩 근음)
+        for b in (0, 2):
+            _place(track, pos + int(b * beat * SR),
+                   _strings(_freq(root, 2), beat * 2.0, amp=0.22, attack=0.08))
+
+        # 왼손 브로큰 코드(분산화음): 가벼운 반짝임으로 얹기
         broken = [tones[0], tones[2], tones[1], tones[2]]
         for e in range(8):
             n = broken[e % len(broken)]
-            octave = 3 if e % 2 == 0 else 4
+            octave = 4 if e % 2 == 0 else 5
             _place(track, pos + int(e * 0.5 * beat * SR),
-                   _piano(_freq(n, octave), beat * 0.5, amp=0.13, decay=4.0))
-
-        # 베이스: 1박, 3박에 근음 저음
-        for b in (0, 2):
-            _place(track, pos + int(b * beat * SR),
-                   _piano(_freq(root, 2), beat * 1.6, amp=0.32, decay=3.0))
+                   _piano(_freq(n, octave), beat * 0.5, amp=0.09, decay=4.5))
 
         # 오른손 스타카타 멜로디: 8분음표 8개, 강박은 코드음에 안착, 가끔 쉼표
         for e in range(8):
