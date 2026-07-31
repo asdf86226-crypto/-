@@ -1,0 +1,15 @@
+# AI 이미지 생성 (Gemini / Imagen)
+google-genai>=1.0.0
+
+# 이미지 처리 (단계 역산)
+pillow>=10.0.0
+numpy>=1.24.0
+
+# 영상 인코딩 (ffmpeg 바이너리 포함)
+imageio>=2.31.0
+imageio-ffmpeg>=0.4.9
+
+# 유튜브 업로드
+google-api-python-client>=2.100.0
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0

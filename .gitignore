@@ -1,0 +1,23 @@
+# Secrets & credentials
+.env
+client_secret*.json
+token.json
+*.pickle
+
+# Generated outputs
+output/
+assets/generated/
+*.mp4
+*.png
+*.jpg
+!assets/bgm/*  # allow user-provided BGM to be tracked if they want
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.python-version
+
+# OS
+.DS_Store

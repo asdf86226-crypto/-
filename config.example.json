@@ -1,0 +1,35 @@
+{
+  "prompt": "A serene lighthouse on a rocky coast at sunset, warm golden light, painterly illustration, highly detailed",
+  "title": "노을 지는 바닷가 등대 그리기 | 스케치부터 완성까지 (타임랩스)",
+  "description": "AI로 만든 그림 그리는 과정 영상입니다. 스케치 → 색칠 → 묘사 → 완성.\n\n#drawing #timelapse #digitalart",
+  "tags": ["drawing", "timelapse", "digital art", "그림", "타임랩스"],
+
+  "image": {
+    "model": "imagen-3.0-generate-002",
+    "aspect_ratio": "16:9"
+  },
+
+  "video": {
+    "width": 1280,
+    "height": 720,
+    "fps": 24,
+    "total_seconds": 240,
+    "stage_weights": {
+      "intro": 0.05,
+      "sketch": 0.20,
+      "color": 0.25,
+      "detail": 0.30,
+      "finish": 0.15,
+      "outro": 0.05
+    },
+    "bgm_path": ""
+  },
+
+  "youtube": {
+    "enabled": true,
+    "privacy_status": "private",
+    "category_id": "24",
+    "client_secret_path": "client_secret.json",
+    "token_path": "token.json"
+  }
+}
