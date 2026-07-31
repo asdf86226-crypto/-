@@ -30,11 +30,14 @@ def load_local_key() -> None:
     """
     if os.environ.get("GEMINI_API_KEY"):
         return
-    key_file = Path("gemini_key.txt")
-    if key_file.exists():
-        key = key_file.read_text(encoding="utf-8").strip()
-        if key:
-            os.environ["GEMINI_API_KEY"] = key
+    # 현재 폴더 -> 홈 폴더 순으로 gemini_key.txt 를 찾는다.
+    # 홈 폴더(예: C:\Users\<나>)에 한 번 두면 매번 새로 만들 필요가 없다.
+    for key_file in (Path("gemini_key.txt"), Path.home() / "gemini_key.txt"):
+        if key_file.exists():
+            key = key_file.read_text(encoding="utf-8").strip()
+            if key:
+                os.environ["GEMINI_API_KEY"] = key
+                return
 
 
 def load_config(path: str) -> dict:
