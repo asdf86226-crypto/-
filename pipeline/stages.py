@@ -10,7 +10,8 @@ from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 
 def _to_rgb(img: Image.Image, size: tuple[int, int]) -> Image.Image:
-    return img.convert("RGB").resize(size, Image.LANCZOS)
+    # 비율이 다른 이미지를 왜곡 없이 채우도록 중앙 크롭 후 리사이즈
+    return ImageOps.fit(img.convert("RGB"), size, Image.LANCZOS)
 
 
 def _pencil_sketch(img: Image.Image) -> Image.Image:
