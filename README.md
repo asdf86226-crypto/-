@@ -16,7 +16,7 @@ AI로 그림을 생성하고, **스케치 → 색칠 → 묘사 → 완성** 4�
         ↓
 [3] 4단계를 타임랩스 영상으로 합성 (wipe + 디졸브 + 켄번즈 + BGM)
         ↓
-[4] YouTube Data API v3로 업로드 (기본 비공개)
+[4] YouTube Data API v3로 업로드 (기본 비공개, 지정 썸네일 설정)
 ```
 
 > **왜 방법 A인가?** AI로 "스케치/색칠/완성"을 각각 따로 생성하면 매번
@@ -68,9 +68,25 @@ python run.py --config other.json
 | `image.model` | Gemini 이미지 모델 (예: `imagen-3.0-generate-002`) |
 | `video.total_seconds` | 영상 길이(기본 240 = 4분) |
 | `video.stage_weights` | 구간별 길이 비율 |
-| `video.bgm_path` | 배경음악 파일 경로(선택) |
+| `video.bgm.mode` | `auto`(코드로 무료 BGM 생성) / `file`(직접 파일) / `none`(무음) |
+| `video.bgm.file` | `mode:"file"`일 때 사용할 음원 경로 |
+| `video.bgm.tempo_bpm` | 자동 BGM 빠르기(기본 100, 클수록 경쾌) |
 | `video.font_path` | 인트로/아웃트로 자막 폰트(한글이면 한글 폰트 .ttf 지정) |
 | `youtube.privacy_status` | `private` / `unlisted` / `public` |
+| `youtube.thumbnail_path` | 직접 준비한 썸네일 이미지 경로(예: `my_thumb.png`) |
+
+## BGM (배경음악)
+기본값 `mode: "auto"` 는 **코드로 경쾌하고 아름다운 곡을 직접 생성**합니다
+(I–V–vi–IV 코드 진행 + 오르골 멜로디). 우리가 만든 음원이라 **저작권·저작자
+표시 의무가 없어** 유튜브 상업적 사용이 자유롭습니다. `tempo_bpm` 으로 빠르기를
+조절하세요. 직접 준비한 음원을 쓰려면 `mode: "file"`, `file: "경로.mp3"` 로 바꾸면
+됩니다.
+
+## 썸네일
+`youtube.thumbnail_path` 에 **직접 만든 이미지 경로**를 넣으면 업로드 시 자동으로
+썸네일로 설정됩니다(1280×720 권장). 비워두면 유튜브가 자동 선택합니다.
+> ⚠️ 맞춤 썸네일은 **전화번호로 인증된 채널**에서만 가능합니다
+> (youtube.com/verify). 미인증 시 영상은 올라가되 썸네일만 건너뜁니다.
 
 ## 자막 폰트에 대해
 인트로 제목·아웃트로 문구는 `video.font_path` 에 폰트를 지정할 때만 표시됩니다.

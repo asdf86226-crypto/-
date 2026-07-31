@@ -22,13 +22,18 @@
       "finish": 0.15,
       "outro": 0.05
     },
-    "bgm_path": ""
+    "bgm": {
+      "mode": "auto",
+      "file": "",
+      "tempo_bpm": 100
+    }
   },
 
   "youtube": {
     "enabled": true,
     "privacy_status": "private",
     "category_id": "24",
+    "thumbnail_path": "",
     "client_secret_path": "client_secret.json",
     "token_path": "token.json"
   }

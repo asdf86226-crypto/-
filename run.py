@@ -69,6 +69,23 @@ def main() -> None:
     for name, img in stages.items():
         img.save(outdir / f"stage_{name}.png")
 
+    # BGM 결정: auto=코드로 생성 / file=지정 파일 / none=무음
+    total_seconds = vcfg.get("total_seconds", 240)
+    bgm_cfg = vcfg.get("bgm", {})
+    bgm_path = ""
+    mode = bgm_cfg.get("mode", "auto")
+    if mode == "auto":
+        from pipeline.bgm import generate_bgm
+
+        print("      경쾌한 BGM 생성 중...")
+        bgm_path = str(generate_bgm(
+            outdir / "bgm.wav",
+            seconds=total_seconds,
+            tempo_bpm=bgm_cfg.get("tempo_bpm", 100),
+        ))
+    elif mode == "file":
+        bgm_path = bgm_cfg.get("file", "")
+
     # [3] 영상 합성
     print("[3/4] 4분 타임랩스 영상 합성 중... (수 분 소요될 수 있음)")
     build_video(
@@ -77,9 +94,9 @@ def main() -> None:
         width=size[0],
         height=size[1],
         fps=vcfg.get("fps", 24),
-        total_seconds=vcfg.get("total_seconds", 240),
+        total_seconds=total_seconds,
         stage_weights=vcfg.get("stage_weights"),
-        bgm_path=vcfg.get("bgm_path", ""),
+        bgm_path=bgm_path,
         title=cfg.get("title", ""),
         font_path=vcfg.get("font_path", ""),
     )
@@ -101,6 +118,7 @@ def main() -> None:
         tags=cfg.get("tags", []),
         privacy_status=ycfg.get("privacy_status", "private"),
         category_id=ycfg.get("category_id", "24"),
+        thumbnail_path=ycfg.get("thumbnail_path", ""),
         client_secret_path=ycfg.get("client_secret_path", "client_secret.json"),
         token_path=ycfg.get("token_path", "token.json"),
     )

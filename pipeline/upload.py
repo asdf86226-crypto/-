@@ -49,10 +49,11 @@ def upload_video(
     *,
     privacy_status: str = "private",
     category_id: str = "24",
+    thumbnail_path: str = "",
     client_secret_path: str = "client_secret.json",
     token_path: str = "token.json",
 ) -> str:
-    """영상을 업로드하고 videoId를 반환."""
+    """영상을 업로드하고 videoId를 반환. thumbnail_path가 있으면 썸네일도 설정."""
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
 
@@ -83,4 +84,24 @@ def upload_video(
 
     video_id = response["id"]
     print(f"  업로드 완료: https://youtu.be/{video_id}  (상태: {privacy_status})")
+
+    # 사용자가 지정한 썸네일 설정 (있을 때만)
+    if thumbnail_path and Path(thumbnail_path).exists():
+        try:
+            ext = Path(thumbnail_path).suffix.lower()
+            mime = "image/png" if ext == ".png" else "image/jpeg"
+            youtube.thumbnails().set(
+                videoId=video_id,
+                media_body=MediaFileUpload(thumbnail_path, mimetype=mime),
+            ).execute()
+            print(f"  썸네일 설정 완료: {thumbnail_path}")
+        except Exception as e:  # 채널 미인증 등
+            print(
+                f"  ⚠️ 썸네일 설정 실패: {e}\n"
+                "     맞춤 썸네일은 전화번호로 인증된 채널에서만 가능합니다 "
+                "(youtube.com/verify)."
+            )
+    elif thumbnail_path:
+        print(f"  ⚠️ 썸네일 파일을 찾을 수 없음: {thumbnail_path}")
+
     return video_id
