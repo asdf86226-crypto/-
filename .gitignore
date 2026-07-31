@@ -1,5 +1,6 @@
 # Secrets & credentials
 .env
+gemini_key.txt
 client_secret*.json
 token.json
 *.pickle

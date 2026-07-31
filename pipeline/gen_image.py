@@ -25,9 +25,8 @@ def generate_final_image(
     api_key = api_key or os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError(
-            "GEMINI_API_KEY 환경변수가 없습니다. "
-            "Google AI Studio(https://aistudio.google.com/apikey)에서 키를 발급받아 "
-            "`export GEMINI_API_KEY=...` 로 설정하세요."
+            "제미나이 키를 찾을 수 없습니다. 프로젝트 폴더에 gemini_key.txt 파일을 만들고 "
+            "그 안에 키만 붙여넣어 저장하세요. (또는 환경변수 GEMINI_API_KEY 설정)"
         )
 
     from google import genai

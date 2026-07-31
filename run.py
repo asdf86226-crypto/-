@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 from PIL import Image
@@ -22,14 +23,32 @@ from pipeline.stages import build_stages
 from pipeline.video import build_video
 
 
+def load_local_key() -> None:
+    """gemini_key.txt 파일이 있으면 GEMINI_API_KEY 환경변수로 로드(초보자 편의).
+
+    환경변수가 이미 설정돼 있으면 그대로 둔다.
+    """
+    if os.environ.get("GEMINI_API_KEY"):
+        return
+    key_file = Path("gemini_key.txt")
+    if key_file.exists():
+        key = key_file.read_text(encoding="utf-8").strip()
+        if key:
+            os.environ["GEMINI_API_KEY"] = key
+
+
 def load_config(path: str) -> dict:
     p = Path(path)
     if not p.exists():
+        # config.json이 없으면 예시 파일로 대체(첫 실행 편의)
+        example = Path("config.example.json")
+        if example.exists():
+            print(f"※ {path} 이 없어 config.example.json 설정으로 실행합니다.")
+            return json.loads(example.read_text(encoding="utf-8"))
         raise SystemExit(
-            f"설정 파일 {path} 이 없습니다. config.example.json 을 복사해 만드세요:\n"
-            f"    cp config.example.json config.json"
+            f"설정 파일 {path} 이 없습니다. config.example.json 을 복사해 만드세요."
         )
-    return json.loads(p.read_text())
+    return json.loads(p.read_text(encoding="utf-8"))
 
 
 def main() -> None:
@@ -40,6 +59,7 @@ def main() -> None:
     ap.add_argument("--outdir", default="output")
     args = ap.parse_args()
 
+    load_local_key()
     cfg = load_config(args.config)
     if args.prompt:
         cfg["prompt"] = args.prompt
