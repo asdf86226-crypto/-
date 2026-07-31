@@ -96,7 +96,14 @@ def generate_final_image(
     from google import genai
     from google.genai import types
 
-    client = genai.Client(api_key=api_key)
+    # 응답이 없을 때 무한정 멈추지 않도록 타임아웃(약 120초)을 건다.
+    try:
+        client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(timeout=120_000),  # 밀리초
+        )
+    except Exception:
+        client = genai.Client(api_key=api_key)
 
     # config에서 지정한 모델을 맨 앞에 두고, 나머지 후보를 뒤에 붙인다.
     candidates: list[str] = []

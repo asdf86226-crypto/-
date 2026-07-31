@@ -54,13 +54,24 @@ def _flat_color(img: Image.Image) -> Image.Image:
     return poster.convert("RGB")
 
 
+def _base_color(img: Image.Image) -> Image.Image:
+    """기본색(밑색): 색을 크게 단순화하고 채도를 낮춰 '밑색 깐' 느낌."""
+    smooth = img.filter(ImageFilter.MedianFilter(size=7))
+    poster = ImageOps.posterize(smooth, bits=2)      # 색을 더 크게 뭉갬
+    poster = ImageEnhance.Color(poster).enhance(0.6)  # 채도 낮게
+    poster = ImageEnhance.Brightness(poster).enhance(1.06)
+    return poster.convert("RGB")
+
+
 def _detail(img: Image.Image) -> Image.Image:
-    """완성 직전: 디테일은 거의 있으나 마감(채도/대비)이 덜 된 단계."""
+    """명암/묘사 단계: 명암은 들어갔으나 하이라이트 마감 전(약간 눌린 하이라이트)."""
     smooth = img.filter(ImageFilter.GaussianBlur(radius=1))
-    blended = Image.blend(img, smooth, alpha=0.3)
-    blended = ImageEnhance.Color(blended).enhance(0.92)
-    blended = ImageEnhance.Contrast(blended).enhance(0.96)
-    return blended.convert("RGB")
+    blended = Image.blend(img, smooth, alpha=0.25)
+    blended = ImageEnhance.Color(blended).enhance(0.95)
+    # 하이라이트를 살짝 눌러 '아직 마감 전'
+    arr = np.asarray(blended, dtype=np.float32)
+    arr = np.where(arr > 200, 200 + (arr - 200) * 0.6, arr)
+    return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGB")
 
 
 def build_stages(
@@ -68,11 +79,16 @@ def build_stages(
     size: tuple[int, int],
     fit: str = "contain",
 ) -> dict[str, Image.Image]:
-    """완성본 경로에서 4단계 이미지를 만들어 dict로 반환."""
+    """완성본 경로에서 그리기 단계 이미지들을 만들어 dict로 반환.
+
+    순서: lineart(선화) -> base(기본색) -> color(색상 확정) -> shade(명암/묘사)
+          -> finish(하이라이트/완성)
+    """
     final = _to_rgb(Image.open(final_image_path), size, fit)
     return {
-        "sketch": _pencil_sketch(final),
+        "lineart": _pencil_sketch(final),
+        "base": _base_color(final),
         "color": _flat_color(final),
-        "detail": _detail(final),
+        "shade": _detail(final),
         "finish": final,
     }

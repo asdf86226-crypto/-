@@ -101,6 +101,81 @@ def _render_label(text: str, font: ImageFont.FreeTypeFont, size: Size):
     return arr[:, :, :3], arr[:, :, 3:4] / 255.0
 
 
+def _seg_sketch_scribble(lineart: Image.Image, n: int, size: Size, fps: int,
+                         label: str = "", label_font: ImageFont.FreeTypeFont | None = None,
+                         seed: int = 0):
+    """흰 캔버스에서 선을 '여러 번 그렸다 지웠다' 하며 러프 스케치 → 깔끔한 선화로 정리.
+
+    - construction line: 선화를 조금씩 어긋나게 겹친 흐릿한 선들이 프레임마다 흔들림
+      (그렸다 지우는 느낌)
+    - 위→아래로 '확정된 깔끔한 선'이 점점 남아 마지막엔 선화로 정리됨
+    """
+    rng = np.random.default_rng(seed)
+    w, h = size
+    ink = 1.0 - np.asarray(_kenburns(lineart, size, 1.0).convert("L"), dtype=np.float32) / 255.0
+    jitter = max(2, w // 160)
+    lab_rgb, lab_a = (None, None)
+    if label and label_font is not None:
+        lab_rgb, lab_a = _render_label(label, label_font, size)
+
+    for i in range(n):
+        p = i / max(1, n - 1)
+        # 확정 선: 위→아래로 드러나며 점점 진해짐
+        commit = np.zeros((h, w), dtype=np.float32)
+        reveal_row = int(h * min(1.0, p * 1.5))
+        commit[:reveal_row, :] = ink[:reveal_row, :] * min(1.0, 0.4 + p)
+        # 러프 construction line: 어긋난 복사본 몇 개(프레임마다 흔들림)
+        rough = np.zeros((h, w), dtype=np.float32)
+        for _ in range(3):
+            dx = int(rng.integers(-jitter, jitter + 1))
+            dy = int(rng.integers(-jitter, jitter + 1))
+            rough += np.roll(np.roll(ink, dy, 0), dx, 1)
+        rough = np.clip(rough / 3.0, 0, 1) * (0.45 * (1.0 - p) + 0.05)
+        ink_disp = np.maximum(commit, rough)
+        gray = (1.0 - ink_disp) * 255.0
+        frame = np.stack([gray, gray, gray], axis=-1)
+        if lab_rgb is not None:
+            frame = frame * (1.0 - lab_a) + lab_rgb * lab_a
+        yield _u8(frame)
+
+
+def _hue_shift(img: Image.Image, degrees: float) -> Image.Image:
+    """색상(Hue)을 degrees 만큼 회전한 이미지를 반환(색 베리에이션용)."""
+    hsv = img.convert("HSV")
+    h, s, v = hsv.split()
+    ha = (np.asarray(h, dtype=np.int16) + int(degrees / 360.0 * 255)) % 256
+    h2 = Image.fromarray(ha.astype(np.uint8), "L")
+    return Image.merge("HSV", (h2, s, v)).convert("RGB")
+
+
+def _seg_variation(prev: Image.Image, variants: list[Image.Image], final: Image.Image,
+                   n: int, size: Size, fps: int, reveal_seconds: float = 1.5,
+                   label: str = "", label_font: ImageFont.FreeTypeFont | None = None):
+    """기본색 위에 색을 채우며, 처음엔 여러 색 후보(variants)를 번갈아 보여주다
+    최종 색(final)으로 확정하는 '색 베리에이션' 단계."""
+    w, h = size
+    reveal_frames = max(1, min(n, int(reveal_seconds * fps)))
+    wobble = min(reveal_frames, int(1.0 * fps))       # 처음 ~1초 색 후보 교체
+    lab_rgb, lab_a = (None, None)
+    if label and label_font is not None:
+        lab_rgb, lab_a = _render_label(label, label_font, size)
+
+    for i in range(n):
+        z = 1.0 + 0.02 * (i / max(1, n - 1))
+        base_prev = _arr(_kenburns(prev, size, z))
+        fill_img = variants[(i // 3) % len(variants)] if i < wobble else final
+        base_cur = _arr(_kenburns(fill_img, size, z))
+        if i < reveal_frames:
+            col = int(w * ((i + 1) / reveal_frames))
+            frame = base_prev.copy()
+            frame[:, :col, :] = base_cur[:, :col, :]
+        else:
+            frame = base_cur
+        if lab_rgb is not None:
+            frame = frame * (1.0 - lab_a) + lab_rgb * lab_a
+        yield _u8(frame)
+
+
 def _seg_intro(finish: Image.Image, n: int, size: Size, title: str, font: ImageFont.FreeTypeFont | None):
     """완성본을 어둡게 깔고 검정에서 페이드인 하는 티저."""
     for i in range(n):
@@ -185,19 +260,19 @@ def build_video(
     """
     size: Size = (width, height)
     weights = stage_weights or {
-        "intro": 0.05, "sketch": 0.20, "color": 0.25,
-        "detail": 0.30, "finish": 0.15, "outro": 0.05,
+        "intro": 0.04, "sketch": 0.26, "base": 0.12, "color": 0.14,
+        "shade": 0.22, "finish": 0.16, "outro": 0.06,
     }
-    order = ["intro", "sketch", "color", "detail", "finish", "outro"]
+    order = ["intro", "sketch", "base", "color", "shade", "finish", "outro"]
     total = sum(weights.get(k, 0) for k in order)
     frames_for = {k: max(1, int(total_seconds * fps * weights.get(k, 0) / total)) for k in order}
 
     font = _load_font(font_path, int(height * 0.05))         # 인트로/아웃트로 큰 자막
-    label_font = _load_font(font_path, int(height * 0.042))  # 단계 자막(스케치/채색…)
+    label_font = _load_font(font_path, int(height * 0.042))  # 단계 자막
     stage_labels = {
-        "sketch": "스케치", "color": "채색", "detail": "묘사", "finish": "완성",
+        "sketch": "스케치", "base": "기본색", "color": "색상",
+        "shade": "묘사", "finish": "완성",
     }
-    white = Image.new("RGB", size, (250, 250, 248))  # 스케치 시작용 캔버스
 
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -215,17 +290,34 @@ def build_video(
     try:
         for frame in _seg_intro(stages["finish"], frames_for["intro"], size, title, font):
             writer.append_data(frame)
-        # 각 단계를 이전 단계 위에 '빠르게 덧그리며' 채운다(방향은 번갈아).
-        prev_img = white
-        for cur_key, direction in [
-            ("sketch", "h"), ("color", "v"), ("detail", "h"), ("finish", "v"),
-        ]:
-            for frame in _seg_reveal(prev_img, stages[cur_key], frames_for[cur_key],
+
+        # 1) 스케치: 러프하게 그렸다 지웠다 → 깔끔한 선화로 정리
+        for frame in _seg_sketch_scribble(stages["lineart"], frames_for["sketch"], size, fps,
+                                          label=stage_labels["sketch"], label_font=label_font):
+            writer.append_data(frame)
+
+        # 2) 기본색: 선화 위에 밑색을 채움
+        for frame in _seg_reveal(stages["lineart"], stages["base"], frames_for["base"],
+                                 size, fps, transition_seconds, "h",
+                                 label=stage_labels["base"], label_font=label_font):
+            writer.append_data(frame)
+
+        # 3) 색상: 여러 색 후보를 번갈아 보다 최종 색으로 확정
+        variants = [_hue_shift(stages["color"], 22), _hue_shift(stages["color"], -28),
+                    stages["color"]]
+        for frame in _seg_variation(stages["base"], variants, stages["color"],
+                                    frames_for["color"], size, fps, transition_seconds,
+                                    label=stage_labels["color"], label_font=label_font):
+            writer.append_data(frame)
+
+        # 4) 묘사: 명암/디테일을 얹음  5) 완성: 하이라이트 마감
+        for cur_key, direction in [("shade", "v"), ("finish", "h")]:
+            prev_key = "color" if cur_key == "shade" else "shade"
+            for frame in _seg_reveal(stages[prev_key], stages[cur_key], frames_for[cur_key],
                                      size, fps, transition_seconds, direction,
-                                     label=stage_labels.get(cur_key, ""),
-                                     label_font=label_font):
+                                     label=stage_labels[cur_key], label_font=label_font):
                 writer.append_data(frame)
-            prev_img = stages[cur_key]
+
         for frame in _seg_outro(stages["finish"], frames_for["outro"], size, outro_text, font):
             writer.append_data(frame)
     finally:

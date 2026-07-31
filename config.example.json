@@ -18,12 +18,13 @@
     "transition_seconds": 1.5,
     "fit": "contain",
     "stage_weights": {
-      "intro": 0.05,
-      "sketch": 0.22,
-      "color": 0.26,
-      "detail": 0.30,
-      "finish": 0.12,
-      "outro": 0.05
+      "intro": 0.04,
+      "sketch": 0.26,
+      "base": 0.12,
+      "color": 0.14,
+      "shade": 0.22,
+      "finish": 0.16,
+      "outro": 0.06
     },
     "bgm": {
       "mode": "auto",
