@@ -86,6 +86,33 @@ def _strings(freq: float, dur: float, amp: float = 0.16,
     return amp * sig * env
 
 
+def _flute(freq: float, dur: float, amp: float = 0.22) -> np.ndarray:
+    """플루트 느낌: 거의 순음(약한 배음) + 비브라토 + 부드러운 어택. 맑은 상단 라인."""
+    t = np.linspace(0, dur, int(SR * dur), endpoint=False)
+    vib = 1.0 + 0.008 * np.sin(2 * np.pi * 5.0 * t)
+    phase = np.cumsum(2 * np.pi * freq * vib / SR)
+    sig = np.sin(phase) + 0.14 * np.sin(2 * phase) + 0.05 * np.sin(3 * phase)
+    a = max(1, int(SR * 0.06))
+    r = max(1, int(SR * 0.12))
+    env = np.ones_like(t)
+    env[:a] = np.linspace(0, 1, a)
+    if r < len(env):
+        env[-r:] = np.linspace(1, 0, r)
+    return amp * sig * env
+
+
+def _reverb(x: np.ndarray, mix: float = 0.28) -> np.ndarray:
+    """가벼운 멀티탭 리버브(공간감/풍성함). 피드백 없이 벡터화되어 빠르다."""
+    taps = [(0.029, 0.6), (0.047, 0.45), (0.071, 0.35),
+            (0.103, 0.26), (0.149, 0.19), (0.211, 0.13), (0.290, 0.08)]
+    wet = np.zeros_like(x)
+    for sec, g in taps:
+        n = int(SR * sec)
+        if n < len(x):
+            wet[n:] += x[:-n] * g
+    return (1.0 - mix) * x + mix * wet
+
+
 def _place(track: np.ndarray, start: int, chunk: np.ndarray) -> None:
     if start >= len(track) or start < 0:
         return
@@ -119,48 +146,83 @@ def generate_bgm(
     chord_dur = beat * 4
     chord_samples = int(SR * chord_dur)
 
+    # 마디별 멜로디 리듬 패턴(박 단위) — 다양하게 섞어 단조로움 방지
+    rhythms = [
+        [1.0, 0.5, 0.5, 1.0, 1.0],
+        [0.5, 0.5, 1.0, 0.5, 0.5, 1.0],
+        [1.5, 0.5, 1.0, 1.0],
+        [0.5, 0.5, 0.5, 0.5, 2.0],
+        [2.0, 1.0, 1.0],
+        [1.0, 1.0, 0.5, 0.5, 1.0],
+    ]
+
     pos = 0
     bar = 0
-    mel_idx = 4  # 멜로디 시작 위치(G5 근처)
+    mel_idx = 4          # 멜로디 시작 위치(G5 근처)
     while pos < total:
         root, tones = _PROGRESSION[bar % len(_PROGRESSION)]
+        phrase_pos = bar % 4                    # 4마디 프레이즈
+        # 프레이즈 다이내믹(살짝 부풀었다 잦아듦)
+        dyn = 0.85 + 0.15 * np.sin(np.pi * phrase_pos / 3.0)
 
         # 현악 앙상블 패드: 코드 3화음을 한 마디 내내 지속(두툼한 배경)
         for n in tones[:3]:
-            _place(track, pos, _strings(_freq(n, 4), chord_dur, amp=0.14))
+            _place(track, pos, _strings(_freq(n, 4), chord_dur, amp=0.13 * dyn))
 
         # 첼로 베이스: 따뜻한 저음 지속(반마디씩 근음)
         for b in (0, 2):
             _place(track, pos + int(b * beat * SR),
-                   _strings(_freq(root, 2), beat * 2.0, amp=0.22, attack=0.08))
+                   _strings(_freq(root, 2), beat * 2.0, amp=0.2, attack=0.08))
 
-        # 왼손 브로큰 코드(분산화음): 가벼운 반짝임으로 얹기
+        # 왼손 브로큰 코드(분산화음): 가벼운 반짝임
         broken = [tones[0], tones[2], tones[1], tones[2]]
         for e in range(8):
             n = broken[e % len(broken)]
             octave = 4 if e % 2 == 0 else 5
             _place(track, pos + int(e * 0.5 * beat * SR),
-                   _piano(_freq(n, octave), beat * 0.5, amp=0.09, decay=4.5))
+                   _piano(_freq(n, octave), beat * 0.5, amp=0.08 * dyn, decay=4.5))
 
-        # 오른손 스타카타 멜로디: 8분음표 8개, 강박은 코드음에 안착, 가끔 쉼표
-        for e in range(8):
-            on_strong = (e % 2 == 0)
-            if on_strong:
+        # 오른손 멜로디: 마디마다 다른 리듬 패턴 + 프레이즈 윤곽
+        pattern = rhythms[int(rng.integers(0, len(rhythms)))]
+        t_beat = 0.0
+        first = True
+        for dur_beats in pattern:
+            strong = (abs(t_beat - round(t_beat)) < 1e-6)  # 정박 여부
+            if first or strong:
                 mel_idx = _nearest_chord_index(tones, mel_idx)
             else:
-                mel_idx += int(rng.integers(-2, 3))  # 약박은 걸어다니기
+                mel_idx += int(rng.integers(-2, 3))
             mel_idx = max(0, min(len(_MELODY_SCALE) - 1, mel_idx))
-
-            # 가벼움을 위해 약박 일부는 쉼표
-            if not on_strong and rng.random() < 0.35:
+            first = False
+            if not strong and rng.random() < 0.2:      # 약박 일부 쉼표
+                t_beat += dur_beats
                 continue
             name, octave = _MELODY_SCALE[mel_idx]
-            # 스타카토: 슬롯보다 짧게 울리고 빠르게 감쇠
-            _place(track, pos + int(e * 0.5 * beat * SR),
-                   _piano(_freq(name, octave), beat * 0.42, amp=0.5, decay=7.5))
+            # 짧은 음은 스타카토, 긴 음은 좀 더 울리게
+            decay = 7.5 if dur_beats <= 0.5 else 4.0
+            _place(track, pos + int(t_beat * beat * SR),
+                   _piano(_freq(name, octave), beat * dur_beats * 0.9,
+                          amp=0.48 * dyn, decay=decay))
+            t_beat += dur_beats
+
+        # 플루트 카운터멜로디: 2마디마다 코드음 위 긴 음으로 응답(맑은 상단)
+        if bar % 2 == 1:
+            fn = tones[int(rng.integers(0, 3))]
+            _place(track, pos + int(beat * SR),
+                   _flute(_freq(fn, 5), beat * 2.5, amp=0.16))
+
+        # 하프풍 아르페지오 장식: 프레이즈 끝(4마디째)에 상승 분산화음
+        if phrase_pos == 3:
+            arp = tones[:3] + [tones[0]]
+            for j, n in enumerate(arp):
+                _place(track, pos + int((2 + j * 0.5) * 0.5 * beat * SR),
+                       _piano(_freq(n, 5 + (j // 3)), beat * 0.4, amp=0.12, decay=5.0))
 
         pos += chord_samples
         bar += 1
+
+    # 공간감(리버브)으로 풍성하게
+    track = _reverb(track, mix=0.28)
 
     # 마스터: 정규화 + 전체 페이드 인/아웃
     peak = float(np.max(np.abs(track))) or 1.0
