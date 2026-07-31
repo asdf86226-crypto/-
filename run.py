@@ -45,14 +45,20 @@ def find_user_track() -> str:
 
     bgm/music 이름 + 흔한 오디오 확장자를 찾는다. (합성 결과 output/bgm.wav 는 제외)
     """
-    names = ("bgm", "music", "song", "배경음악")
     exts = (".mp3", ".m4a", ".wav", ".ogg", ".aac", ".flac")
+    # 1) 정해진 이름(bgm/music 등)을 우선 찾고
+    names = ("bgm", "music", "song", "배경음악")
     for folder in (Path("."), Path.home()):
         for name in names:
             for ext in exts:
                 cand = folder / f"{name}{ext}"
                 if cand.exists():
                     return str(cand)
+    # 2) 없으면 프로젝트 폴더에 있는 아무 음악 파일이나 사용(이름 상관없이)
+    audio = sorted(p for p in Path(".").iterdir()
+                   if p.is_file() and p.suffix.lower() in exts)
+    if audio:
+        return str(audio[0])
     return ""
 
 
