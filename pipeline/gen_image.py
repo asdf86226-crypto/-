@@ -83,6 +83,7 @@ def generate_final_image(
     model: str | None = None,
     aspect_ratio: str = "16:9",
     api_key: str | None = None,
+    prompt_suffix: str = "",
 ) -> Path:
     """프롬프트로 완성 그림 1장을 생성해 out_path 에 저장하고 경로를 반환."""
     api_key = api_key or os.environ.get("GEMINI_API_KEY")
@@ -105,7 +106,8 @@ def generate_final_image(
         if m not in candidates:
             candidates.append(m)
 
-    full_prompt = f"{prompt}. Wide 16:9 landscape composition, highly detailed."
+    # 스타일 지시는 config의 prompt_suffix로 제어(없으면 프롬프트 그대로).
+    full_prompt = f"{prompt}. {prompt_suffix}".strip() if prompt_suffix else prompt
 
     report: list[str] = []
     for m in candidates:

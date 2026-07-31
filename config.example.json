@@ -1,25 +1,27 @@
 {
-  "prompt": "A serene lighthouse on a rocky coast at sunset, warm golden light, painterly illustration, highly detailed",
-  "title": "노을 지는 바닷가 등대 그리기 | 스케치부터 완성까지 (타임랩스)",
-  "description": "AI로 만든 그림 그리는 과정 영상입니다. 스케치 → 색칠 → 묘사 → 완성.\n\n#drawing #timelapse #digitalart",
-  "tags": ["drawing", "timelapse", "digital art", "그림", "타임랩스"],
+  "prompt": "A cute anime girl character, casual streetwear outfit, dynamic standing pose, full body, expressive face, clean bright lighting, simple plain background",
+  "title": "애니 캐릭터 그리기 | 스케치부터 완성까지 (2분 타임랩스)",
+  "description": "AI로 그린 캐릭터 일러스트 과정 영상입니다. 스케치 → 기본색 → 묘사 → 완성.\n\n#anime #drawing #timelapse #illustration",
+  "tags": ["anime", "drawing", "timelapse", "illustration", "캐릭터", "그림", "타임랩스"],
 
   "image": {
     "model": "gemini-2.5-flash-image",
-    "aspect_ratio": "16:9"
+    "aspect_ratio": "16:9",
+    "prompt_suffix": "anime style illustration, clean crisp line art, cel shading, vibrant colors, character-focused, centered composition, high quality"
   },
 
   "video": {
     "width": 1280,
     "height": 720,
     "fps": 24,
-    "total_seconds": 240,
+    "total_seconds": 120,
+    "transition_seconds": 1.5,
     "stage_weights": {
       "intro": 0.05,
-      "sketch": 0.20,
-      "color": 0.25,
+      "sketch": 0.22,
+      "color": 0.26,
       "detail": 0.30,
-      "finish": 0.15,
+      "finish": 0.12,
       "outro": 0.05
     },
     "bgm": {

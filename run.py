@@ -78,8 +78,9 @@ def main() -> None:
     generate_final_image(
         prompt=cfg["prompt"],
         out_path=final_path,
-        model=icfg.get("model", "imagen-3.0-generate-002"),
+        model=icfg.get("model", "gemini-2.5-flash-image"),
         aspect_ratio=icfg.get("aspect_ratio", "16:9"),
+        prompt_suffix=icfg.get("prompt_suffix", ""),
     )
     print(f"      저장: {final_path}")
 
@@ -107,7 +108,7 @@ def main() -> None:
         bgm_path = bgm_cfg.get("file", "")
 
     # [3] 영상 합성
-    print("[3/4] 4분 타임랩스 영상 합성 중... (수 분 소요될 수 있음)")
+    print(f"[3/4] {total_seconds}초 타임랩스 영상 합성 중... (수 분 소요될 수 있음)")
     build_video(
         stages,
         str(video_path),
@@ -116,6 +117,7 @@ def main() -> None:
         fps=vcfg.get("fps", 24),
         total_seconds=total_seconds,
         stage_weights=vcfg.get("stage_weights"),
+        transition_seconds=vcfg.get("transition_seconds", 2.0),
         bgm_path=bgm_path,
         title=cfg.get("title", ""),
         font_path=vcfg.get("font_path", ""),

@@ -51,33 +51,31 @@ def _u8(a: np.ndarray) -> np.ndarray:
 
 # ---------- 세그먼트 렌더러 (numpy 프레임 제너레이터) ----------
 
-def _seg_wipe(prev: Image.Image, cur: Image.Image, n: int, size: Size):
-    """prev(보통 흰 캔버스)에서 cur를 좌->우로 그려나가는 wipe."""
-    w, _ = size
-    reveal_frames = int(n * 0.7)  # 70% 동안 그리고, 나머지는 홀드
+def _seg_reveal(prev: Image.Image, cur: Image.Image, n: int, size: Size,
+                fps: int, reveal_seconds: float = 2.0, direction: str = "h"):
+    """prev 위에 cur를 direction 방향으로 '빠르게 덧그리며' 채우고, 나머지는 홀드.
+
+    디졸브(뭉개짐)가 아니라 각 단계가 또렷하게 얹히는 느낌을 준다.
+    reveal_seconds 동안만 전환하고 그 뒤로는 완성된 현재 단계를 유지한다.
+    """
+    w, h = size
+    reveal_frames = max(1, min(n, int(reveal_seconds * fps)))
     for i in range(n):
-        z = 1.0 + 0.04 * (i / max(1, n - 1))
+        z = 1.0 + 0.02 * (i / max(1, n - 1))   # 아주 옅은 줌(정지 화면 방지)
         base_prev = _arr(_kenburns(prev, size, z))
         base_cur = _arr(_kenburns(cur, size, z))
         if i < reveal_frames:
-            p = i / max(1, reveal_frames - 1)
-            col = int(w * p)
+            p = (i + 1) / reveal_frames
             frame = base_prev.copy()
-            frame[:, :col, :] = base_cur[:, :col, :]
+            if direction == "v":
+                row = int(h * p)
+                frame[:row, :, :] = base_cur[:row, :, :]
+            else:
+                col = int(w * p)
+                frame[:, :col, :] = base_cur[:, :col, :]
         else:
             frame = base_cur
         yield _u8(frame)
-
-
-def _seg_dissolve(prev: Image.Image, cur: Image.Image, n: int, size: Size):
-    """prev에서 cur로 디졸브 후 홀드(둘 다 동일 켄번즈 줌)."""
-    trans = int(n * 0.4)
-    for i in range(n):
-        z = 1.0 + 0.04 * (i / max(1, n - 1))
-        a = _arr(_kenburns(prev, size, z))
-        b = _arr(_kenburns(cur, size, z))
-        t = min(1.0, i / max(1, trans))
-        yield _u8(_dissolve(a, b, t))
 
 
 def _seg_intro(finish: Image.Image, n: int, size: Size, title: str, font: ImageFont.FreeTypeFont | None):
@@ -140,12 +138,16 @@ def build_video(
     fps: int = 24,
     total_seconds: int = 240,
     stage_weights: dict[str, float] | None = None,
+    transition_seconds: float = 2.0,
     bgm_path: str = "",
     title: str = "",
     outro_text: str = "구독과 좋아요 부탁드려요!",
     font_path: str = "",
 ) -> Path:
-    """4단계 이미지 dict -> mp4 파일 생성. 최종 경로 반환."""
+    """4단계 이미지 dict -> mp4 파일 생성. 최종 경로 반환.
+
+    transition_seconds: 각 단계가 '덧그려지며' 바뀌는 데 걸리는 시간(초). 작을수록 빠릿.
+    """
     size: Size = (width, height)
     weights = stage_weights or {
         "intro": 0.05, "sketch": 0.20, "color": 0.25,
@@ -174,15 +176,15 @@ def build_video(
     try:
         for frame in _seg_intro(stages["finish"], frames_for["intro"], size, title, font):
             writer.append_data(frame)
-        for frame in _seg_wipe(white, stages["sketch"], frames_for["sketch"], size):
-            writer.append_data(frame)
-        for prev, cur, key in [
-            ("sketch", "color", "color"),
-            ("color", "detail", "detail"),
-            ("detail", "finish", "finish"),
+        # 각 단계를 이전 단계 위에 '빠르게 덧그리며' 채운다(방향은 번갈아).
+        prev_img = white
+        for cur_key, direction in [
+            ("sketch", "h"), ("color", "v"), ("detail", "h"), ("finish", "v"),
         ]:
-            for frame in _seg_dissolve(stages[prev], stages[cur], frames_for[key], size):
+            for frame in _seg_reveal(prev_img, stages[cur_key], frames_for[cur_key],
+                                     size, fps, transition_seconds, direction):
                 writer.append_data(frame)
+            prev_img = stages[cur_key]
         for frame in _seg_outro(stages["finish"], frames_for["outro"], size, outro_text, font):
             writer.append_data(frame)
     finally:
