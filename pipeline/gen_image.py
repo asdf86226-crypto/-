@@ -5,8 +5,12 @@
 
 여러 이미지 모델을 후보로 시도해, 현재 API 키에서 사용 가능한 첫 모델을
 자동으로 사용한다(키/요금제마다 열려있는 모델이 다르기 때문).
+모두 실패하면 각 모델의 실패 이유를 모아서 알려준다.
 
 필요 환경변수: GEMINI_API_KEY  (Google AI Studio에서 발급)
+
+내 키에 어떤 모델이 있는지 확인하려면:
+    python -c "from pathlib import Path;from google import genai;c=genai.Client(api_key=Path('gemini_key.txt').read_text().strip());[print(m.name,'->',m.supported_actions) for m in c.models.list()]"
 """
 from __future__ import annotations
 
@@ -16,22 +20,20 @@ from pathlib import Path
 
 from PIL import Image
 
-# 우선순위대로 시도할 이미지 생성 모델. 앞의 것이 먼저 시도된다.
+# 우선순위대로 시도할 이미지 생성 모델(앞의 것 먼저).
+# gemini-* 는 generate_content, imagen-* 는 generate_images(predict)로 호출한다.
 _FALLBACK_MODELS = [
-    "gemini-2.5-flash-image",                    # 최신 네이티브 이미지 모델
-    "gemini-2.0-flash-preview-image-generation",  # 대체(무료 티어에서 흔히 가능)
-    "imagen-3.0-generate-002",                    # 최후: Imagen(요금제 필요할 수 있음)
+    "gemini-2.5-flash-image",       # 무료 티어에서 잘 되는 네이티브 이미지 모델
+    "gemini-3.1-flash-image",
+    "nano-banana-pro-preview",
+    "imagen-4.0-generate-001",      # Imagen 4 (predict)
+    "imagen-4.0-fast-generate-001",
 ]
 
 
-def _via_generate_content(client, types, model: str, prompt: str) -> Image.Image | None:
-    """gemini-* 이미지 모델용: generate_content로 이미지를 받는다."""
-    resp = client.models.generate_content(
-        model=model,
-        contents=prompt,
-        config=types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"]),
-    )
-    for cand in (resp.candidates or []):
+def _extract_image(resp) -> Image.Image | None:
+    """generate_content 응답에서 첫 이미지 파트를 꺼낸다."""
+    for cand in (getattr(resp, "candidates", None) or []):
         content = getattr(cand, "content", None)
         for part in (getattr(content, "parts", None) or []):
             inline = getattr(part, "inline_data", None)
@@ -40,15 +42,34 @@ def _via_generate_content(client, types, model: str, prompt: str) -> Image.Image
     return None
 
 
-def _via_imagen(client, types, model: str, prompt: str, aspect_ratio: str) -> Image.Image | None:
-    """imagen-* 모델용: generate_images 사용."""
+def _via_generate_content(client, types, model: str, prompt: str) -> Image.Image:
+    """gemini-* 이미지 모델용. response_modalities 조합을 바꿔가며 시도."""
+    errors = []
+    for modalities in (["IMAGE"], ["TEXT", "IMAGE"]):
+        try:
+            resp = client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(response_modalities=modalities),
+            )
+            img = _extract_image(resp)
+            if img is not None:
+                return img
+            errors.append(f"modalities={modalities}: 응답에 이미지 파트 없음")
+        except Exception as e:
+            errors.append(f"modalities={modalities}: {e}")
+    raise RuntimeError("; ".join(errors))
+
+
+def _via_imagen(client, types, model: str, prompt: str, aspect_ratio: str) -> Image.Image:
+    """imagen-* 모델용. generate_images(predict) 사용."""
     resp = client.models.generate_images(
         model=model,
         prompt=prompt,
         config=types.GenerateImagesConfig(number_of_images=1, aspect_ratio=aspect_ratio),
     )
     if not resp.generated_images:
-        return None
+        raise RuntimeError("generated_images 비어 있음")
     gen = resp.generated_images[0].image
     raw = getattr(gen, "image_bytes", None)
     if raw is not None:
@@ -86,25 +107,23 @@ def generate_final_image(
 
     full_prompt = f"{prompt}. Wide 16:9 landscape composition, highly detailed."
 
-    last_err: Exception | None = None
+    report: list[str] = []
     for m in candidates:
         try:
             if m.startswith("imagen"):
                 img = _via_imagen(client, types, m, full_prompt, aspect_ratio)
             else:
                 img = _via_generate_content(client, types, m, full_prompt)
-            if img is not None:
-                out_path = Path(out_path)
-                out_path.parent.mkdir(parents=True, exist_ok=True)
-                img.save(out_path)
-                print(f"      (사용한 이미지 모델: {m})")
-                return out_path
-        except Exception as e:  # 이 모델이 안 되면 다음 후보로
-            last_err = e
+            out_path = Path(out_path)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            img.save(out_path)
+            print(f"      (사용한 이미지 모델: {m})")
+            return out_path
+        except Exception as e:
+            report.append(f"  - {m}: {e}")
             continue
 
     raise RuntimeError(
-        "사용 가능한 이미지 생성 모델을 찾지 못했습니다. 제미나이 키가 유효한지, "
-        "이미지 생성이 지원되는 키인지 확인하세요.\n"
-        f"마지막 오류: {last_err}"
+        "모든 이미지 모델이 실패했습니다. 아래 이유를 확인하세요:\n"
+        + "\n".join(report)
     )
