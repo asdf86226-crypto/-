@@ -1,0 +1,415 @@
+<meta charset="utf-8">
+<title>판매현황 분석 대시보드</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    color-scheme: light dark;
+    --page:        #f9f9f7;
+    --surface:     #fcfcfb;
+    --text-1:      #0b0b0b;
+    --text-2:      #52514e;
+    --muted:       #898781;
+    --grid:        #e1e0d9;
+    --baseline:    #c3c2b7;
+    --border:      rgba(11,11,11,0.10);
+    --series-1:    #2a78d6;  /* blue  - 판매량 */
+    --series-2:    #eb6834;  /* orange- 매출  */
+    --series-3:    #1baf7a;  /* aqua         */
+    --good:        #006300;
+    --shadow:      0 1px 3px rgba(11,11,11,0.06), 0 1px 2px rgba(11,11,11,0.04);
+    --radius:      14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      --page:      #0d0d0d;
+      --surface:   #1a1a19;
+      --text-1:    #ffffff;
+      --text-2:    #c3c2b7;
+      --muted:     #898781;
+      --grid:      #2c2c2a;
+      --baseline:  #383835;
+      --border:    rgba(255,255,255,0.10);
+      --series-1:  #3987e5;
+      --series-2:  #d95926;
+      --series-3:  #199e70;
+      --good:      #0ca30c;
+      --shadow:    0 1px 3px rgba(0,0,0,0.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    background: var(--page);
+    color: var(--text-1);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.45;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 64px; }
+  header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--text-2); font-size: 13px; margin: 0; }
+  .datarange { color: var(--muted); font-size: 12px; margin-top: 6px; }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .btn {
+    font: inherit; font-size: 13px; cursor: pointer;
+    background: var(--surface); color: var(--text-1);
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 14px; box-shadow: var(--shadow);
+    transition: background .12s;
+  }
+  .btn:hover { background: color-mix(in srgb, var(--surface) 92%, var(--text-1)); }
+  .btn.ghost { box-shadow: none; }
+
+  /* period tabs */
+  .tabs { display: inline-flex; background: var(--surface); border: 1px solid var(--border);
+          border-radius: 12px; padding: 4px; gap: 2px; box-shadow: var(--shadow); }
+  .tab { font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; border: 0; background: transparent;
+         color: var(--text-2); padding: 8px 16px; border-radius: 9px; transition: all .12s; }
+  .tab[aria-selected="true"] { background: var(--series-1); color: #fff; }
+
+  /* KPI row */
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 22px 0; }
+  @media (max-width: 720px) { .kpis { grid-template-columns: repeat(2,1fr); } }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+         padding: 16px 18px; box-shadow: var(--shadow); }
+  .kpi .label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .kpi .value { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+  .kpi .unit { font-size: 13px; font-weight: 500; color: var(--text-2); margin-left: 3px; }
+  .kpi .delta { font-size: 12px; margin-top: 6px; color: var(--text-2); }
+  .kpi .delta.up { color: var(--good); }
+  .kpi .delta.down { color: #d03b3b; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+          padding: 20px; box-shadow: var(--shadow); margin-bottom: 22px; }
+  .card h2 { font-size: 15px; margin: 0 0 2px; }
+  .card .hint { font-size: 12px; color: var(--muted); margin: 0 0 14px; }
+
+  .chart { width: 100%; overflow-x: auto; }
+  svg text { font-family: inherit; }
+  .axis-label { fill: var(--muted); font-size: 11px; }
+  .val-label { fill: var(--text-2); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); margin-top: 4px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 9px 10px; text-align: right; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; font-variant-numeric: normal; }
+  thead th { color: var(--muted); font-weight: 600; font-size: 12px; border-bottom: 1px solid var(--baseline); }
+  tbody tr:hover { background: color-mix(in srgb, var(--surface) 90%, var(--text-1)); }
+  .table-scroll { max-height: 360px; overflow-y: auto; }
+
+  .tooltip { position: fixed; pointer-events: none; background: var(--text-1); color: var(--page);
+             font-size: 12px; padding: 6px 9px; border-radius: 7px; opacity: 0; transition: opacity .08s;
+             white-space: nowrap; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+  .tooltip b { font-variant-numeric: tabular-nums; }
+
+  .fileinfo { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 8px; }
+  a { color: var(--series-1); }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>판매현황 분석 대시보드</h1>
+      <p class="sub">주별 · 월별 · 분기별 · 연별 판매량과 매출을 한눈에</p>
+      <p class="datarange" id="dataRange"></p>
+    </div>
+    <div class="toolbar">
+      <input type="file" id="csvInput" accept=".csv,text/csv" hidden>
+      <button class="btn" id="uploadBtn">📂 CSV 업로드</button>
+      <button class="btn ghost" id="sampleBtn">샘플 데이터</button>
+      <button class="btn ghost" id="templateBtn">CSV 양식 받기</button>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist" id="tabs">
+    <button class="tab" role="tab" data-period="week"    aria-selected="false">주별</button>
+    <button class="tab" role="tab" data-period="month"   aria-selected="true">월별</button>
+    <button class="tab" role="tab" data-period="quarter" aria-selected="false">분기별</button>
+    <button class="tab" role="tab" data-period="year"    aria-selected="false">연별</button>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="card">
+    <h2 id="chartTitle">월별 판매량 추이</h2>
+    <p class="hint">막대는 판매량, 선은 매출입니다. 막대에 마우스를 올리면 상세 수치가 보입니다.</p>
+    <div class="chart"><svg id="chart" width="100%" height="360" role="img" aria-label="기간별 판매 추이"></svg></div>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--series-1)"></i>판매량 (개)</span>
+      <span><i class="swatch" style="background:var(--series-2)"></i>매출 (원)</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 id="tableTitle">월별 상세</h2>
+    <p class="hint">기간별 판매량, 매출, 그리고 직전 기간 대비 증감률입니다.</p>
+    <div class="table-scroll">
+      <table id="dataTable">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>판매현황 분석 대시보드 · 모든 처리는 브라우저 안에서만 이루어지며 데이터는 외부로 전송되지 않습니다.</footer>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+/* ------------------------------------------------------------------ *
+ *  판매현황 분석 대시보드 — 단일 HTML, 외부 라이브러리 없음
+ *  CSV 컬럼(유연 매핑):
+ *    날짜   : date / 날짜 / 일자 / 판매일   (YYYY-MM-DD 등)
+ *    수량   : quantity / qty / 수량 / 판매량 / 판매수량
+ *    금액   : amount / sales / revenue / 매출 / 금액 / 판매금액 (선택)
+ *    상품   : product / item / 상품 / 품목 (선택)
+ * ------------------------------------------------------------------ */
+
+const KRW = new Intl.NumberFormat('ko-KR');
+const $ = (s) => document.querySelector(s);
+
+let RAW = [];            // {date: Date, qty: Number, amount: Number}
+let currentPeriod = 'month';
+
+/* ---------- 샘플 데이터 생성 (약 18개월, 일별) ---------- */
+function makeSampleData() {
+  const out = [];
+  const start = new Date(2024, 6, 1);      // 2024-07-01
+  const end   = new Date(2025, 11, 31);    // 2025-12-31
+  const price = 32000;                     // 개당 평균 단가
+  let seed = 20240701;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const month = d.getMonth();
+    const dow = d.getDay();
+    // 계절성: 연말/봄 성수기, 성장 추세, 주말 강세
+    const season = 1 + 0.35 * Math.sin((month - 2) / 12 * 2 * Math.PI);
+    const trend  = 1 + (d - start) / (end - start) * 0.6;
+    const weekend = (dow === 0 || dow === 6) ? 1.25 : 1.0;
+    const noise = 0.7 + rnd() * 0.6;
+    const qty = Math.max(0, Math.round(45 * season * trend * weekend * noise));
+    out.push({ date: new Date(d), qty, amount: qty * Math.round(price * (0.9 + rnd() * 0.2)) });
+  }
+  return out;
+}
+
+/* ---------- 기간 키 계산 ---------- */
+function isoWeek(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = (d.getUTCDay() + 6) % 7;          // 월=0
+  d.setUTCDate(d.getUTCDate() - day + 3);        // 목요일
+  const firstThu = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((d - firstThu) / 86400000 - 3 + ((firstThu.getUTCDay() + 6) % 7)) / 7);
+  return { year: d.getUTCFullYear(), week };
+}
+function periodKey(date, period) {
+  const y = date.getFullYear();
+  if (period === 'year')    return { key: `${y}`,                     label: `${y}년`,           sort: y * 100 };
+  if (period === 'quarter') { const q = Math.floor(date.getMonth() / 3) + 1;
+                              return { key: `${y}-Q${q}`,             label: `${y} ${q}분기`,     sort: y * 100 + q }; }
+  if (period === 'month')   { const m = date.getMonth() + 1;
+                              return { key: `${y}-${String(m).padStart(2,'0')}`, label: `${y}.${String(m).padStart(2,'0')}`, sort: y * 100 + m }; }
+  const { year, week } = isoWeek(date);          // week
+  return { key: `${year}-W${String(week).padStart(2,'0')}`, label: `${String(year).slice(2)}년 ${week}주`, sort: year * 100 + week };
+}
+
+/* ---------- 집계 ---------- */
+function aggregate(period) {
+  const map = new Map();
+  for (const r of RAW) {
+    const { key, label, sort } = periodKey(r.date, period);
+    if (!map.has(key)) map.set(key, { key, label, sort, qty: 0, amount: 0 });
+    const g = map.get(key);
+    g.qty += r.qty; g.amount += r.amount;
+  }
+  return [...map.values()].sort((a, b) => a.sort - b.sort);
+}
+
+/* ---------- KPI ---------- */
+function renderKPIs(rows, period) {
+  const totalQty = rows.reduce((s, r) => s + r.qty, 0);
+  const totalAmt = rows.reduce((s, r) => s + r.amount, 0);
+  const avgQty = rows.length ? totalQty / rows.length : 0;
+  const best = rows.reduce((m, r) => (r.qty > (m?.qty ?? -1) ? r : m), null);
+  const last = rows[rows.length - 1], prev = rows[rows.length - 2];
+  let deltaHtml = '<div class="delta">직전 기간 데이터 없음</div>';
+  if (last && prev) {
+    const dq = prev.qty ? (last.qty - prev.qty) / prev.qty * 100 : 0;
+    const up = dq >= 0;
+    deltaHtml = `<div class="delta ${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${Math.abs(dq).toFixed(1)}% <span style="color:var(--muted)">직전 기간 대비</span></div>`;
+  }
+  const unitName = { week: '주', month: '월', quarter: '분기', year: '연' }[period];
+  $('#kpis').innerHTML = `
+    <div class="kpi"><div class="label">총 판매량</div><div class="value">${KRW.format(totalQty)}<span class="unit">개</span></div><div class="delta">${rows.length}개 ${unitName} 합계</div></div>
+    <div class="kpi"><div class="label">총 매출</div><div class="value">${KRW.format(Math.round(totalAmt))}<span class="unit">원</span></div><div class="delta">평균 단가 ${totalQty ? KRW.format(Math.round(totalAmt/totalQty)) : 0}원</div></div>
+    <div class="kpi"><div class="label">${unitName} 평균 판매량</div><div class="value">${KRW.format(Math.round(avgQty))}<span class="unit">개</span></div><div class="delta">${unitName}당 평균</div></div>
+    <div class="kpi"><div class="label">최고 실적 ${unitName}</div><div class="value" style="font-size:20px">${best ? best.label : '-'}</div>${deltaHtml}</div>`;
+}
+
+/* ---------- 차트 (막대=판매량, 선=매출) ---------- */
+function renderChart(rows, period) {
+  const svg = $('#chart');
+  const tip = $('#tooltip');
+  const W = Math.max(svg.clientWidth || 900, rows.length * 34 + 80);
+  const H = 360;
+  const m = { top: 20, right: 56, bottom: 46, left: 56 };
+  const iw = W - m.left - m.right, ih = H - m.top - m.bottom;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width', W);
+
+  const maxQty = Math.max(1, ...rows.map(r => r.qty));
+  const maxAmt = Math.max(1, ...rows.map(r => r.amount));
+  const x = (i) => m.left + (iw / rows.length) * i;
+  const bw = Math.min(34, iw / rows.length * 0.62);
+  const yQ = (v) => m.top + ih - (v / maxQty) * ih;
+  const yA = (v) => m.top + ih - (v / maxAmt) * ih;
+
+  let s = '';
+  // gridlines + y축 (판매량)
+  for (let t = 0; t <= 4; t++) {
+    const gv = maxQty * t / 4, gy = yQ(gv);
+    s += `<line x1="${m.left}" y1="${gy}" x2="${m.left+iw}" y2="${gy}" stroke="var(--grid)" stroke-width="1"/>`;
+    s += `<text class="axis-label" x="${m.left-8}" y="${gy+4}" text-anchor="end">${KRW.format(Math.round(gv))}</text>`;
+  }
+  // 막대 (판매량)
+  const showEvery = Math.ceil(rows.length / 26);
+  rows.forEach((r, i) => {
+    const cx = x(i) + (iw / rows.length - bw) / 2;
+    const h = ih - (yQ(r.qty) - m.top);
+    s += `<rect class="bar" x="${cx.toFixed(1)}" y="${yQ(r.qty).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,h).toFixed(1)}"
+            rx="4" fill="var(--series-1)" data-i="${i}"><title></title></rect>`;
+    if (i % showEvery === 0)
+      s += `<text class="axis-label" x="${(x(i)+iw/rows.length/2).toFixed(1)}" y="${H-m.bottom+18}" text-anchor="middle">${r.label}</text>`;
+  });
+  // 선 (매출)
+  const pts = rows.map((r, i) => `${(x(i)+iw/rows.length/2).toFixed(1)},${yA(r.amount).toFixed(1)}`).join(' ');
+  s += `<polyline points="${pts}" fill="none" stroke="var(--series-2)" stroke-width="2" stroke-linejoin="round"/>`;
+  rows.forEach((r, i) => {
+    s += `<circle cx="${(x(i)+iw/rows.length/2).toFixed(1)}" cy="${yA(r.amount).toFixed(1)}" r="3" fill="var(--surface)" stroke="var(--series-2)" stroke-width="2"/>`;
+  });
+  // 우측 y축 (매출)
+  for (let t = 0; t <= 4; t++) {
+    const gv = maxAmt * t / 4, gy = yA(gv);
+    const short = gv >= 1e8 ? (gv/1e8).toFixed(1)+'억' : gv >= 1e4 ? Math.round(gv/1e4)+'만' : Math.round(gv);
+    s += `<text class="axis-label" x="${m.left+iw+8}" y="${gy+4}" text-anchor="start">${short}</text>`;
+  }
+  svg.innerHTML = s;
+
+  // hover
+  svg.querySelectorAll('rect.bar').forEach(rect => {
+    rect.addEventListener('mousemove', (e) => {
+      const r = rows[+rect.dataset.i];
+      tip.innerHTML = `<div>${r.label}</div><div>판매량 <b>${KRW.format(r.qty)}</b> 개</div><div>매출 <b>${KRW.format(Math.round(r.amount))}</b> 원</div>`;
+      tip.style.opacity = 1;
+      tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 12) + 'px';
+      tip.style.top  = (e.clientY - 10) + 'px';
+      rect.setAttribute('fill', 'var(--series-3)');
+    });
+    rect.addEventListener('mouseleave', () => { tip.style.opacity = 0; rect.setAttribute('fill', 'var(--series-1)'); });
+  });
+}
+
+/* ---------- 테이블 ---------- */
+function renderTable(rows, period) {
+  const unitName = { week: '주', month: '월', quarter: '분기', year: '연' }[period];
+  $('#dataTable').querySelector('thead').innerHTML =
+    `<tr><th>${unitName}</th><th>판매량 (개)</th><th>매출 (원)</th><th>평균 단가</th><th>증감률</th></tr>`;
+  const body = rows.map((r, i) => {
+    const prev = rows[i - 1];
+    let d = '-';
+    if (prev && prev.qty) {
+      const dv = (r.qty - prev.qty) / prev.qty * 100, up = dv >= 0;
+      d = `<span style="color:${up ? 'var(--good)' : '#d03b3b'}">${up ? '▲' : '▼'} ${Math.abs(dv).toFixed(1)}%</span>`;
+    }
+    const unit = r.qty ? KRW.format(Math.round(r.amount / r.qty)) : '-';
+    return `<tr><td>${r.label}</td><td>${KRW.format(r.qty)}</td><td>${KRW.format(Math.round(r.amount))}</td><td>${unit}</td><td>${d}</td></tr>`;
+  }).reverse().join('');
+  $('#dataTable').querySelector('tbody').innerHTML = body;
+}
+
+/* ---------- 렌더 오케스트레이션 ---------- */
+function render() {
+  const rows = aggregate(currentPeriod);
+  const name = { week: '주별', month: '월별', quarter: '분기별', year: '연별' }[currentPeriod];
+  $('#chartTitle').textContent = `${name} 판매량 추이`;
+  $('#tableTitle').textContent = `${name} 상세`;
+  renderKPIs(rows, currentPeriod);
+  renderChart(rows, currentPeriod);
+  renderTable(rows, currentPeriod);
+  if (RAW.length) {
+    const ds = RAW.map(r => r.date).sort((a, b) => a - b);
+    const f = (d) => `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+    $('#dataRange').textContent = `데이터 기간: ${f(ds[0])} ~ ${f(ds[ds.length-1])} · 총 ${KRW.format(RAW.length)}건`;
+  }
+}
+
+/* ---------- CSV 파싱 ---------- */
+function parseCSV(text) {
+  const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) throw new Error('빈 파일입니다.');
+  const split = (l) => {
+    const out = []; let cur = '', q = false;
+    for (const c of l) {
+      if (c === '"') q = !q;
+      else if (c === ',' && !q) { out.push(cur); cur = ''; }
+      else cur += c;
+    }
+    out.push(cur); return out.map(s => s.trim().replace(/^"|"$/g, ''));
+  };
+  const header = split(lines[0]).map(h => h.toLowerCase());
+  const find = (cands) => header.findIndex(h => cands.some(c => h.includes(c)));
+  const di = find(['date', '날짜', '일자', '판매일', '거래일']);
+  const qi = find(['quantity', 'qty', '수량', '판매량', '판매수량', '개수']);
+  const ai = find(['amount', 'sales', 'revenue', '매출', '금액', '판매금액']);
+  if (di < 0) throw new Error('날짜 컬럼을 찾을 수 없습니다. (date / 날짜 / 일자)');
+  if (qi < 0 && ai < 0) throw new Error('수량 또는 금액 컬럼이 필요합니다. (수량 / 금액)');
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const c = split(lines[i]);
+    const dt = new Date(c[di]);
+    if (isNaN(dt)) continue;
+    const qty = qi >= 0 ? Number((c[qi] || '').replace(/[^0-9.-]/g, '')) || 0 : 0;
+    const amt = ai >= 0 ? Number((c[ai] || '').replace(/[^0-9.-]/g, '')) || 0 : 0;
+    rows.push({ date: dt, qty, amount: amt });
+  }
+  if (!rows.length) throw new Error('읽을 수 있는 데이터 행이 없습니다.');
+  return rows;
+}
+
+/* ---------- 이벤트 ---------- */
+$('#tabs').addEventListener('click', (e) => {
+  const t = e.target.closest('.tab'); if (!t) return;
+  currentPeriod = t.dataset.period;
+  [...$('#tabs').children].forEach(x => x.setAttribute('aria-selected', x === t));
+  render();
+});
+$('#uploadBtn').addEventListener('click', () => $('#csvInput').click());
+$('#csvInput').addEventListener('change', (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try { RAW = parseCSV(reader.result); render(); }
+    catch (err) { alert('CSV 오류: ' + err.message); }
+  };
+  reader.readAsText(file, 'utf-8');
+});
+$('#sampleBtn').addEventListener('click', () => { RAW = makeSampleData(); render(); });
+$('#templateBtn').addEventListener('click', () => {
+  const csv = '날짜,상품,수량,금액\n2025-01-05,A상품,12,384000\n2025-01-05,B상품,7,231000\n2025-01-12,A상품,15,480000\n';
+  const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a'); a.href = url; a.download = 'sales_template.csv'; a.click();
+  URL.revokeObjectURL(url);
+});
+window.addEventListener('resize', () => render());
+
+/* ---------- 시작 ---------- */
+RAW = makeSampleData();
+render();
+</script>
