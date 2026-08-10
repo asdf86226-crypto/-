@@ -88,7 +88,7 @@
   <header class="top">
     <div>
       <h1>판매현황 분석 대시보드</h1>
-      <p class="sub">이카운트(ECOUNT) 엑셀을 올려 주별 · 월별 · 분기별 · 연별, 그리고 상품별로 분석</p>
+      <p class="sub">이카운트(ECOUNT) 엑셀을 올려 주별 · 월별 · 분기별 · 연별 × 상품 · 상품그룹 · 거래처별로 분석</p>
       <p class="meta" id="meta"></p>
     </div>
     <div class="toolbar">
@@ -106,11 +106,15 @@
       <button class="tab" role="tab" data-period="year"    aria-selected="false">연별</button>
     </div>
     <div class="prodfilter">
-      <label style="display:flex;align-items:center;gap:8px">매출 기준
-        <select id="amountSelect"></select>
+      <label style="display:flex;align-items:center;gap:8px">분석 기준
+        <select id="dimSelect">
+          <option value="product">상품</option>
+          <option value="group">상품그룹</option>
+          <option value="customer">거래처</option>
+        </select>
       </label>
-      <label style="display:flex;align-items:center;gap:8px">상품 필터
-        <select id="prodSelect"><option value="__all__">전체 상품</option></select>
+      <label style="display:flex;align-items:center;gap:8px"><span id="filterLabel">상품 필터</span>
+        <select id="dimFilter"><option value="__all__">전체</option></select>
       </label>
     </div>
   </div>
@@ -119,7 +123,7 @@
 
   <div class="card">
     <h2 id="chartTitle">월별 판매량 추이</h2>
-    <p class="hint">막대는 판매량, 선은 매출입니다. 막대에 마우스를 올리면 상세 수치가 보입니다. 상품 필터로 특정 상품만 볼 수 있습니다.</p>
+    <p class="hint">막대는 판매량, 선은 매출(공급가액)입니다. 막대에 마우스를 올리면 상세 수치가 보입니다. 위의 필터로 특정 상품·상품그룹·거래처만 볼 수 있습니다.</p>
     <div class="chart"><svg id="chart" width="100%" height="360" role="img" aria-label="기간별 판매 추이"></svg></div>
     <div class="legend">
       <span><i class="swatch" style="background:var(--series-1)"></i>판매량 (개)</span>
@@ -129,9 +133,9 @@
 
   <div class="grid2">
     <div class="card" id="prodCard">
-      <h2>상품별 판매 순위</h2>
-      <p class="hint">전체 기간 기준 상품별 판매량 상위입니다. 막대에 올리면 매출·비중이 보입니다.</p>
-      <div class="chart"><svg id="prodChart" width="100%" height="360" role="img" aria-label="상품별 판매 순위"></svg></div>
+      <h2 id="rankTitle">상품별 판매 순위</h2>
+      <p class="hint" id="rankHint">전체 기간 기준 상위 12개입니다. 막대에 올리면 매출·비중이 보입니다.</p>
+      <div class="chart"><svg id="prodChart" width="100%" height="360" role="img" aria-label="분석 기준별 판매 순위"></svg></div>
     </div>
     <div class="card">
       <h2 id="tableTitle">월별 상세</h2>
@@ -143,8 +147,8 @@
   </div>
 
   <div class="card">
-    <h2>상품별 상세</h2>
-    <p class="hint">전체 기간 기준. 비중은 총 판매량 대비 각 상품의 비율입니다.</p>
+    <h2 id="dimTableTitle">상품별 상세</h2>
+    <p class="hint">전체 기간 기준. 비중은 총 판매량 대비 각 항목의 비율입니다.</p>
     <div class="table-scroll">
       <table id="prodTable"><thead></thead><tbody></tbody></table>
     </div>
@@ -171,12 +175,36 @@ const KRW = new Intl.NumberFormat('ko-KR');
 const $ = (s) => document.querySelector(s);
 const SERIES = ['--series-1','--series-2','--series-3','--series-4','--series-5','--series-6','--series-7','--series-8'];
 
-let RAW = [];              // {date:Date, qty:Number, amounts:{열이름:Number}, product:String}
+let RAW = [];              // {date:Date, qty:Number, amounts:{열이름:Number}, product:String, customer:String}
 let currentPeriod = 'month';
-let currentProduct = '__all__';
-let amountCols = [];       // 감지된 매출 후보 열 이름들 (우선순위 순)
-let amountKey = null;      // 현재 선택된 매출 기준 열 이름
+let currentDim = 'product';   // 분석 기준: product | group | customer
+let currentFilter = '__all__';// 현재 선택된 분석 기준 항목
+let amountKey = null;      // 매출 기준 열 (공급가액 우선 자동 선택, 부가세 제외)
 const amtOf = (r) => (amountKey && r.amounts && amountKey in r.amounts) ? r.amounts[amountKey] : 0;
+
+const DIMS = {
+  product:  { label:'상품',     all:'전체 상품' },
+  group:    { label:'상품그룹', all:'전체 그룹' },
+  customer: { label:'거래처',   all:'전체 거래처' },
+};
+// 품목명 → 그룹명: 괄호 안 등급/규격과 끝의 규격 코드를 떼어 묶음
+//   예) "황동3종잉곳(C급)"→"황동3종잉곳", "열량계 하부외갑 20E"→"열량계 하부외갑"
+function groupOf(name) {
+  let s = String(name).replace(/[\(\[（【][^\)\]）】]*[\)\]）】]/g, '');
+  s = s.replace(/\s+/g, ' ').trim();
+  const parts = s.split(' ');
+  if (parts.length > 1) {
+    const last = parts[parts.length - 1];
+    if (/^[0-9]+[A-Za-z가-힣]?$/.test(last) || /^[A-Za-z]?급$/.test(last) || /^[A-Za-z0-9]{1,3}$/.test(last)) parts.pop();
+  }
+  return parts.join(' ').trim() || String(name);
+}
+function dimValue(r, dim) {
+  if (dim === 'customer') return r.customer || '(미지정)';
+  if (dim === 'group')    return groupOf(r.product);
+  return r.product;
+}
+const hasCustomerData = () => RAW.some(r => r.customer && r.customer !== '(미지정)');
 
 /* ---------- 컬럼 매핑 사전 (우선순위 순서 중요) ---------- */
 const DICT = {
@@ -184,6 +212,7 @@ const DICT = {
   qty:  ['수량','판매수량','판매량','출고수량','개수','quantity','qty'],
   amt:  ['공급가액','매출액','판매금액','매출','합계금액','합계','금액','amount','sales','revenue'],
   prod: ['품목명','제품명','상품명','품명','품목','제품','상품','item','product'],
+  cust: ['거래처명','거래처','매출처','고객명','고객','client','customer','account'],
 };
 // 부가세/단가처럼 매출로 오해하기 쉬운 열은 매출 후보에서 제외
 const AMT_EXCLUDE = ['부가세','vat','세액','단가','unit','원가','잔액','미수'];
@@ -248,6 +277,7 @@ function ingestRows(rows) {
   const qi = resolveCol(header, DICT.qty, false);
   const amtCols = resolveAmountCols(header);
   const pi = resolveCol(header, DICT.prod, true);
+  const ci = resolveCol(header, DICT.cust, false);
   if (di < 0) throw new Error('날짜 컬럼을 찾지 못했습니다.');
   if (qi < 0 && !amtCols.length) throw new Error('수량 또는 금액 컬럼이 필요합니다.');
 
@@ -260,22 +290,16 @@ function ingestRows(rows) {
     let anyAmt = false;
     for (const c of amtCols) { const v = toNum(r[c.idx]); amounts[c.name] = v; if (v) anyAmt = true; }
     if (qty === 0 && !anyAmt) continue;           // 합계행·export시각 footer·공백행 skip
-    const product = pi >= 0 ? (String(r[pi]).trim() || '(미지정)') : '(미지정)';
-    out.push({ date: dt, qty, amounts, product });
+    const product  = pi >= 0 ? (String(r[pi]).trim() || '(미지정)') : '(미지정)';
+    const customer = ci >= 0 ? (String(r[ci]).trim() || '(미지정)') : '(미지정)';
+    out.push({ date: dt, qty, amounts, product, customer });
   }
   if (!out.length) throw new Error('읽을 수 있는 판매 데이터 행이 없습니다.');
-  amountCols = amtCols.map(c => c.name);
-  amountKey = amountCols[0] || null;
+  // 매출은 공급가액(부가세 제외) 우선 자동 선택
+  amountKey = amtCols.length ? amtCols[0].name : null;
   const label = (i) => i >= 0 ? header[i] : '없음';
-  const amtLabel = amountCols.length ? amountCols.map((n,k)=>k===0?`<b>${n}</b>`:n).join(' / ') : '없음';
-  const mapping = `인식됨 — 날짜: <b>${label(di)}</b> · 수량: <b>${label(qi)}</b> · 매출: ${amtLabel} · 품목: <b>${label(pi)}</b>`;
+  const mapping = `인식됨 — 날짜: <b>${label(di)}</b> · 수량: <b>${label(qi)}</b> · 매출: <b>${amountKey || '없음'}</b> · 품목: <b>${label(pi)}</b> · 거래처: <b>${label(ci)}</b>`;
   return { data: out, mapping };
-}
-function rebuildAmountOptions() {
-  const sel = $('#amountSelect');
-  if (!amountCols.length) { sel.innerHTML = '<option>매출 없음</option>'; sel.disabled = true; return; }
-  sel.disabled = false;
-  sel.innerHTML = amountCols.map(n => `<option value="${n.replace(/"/g,'&quot;')}"${n===amountKey?' selected':''}>${n}</option>`).join('');
 }
 
 /* ---------- 파일 읽기 ---------- */
@@ -296,8 +320,7 @@ function readFile(file) {
       }
       const { data, mapping } = ingestRows(rows);
       RAW = data;
-      rebuildAmountOptions();
-      rebuildProductOptions();
+      setupDims();
       render(mapping, file.name);
     } catch (err) { alert('불러오기 오류: ' + err.message); }
   };
@@ -336,7 +359,7 @@ function periodKey(date, period) {
 
 /* ---------- 집계 ---------- */
 function filteredRaw() {
-  return currentProduct === '__all__' ? RAW : RAW.filter(r => r.product === currentProduct);
+  return currentFilter === '__all__' ? RAW : RAW.filter(r => dimValue(r, currentDim) === currentFilter);
 }
 function aggregate(period) {
   const map = new Map();
@@ -347,26 +370,35 @@ function aggregate(period) {
   }
   return [...map.values()].sort((a,b) => a.sort - b.sort);
 }
-function aggregateProducts() {
+// 분석 기준(상품/상품그룹/거래처)별 전체 기간 집계
+function aggregateDim(dim) {
   const map = new Map();
   let total = 0;
   for (const r of RAW) {
-    if (!map.has(r.product)) map.set(r.product, { product:r.product, qty:0, amount:0 });
-    const g = map.get(r.product); g.qty += r.qty; g.amount += amtOf(r); total += r.qty;
+    const k = dimValue(r, dim);
+    if (!map.has(k)) map.set(k, { name:k, qty:0, amount:0 });
+    const g = map.get(k); g.qty += r.qty; g.amount += amtOf(r); total += r.qty;
   }
   const arr = [...map.values()].sort((a,b) => b.qty - a.qty);
   arr.forEach(p => p.share = total ? p.qty/total*100 : 0);
   return arr;
 }
 
-/* ---------- 상품 드롭다운 ---------- */
-function rebuildProductOptions() {
-  const prods = aggregateProducts().map(p => p.product);
-  const sel = $('#prodSelect');
-  sel.innerHTML = '<option value="__all__">전체 상품</option>' +
-    prods.map(p => `<option value="${p.replace(/"/g,'&quot;')}">${p}</option>`).join('');
-  currentProduct = '__all__';
-  $('#prodCard').style.display = (prods.length <= 1 && prods[0] === '(미지정)') ? 'none' : '';
+/* ---------- 분석 기준 · 필터 드롭다운 ---------- */
+function setupDims() {
+  currentDim = 'product';                    // 새 데이터는 상품 기준으로 시작
+  // 거래처 데이터가 없으면 거래처 옵션 비활성화
+  document.querySelector('#dimSelect option[value="customer"]').disabled = !hasCustomerData();
+  $('#dimSelect').value = currentDim;
+  rebuildFilter();
+}
+function rebuildFilter() {
+  const meta = DIMS[currentDim];
+  const members = aggregateDim(currentDim).map(x => x.name);
+  $('#filterLabel').textContent = `${meta.label} 필터`;
+  $('#dimFilter').innerHTML = `<option value="__all__">${meta.all}</option>` +
+    members.map(m => `<option value="${String(m).replace(/"/g,'&quot;')}">${m}</option>`).join('');
+  currentFilter = '__all__';
 }
 
 /* ---------- KPI ---------- */
@@ -424,12 +456,12 @@ function renderTrend(rows) {
   });
 }
 
-/* ---------- 상품별 순위 (가로 막대) ---------- */
-function renderProducts(products) {
+/* ---------- 분석 기준별 순위 (가로 막대) ---------- */
+function renderRank(items) {
   const svg = $('#prodChart'), tip = $('#tooltip');
-  const top = products.slice(0, 12);
+  const top = items.slice(0, 12);
   const W = svg.clientWidth || 520, rowH = 26, H = Math.max(120, top.length*rowH + 40);
-  const m = {top:8,right:16,bottom:8,left:120}, iw = W-m.left-m.right;
+  const m = {top:8,right:16,bottom:8,left:130}, iw = W-m.left-m.right;
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height',H);
   if (!top.length) { svg.innerHTML=''; return; }
   const max = Math.max(1,...top.map(p=>p.qty));
@@ -437,7 +469,7 @@ function renderProducts(products) {
   top.forEach((p,i)=>{
     const y = m.top + i*rowH, bw = (p.qty/max)*iw;
     const color = `var(${SERIES[i % SERIES.length]})`;
-    const name = p.product.length>9 ? p.product.slice(0,9)+'…' : p.product;
+    const name = p.name.length>10 ? p.name.slice(0,10)+'…' : p.name;
     s+=`<text class="axis-label" x="${m.left-8}" y="${y+rowH/2+4}" text-anchor="end" fill="var(--text-2)">${name}</text>`;
     s+=`<rect class="pbar" x="${m.left}" y="${y+4}" width="${Math.max(2,bw).toFixed(1)}" height="${rowH-10}" rx="4" fill="${color}" data-i="${i}"/>`;
     s+=`<text class="axis-label" x="${m.left+bw+6}" y="${y+rowH/2+4}" fill="var(--text-2)">${KRW.format(p.qty)}</text>`;
@@ -445,7 +477,7 @@ function renderProducts(products) {
   svg.innerHTML = s;
   svg.querySelectorAll('rect.pbar').forEach(rect=>{
     rect.addEventListener('mousemove',e=>{ const p=top[+rect.dataset.i];
-      tip.innerHTML=`<div>${p.product}</div><div>판매량 <b>${KRW.format(p.qty)}</b> 개</div><div>매출 <b>${KRW.format(Math.round(p.amount))}</b> 원</div><div>비중 <b>${p.share.toFixed(1)}</b>%</div>`;
+      tip.innerHTML=`<div>${p.name}</div><div>판매량 <b>${KRW.format(p.qty)}</b> 개</div><div>매출 <b>${KRW.format(Math.round(p.amount))}</b> 원</div><div>비중 <b>${p.share.toFixed(1)}</b>%</div>`;
       tip.style.opacity=1; tip.style.left=Math.min(e.clientX+14, innerWidth-tip.offsetWidth-12)+'px'; tip.style.top=(e.clientY-10)+'px'; });
     rect.addEventListener('mouseleave',()=>{ tip.style.opacity=0; });
   });
@@ -464,15 +496,15 @@ function renderTable(rows, period) {
   }).reverse().join('');
 }
 
-/* ---------- 상품 상세 테이블 ---------- */
-function renderProductTable(products) {
-  const maxQty = Math.max(1,...products.map(p=>p.qty));
+/* ---------- 분석 기준별 상세 테이블 ---------- */
+function renderDimTable(items, dimLabel) {
+  const maxQty = Math.max(1,...items.map(p=>p.qty));
   $('#prodTable').querySelector('thead').innerHTML =
-    `<tr><th>상품</th><th>판매량</th><th>매출</th><th>평균 단가</th><th>비중</th></tr>`;
-  $('#prodTable').querySelector('tbody').innerHTML = products.map(p=>{
+    `<tr><th>${dimLabel}</th><th>판매량</th><th>매출</th><th>평균 단가</th><th>비중</th></tr>`;
+  $('#prodTable').querySelector('tbody').innerHTML = items.map(p=>{
     const w = (p.qty/maxQty*100).toFixed(1);
     const unit = p.qty ? KRW.format(Math.round(p.amount/p.qty)) : '-';
-    return `<tr><td>${p.product}</td>
+    return `<tr><td>${p.name}</td>
       <td class="bar-cell"><div class="fill" style="width:${w}%"></div><span>${KRW.format(p.qty)}</span></td>
       <td>${KRW.format(Math.round(p.amount))}</td><td>${unit}</td><td>${p.share.toFixed(1)}%</td></tr>`;
   }).join('');
@@ -481,36 +513,44 @@ function renderProductTable(products) {
 /* ---------- 오케스트레이션 ---------- */
 function render(mapping, fname) {
   const rows = aggregate(currentPeriod);
-  const products = aggregateProducts();
+  const dimItems = aggregateDim(currentDim);
+  const meta = DIMS[currentDim];
   const name = {week:'주별',month:'월별',quarter:'분기별',year:'연별'}[currentPeriod];
-  const pf = currentProduct === '__all__' ? '' : ` · ${currentProduct}`;
+  const pf = currentFilter === '__all__' ? '' : ` · ${currentFilter}`;
   $('#chartTitle').textContent = `${name} 판매량 추이${pf}`;
   $('#tableTitle').textContent = `${name} 상세${pf}`;
+  $('#rankTitle').textContent  = `${meta.label}별 판매 순위`;
+  $('#rankHint').textContent   = `전체 기간 기준 ${meta.label} 판매량 상위 12개입니다. 막대에 올리면 매출·비중이 보입니다.`;
+  $('#dimTableTitle').textContent = `${meta.label}별 상세`;
   renderKPIs(rows, currentPeriod);
   renderTrend(rows);
-  renderProducts(products);
+  renderRank(dimItems);
   renderTable(rows, currentPeriod);
-  renderProductTable(products);
-  if (amountKey) $('#amtLegend').textContent = amountKey;
+  renderDimTable(dimItems, meta.label);
+  if (amountKey) $('#amtLegend').textContent = `매출(${amountKey})`;
   if (RAW.length) {
     const ds = RAW.map(r=>r.date).sort((a,b)=>a-b);
     const f = d => `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
     const src = fname ? `${fname} · ` : '';
-    $('#meta').innerHTML = `${src}기간 ${f(ds[0])} ~ ${f(ds[ds.length-1])} · ${KRW.format(RAW.length)}건 · 상품 ${products.length}종` +
+    const nProd = aggregateDim('product').length;
+    const custInfo = hasCustomerData() ? ` · 거래처 ${aggregateDim('customer').length}곳` : '';
+    $('#meta').innerHTML = `${src}기간 ${f(ds[0])} ~ ${f(ds[ds.length-1])} · ${KRW.format(RAW.length)}건 · 상품 ${nProd}종${custInfo}` +
                            (mapping ? `<br>${mapping}` : (window.__lastMapping || ''));
     if (mapping) window.__lastMapping = mapping;
   }
 }
 
-/* ---------- 샘플 데이터 (상품 포함, 약 18개월) ---------- */
+/* ---------- 샘플 데이터 (상품·거래처 포함, 약 18개월) ---------- */
 function makeSampleData() {
   const products = [
-    { name:'노트북 스탠드', price:32000, w:1.0 },
-    { name:'무선 마우스',   price:19000, w:1.4 },
-    { name:'USB-C 허브',    price:45000, w:0.8 },
-    { name:'기계식 키보드', price:89000, w:0.6 },
-    { name:'모니터 암',     price:68000, w:0.5 },
+    { name:'노트북 스탠드(실버)', price:32000, w:1.0 },
+    { name:'노트북 스탠드(블랙)', price:32000, w:0.7 },
+    { name:'무선 마우스',         price:19000, w:1.4 },
+    { name:'USB-C 허브 4포트',    price:45000, w:0.8 },
+    { name:'기계식 키보드',       price:89000, w:0.6 },
+    { name:'모니터 암',           price:68000, w:0.5 },
   ];
+  const customers = ['가나상사','대한유통','서울상회','한빛코퍼','동양물산','미래테크'];
   const out = [], start = new Date(2024,6,1), end = new Date(2025,11,31);
   let seed = 20240701; const rnd = () => { seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; };
   for (let d=new Date(start); d<=end; d.setDate(d.getDate()+1)) {
@@ -519,14 +559,14 @@ function makeSampleData() {
     const trend=1+(d-start)/(end-start)*0.6;
     const weekend=(dow===0||dow===6)?1.25:1.0;
     for (const p of products) {
-      if (rnd() < 0.35) continue;                       // 상품마다 매일 팔리진 않음
+      if (rnd() < 0.4) continue;                        // 상품마다 매일 팔리진 않음
       const qty = Math.max(0, Math.round(9*p.w*season*trend*weekend*(0.6+rnd()*0.8)));
       if (!qty) continue;
       const supply = qty*Math.round(p.price*(0.92+rnd()*0.16));
-      out.push({ date:new Date(d), qty, amounts:{ '공급가액':supply, '합계':Math.round(supply*1.1) }, product:p.name });
+      const customer = customers[Math.floor(rnd()*customers.length)];
+      out.push({ date:new Date(d), qty, amounts:{ '공급가액':supply }, product:p.name, customer });
     }
   }
-  amountCols = ['공급가액','합계'];
   amountKey = '공급가액';
   return out;
 }
@@ -534,17 +574,16 @@ function makeSampleData() {
 /* ---------- 이벤트 ---------- */
 $('#tabs').addEventListener('click', e=>{ const t=e.target.closest('.tab'); if(!t) return;
   currentPeriod=t.dataset.period; [...$('#tabs').children].forEach(x=>x.setAttribute('aria-selected',x===t)); render(); });
-$('#prodSelect').addEventListener('change', e=>{ currentProduct=e.target.value; render(); });
-$('#amountSelect').addEventListener('change', e=>{ amountKey=e.target.value; render(); });
+$('#dimSelect').addEventListener('change', e=>{ currentDim=e.target.value; rebuildFilter(); render(); });
+$('#dimFilter').addEventListener('change', e=>{ currentFilter=e.target.value; render(); });
 $('#uploadBtn').addEventListener('click', ()=>$('#fileInput').click());
 $('#fileInput').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) readFile(f); e.target.value=''; });
-$('#sampleBtn').addEventListener('click', ()=>{ RAW=makeSampleData(); window.__lastMapping='<b>샘플 데이터</b> (상품 5종)'; rebuildAmountOptions(); rebuildProductOptions(); render('샘플 데이터 (상품 5종 · 약 18개월)'); });
+$('#sampleBtn').addEventListener('click', ()=>{ RAW=makeSampleData(); window.__lastMapping='<b>샘플 데이터</b> (상품 6종 · 거래처 6곳)'; setupDims(); render('샘플 데이터 (상품 6종 · 거래처 6곳 · 약 18개월)'); });
 window.addEventListener('resize', ()=>render());
 
 /* ---------- 시작 ---------- */
 RAW = makeSampleData();
 window.__lastMapping = '<b>샘플 데이터</b> — 상단의 “엑셀/CSV 업로드”로 이카운트 파일을 올려보세요.';
-rebuildAmountOptions();
-rebuildProductOptions();
-render('샘플 데이터 (상품 5종 · 약 18개월)');
+setupDims();
+render('샘플 데이터 (상품 6종 · 거래처 6곳 · 약 18개월)');
 </script>
