@@ -105,9 +105,14 @@
       <button class="tab" role="tab" data-period="quarter" aria-selected="false">분기별</button>
       <button class="tab" role="tab" data-period="year"    aria-selected="false">연별</button>
     </div>
-    <label class="prodfilter">상품 필터
-      <select id="prodSelect"><option value="__all__">전체 상품</option></select>
-    </label>
+    <div class="prodfilter">
+      <label style="display:flex;align-items:center;gap:8px">매출 기준
+        <select id="amountSelect"></select>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px">상품 필터
+        <select id="prodSelect"><option value="__all__">전체 상품</option></select>
+      </label>
+    </div>
   </div>
 
   <div class="kpis" id="kpis"></div>
@@ -118,7 +123,7 @@
     <div class="chart"><svg id="chart" width="100%" height="360" role="img" aria-label="기간별 판매 추이"></svg></div>
     <div class="legend">
       <span><i class="swatch" style="background:var(--series-1)"></i>판매량 (개)</span>
-      <span><i class="swatch" style="background:var(--series-2)"></i>매출 (원)</span>
+      <span><i class="swatch" style="background:var(--series-2)"></i><span id="amtLegend">매출</span> (원)</span>
     </div>
   </div>
 
@@ -166,17 +171,22 @@ const KRW = new Intl.NumberFormat('ko-KR');
 const $ = (s) => document.querySelector(s);
 const SERIES = ['--series-1','--series-2','--series-3','--series-4','--series-5','--series-6','--series-7','--series-8'];
 
-let RAW = [];              // {date:Date, qty:Number, amount:Number, product:String}
+let RAW = [];              // {date:Date, qty:Number, amounts:{열이름:Number}, product:String}
 let currentPeriod = 'month';
 let currentProduct = '__all__';
+let amountCols = [];       // 감지된 매출 후보 열 이름들 (우선순위 순)
+let amountKey = null;      // 현재 선택된 매출 기준 열 이름
+const amtOf = (r) => (amountKey && r.amounts && amountKey in r.amounts) ? r.amounts[amountKey] : 0;
 
 /* ---------- 컬럼 매핑 사전 (우선순위 순서 중요) ---------- */
 const DICT = {
   date: ['일자','날짜','판매일','거래일','전표일자','거래일자','date'],
   qty:  ['수량','판매수량','판매량','출고수량','개수','quantity','qty'],
-  amt:  ['합계금액','판매금액','매출액','매출','공급가액','금액','amount','sales','revenue'],
+  amt:  ['공급가액','매출액','판매금액','매출','합계금액','합계','금액','amount','sales','revenue'],
   prod: ['품목명','제품명','상품명','품명','품목','제품','상품','item','product'],
 };
+// 부가세/단가처럼 매출로 오해하기 쉬운 열은 매출 후보에서 제외
+const AMT_EXCLUDE = ['부가세','vat','세액','단가','unit','원가','잔액','미수'];
 const EXCLUDE = ['코드','code','번호','no.','구분','id'];
 const norm = (s) => String(s == null ? '' : s).toLowerCase().replace(/\s/g,'');
 
@@ -201,6 +211,20 @@ function resolveCol(header, cands, excludeCode) {
   }
   return -1;
 }
+// 매출 후보에 해당하는 모든 열을 우선순위 순서로 수집 (부가세/단가 등은 제외)
+function resolveAmountCols(header) {
+  const H = header.map(norm);
+  const seen = new Set(), cols = [];
+  for (const cand of DICT.amt) {
+    const c = norm(cand);
+    for (let j = 0; j < H.length; j++) {
+      if (seen.has(j) || !H[j].includes(c)) continue;
+      if (AMT_EXCLUDE.some(e => H[j].includes(norm(e)))) continue;
+      seen.add(j); cols.push({ name: String(header[j]).trim(), idx: j });
+    }
+  }
+  return cols;
+}
 function excelSerialToDate(n) {                 // Excel(1900) 직렬값 → Date
   return new Date(Math.round((n - 25569) * 86400 * 1000));
 }
@@ -222,25 +246,36 @@ function ingestRows(rows) {
   const header = rows[hi];
   const di = resolveCol(header, DICT.date, false);
   const qi = resolveCol(header, DICT.qty, false);
-  const ai = resolveCol(header, DICT.amt, false);
+  const amtCols = resolveAmountCols(header);
   const pi = resolveCol(header, DICT.prod, true);
   if (di < 0) throw new Error('날짜 컬럼을 찾지 못했습니다.');
-  if (qi < 0 && ai < 0) throw new Error('수량 또는 금액 컬럼이 필요합니다.');
+  if (qi < 0 && !amtCols.length) throw new Error('수량 또는 금액 컬럼이 필요합니다.');
 
   const out = [];
   for (let i = hi + 1; i < rows.length; i++) {
     const r = rows[i]; if (!r) continue;
     const dt = parseDate(r[di]); if (!dt) continue;
     const qty = qi >= 0 ? toNum(r[qi]) : 0;
-    const amt = ai >= 0 ? toNum(r[ai]) : 0;
-    if (qty === 0 && amt === 0) continue;         // 합계/공백행 skip
+    const amounts = {};
+    let anyAmt = false;
+    for (const c of amtCols) { const v = toNum(r[c.idx]); amounts[c.name] = v; if (v) anyAmt = true; }
+    if (qty === 0 && !anyAmt) continue;           // 합계행·export시각 footer·공백행 skip
     const product = pi >= 0 ? (String(r[pi]).trim() || '(미지정)') : '(미지정)';
-    out.push({ date: dt, qty, amount: amt, product });
+    out.push({ date: dt, qty, amounts, product });
   }
   if (!out.length) throw new Error('읽을 수 있는 판매 데이터 행이 없습니다.');
+  amountCols = amtCols.map(c => c.name);
+  amountKey = amountCols[0] || null;
   const label = (i) => i >= 0 ? header[i] : '없음';
-  const mapping = `인식됨 — 날짜: <b>${label(di)}</b> · 수량: <b>${label(qi)}</b> · 금액: <b>${label(ai)}</b> · 품목: <b>${label(pi)}</b>`;
+  const amtLabel = amountCols.length ? amountCols.map((n,k)=>k===0?`<b>${n}</b>`:n).join(' / ') : '없음';
+  const mapping = `인식됨 — 날짜: <b>${label(di)}</b> · 수량: <b>${label(qi)}</b> · 매출: ${amtLabel} · 품목: <b>${label(pi)}</b>`;
   return { data: out, mapping };
+}
+function rebuildAmountOptions() {
+  const sel = $('#amountSelect');
+  if (!amountCols.length) { sel.innerHTML = '<option>매출 없음</option>'; sel.disabled = true; return; }
+  sel.disabled = false;
+  sel.innerHTML = amountCols.map(n => `<option value="${n.replace(/"/g,'&quot;')}"${n===amountKey?' selected':''}>${n}</option>`).join('');
 }
 
 /* ---------- 파일 읽기 ---------- */
@@ -261,6 +296,7 @@ function readFile(file) {
       }
       const { data, mapping } = ingestRows(rows);
       RAW = data;
+      rebuildAmountOptions();
       rebuildProductOptions();
       render(mapping, file.name);
     } catch (err) { alert('불러오기 오류: ' + err.message); }
@@ -307,7 +343,7 @@ function aggregate(period) {
   for (const r of filteredRaw()) {
     const { key, label, sort } = periodKey(r.date, period);
     if (!map.has(key)) map.set(key, { key, label, sort, qty:0, amount:0 });
-    const g = map.get(key); g.qty += r.qty; g.amount += r.amount;
+    const g = map.get(key); g.qty += r.qty; g.amount += amtOf(r);
   }
   return [...map.values()].sort((a,b) => a.sort - b.sort);
 }
@@ -316,7 +352,7 @@ function aggregateProducts() {
   let total = 0;
   for (const r of RAW) {
     if (!map.has(r.product)) map.set(r.product, { product:r.product, qty:0, amount:0 });
-    const g = map.get(r.product); g.qty += r.qty; g.amount += r.amount; total += r.qty;
+    const g = map.get(r.product); g.qty += r.qty; g.amount += amtOf(r); total += r.qty;
   }
   const arr = [...map.values()].sort((a,b) => b.qty - a.qty);
   arr.forEach(p => p.share = total ? p.qty/total*100 : 0);
@@ -455,6 +491,7 @@ function render(mapping, fname) {
   renderProducts(products);
   renderTable(rows, currentPeriod);
   renderProductTable(products);
+  if (amountKey) $('#amtLegend').textContent = amountKey;
   if (RAW.length) {
     const ds = RAW.map(r=>r.date).sort((a,b)=>a-b);
     const f = d => `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
@@ -485,9 +522,12 @@ function makeSampleData() {
       if (rnd() < 0.35) continue;                       // 상품마다 매일 팔리진 않음
       const qty = Math.max(0, Math.round(9*p.w*season*trend*weekend*(0.6+rnd()*0.8)));
       if (!qty) continue;
-      out.push({ date:new Date(d), qty, amount:qty*Math.round(p.price*(0.92+rnd()*0.16)), product:p.name });
+      const supply = qty*Math.round(p.price*(0.92+rnd()*0.16));
+      out.push({ date:new Date(d), qty, amounts:{ '공급가액':supply, '합계':Math.round(supply*1.1) }, product:p.name });
     }
   }
+  amountCols = ['공급가액','합계'];
+  amountKey = '공급가액';
   return out;
 }
 
@@ -495,14 +535,16 @@ function makeSampleData() {
 $('#tabs').addEventListener('click', e=>{ const t=e.target.closest('.tab'); if(!t) return;
   currentPeriod=t.dataset.period; [...$('#tabs').children].forEach(x=>x.setAttribute('aria-selected',x===t)); render(); });
 $('#prodSelect').addEventListener('change', e=>{ currentProduct=e.target.value; render(); });
+$('#amountSelect').addEventListener('change', e=>{ amountKey=e.target.value; render(); });
 $('#uploadBtn').addEventListener('click', ()=>$('#fileInput').click());
 $('#fileInput').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) readFile(f); e.target.value=''; });
-$('#sampleBtn').addEventListener('click', ()=>{ RAW=makeSampleData(); window.__lastMapping='<b>샘플 데이터</b> (상품 5종)'; rebuildProductOptions(); render('샘플 데이터 (상품 5종 · 약 18개월)'); });
+$('#sampleBtn').addEventListener('click', ()=>{ RAW=makeSampleData(); window.__lastMapping='<b>샘플 데이터</b> (상품 5종)'; rebuildAmountOptions(); rebuildProductOptions(); render('샘플 데이터 (상품 5종 · 약 18개월)'); });
 window.addEventListener('resize', ()=>render());
 
 /* ---------- 시작 ---------- */
 RAW = makeSampleData();
 window.__lastMapping = '<b>샘플 데이터</b> — 상단의 “엑셀/CSV 업로드”로 이카운트 파일을 올려보세요.';
+rebuildAmountOptions();
 rebuildProductOptions();
 render('샘플 데이터 (상품 5종 · 약 18개월)');
 </script>
