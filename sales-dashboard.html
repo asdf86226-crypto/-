@@ -372,11 +372,24 @@ function filteredRaw() {
   return currentFilter === '__all__' ? RAW : RAW.filter(r => dimValue(r, currentDim) === currentFilter);
 }
 function aggregate(period) {
+  if (!RAW.length) return [];
+  // 전체 데이터 기간(첫 판매일~마지막 판매일)의 모든 구간을 미리 만든다.
+  // 하루씩 훑어 구간 키를 채우므로 판매가 없는 주/월/분기/연도 빠짐없이 0으로 나온다.
+  const times = RAW.map(r => r.date.getTime());
+  const min = new Date(Math.min(...times)), max = new Date(Math.max(...times));
   const map = new Map();
-  for (const r of filteredRaw()) {
-    const { key, label, sort } = periodKey(r.date, period);
+  const cur = new Date(min.getFullYear(), min.getMonth(), min.getDate());
+  const end = new Date(max.getFullYear(), max.getMonth(), max.getDate());
+  while (cur <= end) {
+    const { key, label, sort } = periodKey(cur, period);
     if (!map.has(key)) map.set(key, { key, label, sort, qty:0, amount:0 });
-    const g = map.get(key); g.qty += r.qty; g.amount += amtOf(r);
+    cur.setDate(cur.getDate() + 1);
+  }
+  // 필터된 데이터를 해당 구간에 합산 (없는 구간은 0 유지)
+  for (const r of filteredRaw()) {
+    const { key } = periodKey(r.date, period);
+    const g = map.get(key);
+    if (g) { g.qty += r.qty; g.amount += amtOf(r); }
   }
   return [...map.values()].sort((a,b) => a.sort - b.sort);
 }
@@ -451,9 +464,11 @@ function renderTrend(rows) {
   const bw = Math.min(34, iw/rows.length*0.62);
   const yQ = v => m.top + ih - (v/maxQty)*ih, yA = v => m.top + ih - (v/maxAmt)*ih;
   let s = '';
+  let lastQLbl = null;
   for (let t=0;t<=4;t++){ const gv=maxQty*t/4, gy=yQ(gv);
     s+=`<line x1="${m.left}" y1="${gy}" x2="${m.left+iw}" y2="${gy}" stroke="var(--grid)" stroke-width="1"/>`;
-    s+=`<text class="axis-label" x="${m.left-8}" y="${gy+4}" text-anchor="end">${KRW.format(Math.round(gv))}</text>`; }
+    const lbl = KRW.format(Math.round(gv));
+    if (lbl !== lastQLbl) { s+=`<text class="axis-label" x="${m.left-8}" y="${gy+4}" text-anchor="end">${lbl}</text>`; lastQLbl = lbl; } }
   const step = Math.ceil(rows.length/26);
   rows.forEach((r,i)=>{ const cx=x(i)+(iw/rows.length-bw)/2, h=ih-(yQ(r.qty)-m.top);
     s+=`<rect class="bar" x="${cx.toFixed(1)}" y="${yQ(r.qty).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,h).toFixed(1)}" rx="4" fill="var(--series-1)" data-i="${i}"/>`;
@@ -461,9 +476,10 @@ function renderTrend(rows) {
   const pts = rows.map((r,i)=>`${(x(i)+iw/rows.length/2).toFixed(1)},${yA(r.amount).toFixed(1)}`).join(' ');
   s+=`<polyline points="${pts}" fill="none" stroke="var(--series-2)" stroke-width="2" stroke-linejoin="round"/>`;
   rows.forEach((r,i)=>{ s+=`<circle cx="${(x(i)+iw/rows.length/2).toFixed(1)}" cy="${yA(r.amount).toFixed(1)}" r="3" fill="var(--surface)" stroke="var(--series-2)" stroke-width="2"/>`; });
+  let lastALbl = null;
   for (let t=0;t<=4;t++){ const gv=maxAmt*t/4, gy=yA(gv);
-    const short = gv>=1e8?(gv/1e8).toFixed(1)+'억':gv>=1e4?Math.round(gv/1e4)+'만':Math.round(gv);
-    s+=`<text class="axis-label" x="${m.left+iw+8}" y="${gy+4}" text-anchor="start">${short}</text>`; }
+    const short = gv>=1e8?(gv/1e8).toFixed(1)+'억':gv>=1e4?Math.round(gv/1e4)+'만':String(Math.round(gv));
+    if (short !== lastALbl) { s+=`<text class="axis-label" x="${m.left+iw+8}" y="${gy+4}" text-anchor="start">${short}</text>`; lastALbl = short; } }
   svg.innerHTML = s;
   svg.querySelectorAll('rect.bar').forEach(rect=>{
     rect.addEventListener('mousemove',e=>{ const r=rows[+rect.dataset.i];
