@@ -430,6 +430,8 @@ function aggregateDim(dim) {
     p.share = total ? p.qty/total*100 : 0;
     const cs = [...p.codes];
     p.code = cs.slice(0,2).join(', ') + (cs.length > 2 ? ` 외 ${cs.length-2}` : '');
+    p.codeFull = cs.join(', ');
+    if (dim === 'product') p.category = categoryOf(p.name, cs.join(' '));
   });
   return arr;
 }
@@ -557,12 +559,13 @@ function renderDimTable(items, dimLabel) {
   const showCode = currentDim === 'product';
   const maxQty = Math.max(1,...items.map(p=>p.qty));
   $('#prodTable').querySelector('thead').innerHTML =
-    `<tr>${showCode ? '<th style="text-align:left">품목코드</th>' : ''}<th style="text-align:left">${dimLabel}</th><th>판매량</th><th>매출</th><th>평균 단가</th><th>비중</th></tr>`;
+    `<tr>${showCode ? '<th style="text-align:left">품목코드</th>' : ''}<th style="text-align:left">${dimLabel}</th>${showCode ? '<th style="text-align:left">상품분류</th>' : ''}<th>판매량</th><th>매출</th><th>평균 단가</th><th>비중</th></tr>`;
   $('#prodTable').querySelector('tbody').innerHTML = items.map(p=>{
     const w = (p.qty/maxQty*100).toFixed(1);
     const unit = p.qty ? KRW.format(Math.round(p.amount/p.qty)) : '-';
     const codeCell = showCode ? `<td style="text-align:left;font-variant-numeric:normal;color:var(--text-2)">${p.code || '-'}</td>` : '';
-    return `<tr>${codeCell}<td style="text-align:left;font-variant-numeric:normal">${p.name}</td>
+    const catCell = showCode ? `<td style="text-align:left;font-variant-numeric:normal;color:var(--text-2)">${p.category || '-'}</td>` : '';
+    return `<tr>${codeCell}<td style="text-align:left;font-variant-numeric:normal">${p.name}</td>${catCell}
       <td class="bar-cell" style="--w:${w}%">${KRW.format(p.qty)}</td>
       <td>${KRW.format(Math.round(p.amount))}</td><td>${unit}</td><td>${p.share.toFixed(1)}%</td></tr>`;
   }).join('');
@@ -598,79 +601,71 @@ function render(mapping, fname) {
   }
 }
 
-/* ---------- 표 복사 (샌드박스에서 다운로드 대신) ---------- */
-function currentTableTSV() {
+/* ---------- 현재 뷰 표 데이터 (복사·내보내기 공용) ---------- */
+function currentViewTable() {
   const meta = DIMS[currentDim];
   const showCode = currentDim === 'product';
   const money = amountKey ? `매출(${amountKey})` : '매출';
-  const head = (showCode ? ['품목코드'] : []).concat([meta.label, '판매량', money, '평균단가', '비중(%)']);
-  const lines = [head.join('\t')];
-  for (const p of aggregateDim(currentDim)) {
+  const headers = (showCode ? ['품목코드'] : []).concat([meta.label], showCode ? ['상품분류'] : [], ['판매량', money, '평균단가', '비중(%)']);
+  const rows = aggregateDim(currentDim).map(p => {
     const unit = p.qty ? Math.round(p.amount / p.qty) : 0;
-    const row = (showCode ? [p.code] : []).concat([p.name, p.qty, Math.round(p.amount), unit, p.share.toFixed(1)]);
-    lines.push(row.join('\t'));
-  }
-  return lines.join('\n');
+    return (showCode ? [p.codeFull || p.code] : []).concat([p.name], showCode ? [p.category] : [], [p.qty, Math.round(p.amount), unit, Number(p.share.toFixed(1))]);
+  });
+  return { headers, rows, label: meta.label };
 }
+const todayStr = () => new Date().toISOString().slice(0,10);
+
+/* ---------- 표 복사 (클립보드 → 실패 시 수동 복사 창) ---------- */
 async function copyTable() {
   if (!RAW.length) { alert('복사할 데이터가 없습니다. 먼저 파일을 올려주세요.'); return; }
-  const tsv = currentTableTSV();
+  const { headers, rows, label } = currentViewTable();
+  const tsv = [headers.join('\t')].concat(rows.map(r => r.join('\t'))).join('\n');
   try {
     await navigator.clipboard.writeText(tsv);
-    const n = aggregateDim(currentDim).length;
-    alert(`현재 「${DIMS[currentDim].label}별」 표(${n}행)를 클립보드에 복사했습니다.\n엑셀·구글시트에서 붙여넣기(Ctrl+V) 하면 셀로 나뉩니다.`);
+    alert(`현재 「${label}별」 표(${rows.length}행)를 클립보드에 복사했습니다.\n엑셀·구글시트에서 붙여넣기(Ctrl+V) 하면 셀로 나뉩니다.`);
   } catch (e) {
-    // 클립보드 API가 막힌 경우: 수동 복사 창
     $('#copyArea').value = tsv;
     $('#copyModal').classList.add('open');
     const ta = $('#copyArea'); ta.focus(); ta.select();
   }
 }
 
-/* ---------- 엑셀 내보내기 ---------- */
-function exportExcel() {
-  if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리를 불러오지 못했습니다. 페이지를 새로고침해 주세요.'); return; }
+/* ---------- 내보내기: 아티팩트=CSV(downloads capability), 로컬=xlsx ---------- */
+function tableToCSV(headers, rows) {
+  const esc = s => { s = String(s); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
+  return '﻿' + [headers.map(esc).join(',')].concat(rows.map(r => r.map(esc).join(','))).join('\r\n');
+}
+async function exportExcel() {
   if (!RAW.length) { alert('내보낼 데이터가 없습니다. 먼저 파일을 올려주세요.'); return; }
-  const wb = XLSX.utils.book_new();
-  const money = amountKey ? `매출(${amountKey})` : '매출';
+  const { headers, rows, label } = currentViewTable();
 
-  // 시트1: 현재 분석 기준별 요약
-  const meta = DIMS[currentDim];
-  const showCode = currentDim === 'product';
-  const s1 = aggregateDim(currentDim).map(p => {
-    const row = {};
-    if (showCode) row['품목코드'] = p.code;
-    row[meta.label] = p.name;
-    row['판매량'] = p.qty;
-    row[money] = Math.round(p.amount);
-    row['평균단가'] = p.qty ? Math.round(p.amount / p.qty) : 0;
-    row['비중(%)'] = Number(p.share.toFixed(1));
-    return row;
-  });
-  const ws1 = XLSX.utils.json_to_sheet(s1);
-  ws1['!cols'] = (showCode ? [{wch:18}] : []).concat([{wch:28},{wch:12},{wch:16},{wch:12},{wch:9}]);
-  XLSX.utils.book_append_sheet(wb, ws1, `${meta.label}별 요약`.slice(0,31));
-
-  // 시트2: 품목별 상품분류 (전체 매핑)
-  const pmap = new Map();
-  for (const r of RAW) {
-    if (!pmap.has(r.product)) pmap.set(r.product, { codes:new Set(), qty:0, amount:0 });
-    const g = pmap.get(r.product); if (r.code) g.codes.add(r.code); g.qty += r.qty; g.amount += amtOf(r);
+  // 웹 아티팩트: 파일 다운로드가 샌드박스로 막혀 downloads capability로 CSV 저장
+  if (window.claude && window.claude.downloads) {
+    try {
+      await window.claude.downloads.save({ filename: `${label}별_판매분석_${todayStr()}.csv`, data: tableToCSV(headers, rows) });
+    } catch (err) {
+      if (err && err.code === 'declined') return;
+      alert('이 화면에서는 파일 저장이 제한됩니다. 대신 표를 복사합니다.');
+      copyTable();
+    }
+    return;
   }
-  const s2 = [...pmap.entries()].map(([name, v]) => {
-    const codeStr = [...v.codes].join(', ');
-    return { '품목코드':codeStr, '품목명':name, '상품분류':categoryOf(name, codeStr),
-             '판매량':v.qty, [money]:Math.round(v.amount), '평균단가':v.qty?Math.round(v.amount/v.qty):0 };
-  }).sort((a,b) => a['상품분류'].localeCompare(b['상품분류']) || b['판매량'] - a['판매량']);
-  const ws2 = XLSX.utils.json_to_sheet(s2);
-  ws2['!cols'] = [{wch:20},{wch:32},{wch:14},{wch:12},{wch:16},{wch:12}];
-  XLSX.utils.book_append_sheet(wb, ws2, '품목별 분류');
 
-  const today = new Date().toISOString().slice(0,10);
+  // 로컬 파일: 진짜 xlsx (현재 뷰 + 품목별 분류 2시트)
+  if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리를 불러오지 못했습니다.'); return; }
+  const money = amountKey ? `매출(${amountKey})` : '매출';
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  XLSX.utils.book_append_sheet(wb, ws1, `${label}별 요약`.slice(0,31));
+  const prod = aggregateDim('product');
+  const s2 = [['품목코드','품목명','상품분류','판매량',money,'평균단가']].concat(
+    prod.slice().sort((a,b)=> a.category.localeCompare(b.category) || b.qty-a.qty)
+        .map(p => [p.codeFull || p.code, p.name, p.category, p.qty, Math.round(p.amount), p.qty?Math.round(p.amount/p.qty):0]));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s2), '품목별 분류');
   const out = XLSX.write(wb, { bookType:'xlsx', type:'array' });
   const url = URL.createObjectURL(new Blob([out], { type:'application/octet-stream' }));
   const a = document.createElement('a');
-  a.href = url; a.download = `판매분석_${today}.xlsx`;
+  a.href = url; a.download = `판매분석_${todayStr()}.xlsx`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
