@@ -101,6 +101,7 @@
     <div class="toolbar">
       <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden>
       <button class="btn" id="uploadBtn">📂 엑셀/CSV 업로드</button>
+      <button class="btn ghost" id="exportBtn">⬇ 엑셀 내보내기</button>
       <button class="btn ghost" id="sampleBtn">샘플 데이터</button>
     </div>
   </header>
@@ -576,6 +577,54 @@ function render(mapping, fname) {
   }
 }
 
+/* ---------- 엑셀 내보내기 ---------- */
+function exportExcel() {
+  if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리를 불러오지 못했습니다. 페이지를 새로고침해 주세요.'); return; }
+  if (!RAW.length) { alert('내보낼 데이터가 없습니다. 먼저 파일을 올려주세요.'); return; }
+  const wb = XLSX.utils.book_new();
+  const money = amountKey ? `매출(${amountKey})` : '매출';
+
+  // 시트1: 현재 분석 기준별 요약
+  const meta = DIMS[currentDim];
+  const showCode = currentDim === 'product';
+  const s1 = aggregateDim(currentDim).map(p => {
+    const row = {};
+    if (showCode) row['품목코드'] = p.code;
+    row[meta.label] = p.name;
+    row['판매량'] = p.qty;
+    row[money] = Math.round(p.amount);
+    row['평균단가'] = p.qty ? Math.round(p.amount / p.qty) : 0;
+    row['비중(%)'] = Number(p.share.toFixed(1));
+    return row;
+  });
+  const ws1 = XLSX.utils.json_to_sheet(s1);
+  ws1['!cols'] = (showCode ? [{wch:18}] : []).concat([{wch:28},{wch:12},{wch:16},{wch:12},{wch:9}]);
+  XLSX.utils.book_append_sheet(wb, ws1, `${meta.label}별 요약`.slice(0,31));
+
+  // 시트2: 품목별 상품분류 (전체 매핑)
+  const pmap = new Map();
+  for (const r of RAW) {
+    if (!pmap.has(r.product)) pmap.set(r.product, { codes:new Set(), qty:0, amount:0 });
+    const g = pmap.get(r.product); if (r.code) g.codes.add(r.code); g.qty += r.qty; g.amount += amtOf(r);
+  }
+  const s2 = [...pmap.entries()].map(([name, v]) => {
+    const codeStr = [...v.codes].join(', ');
+    return { '품목코드':codeStr, '품목명':name, '상품분류':categoryOf(name, codeStr),
+             '판매량':v.qty, [money]:Math.round(v.amount), '평균단가':v.qty?Math.round(v.amount/v.qty):0 };
+  }).sort((a,b) => a['상품분류'].localeCompare(b['상품분류']) || b['판매량'] - a['판매량']);
+  const ws2 = XLSX.utils.json_to_sheet(s2);
+  ws2['!cols'] = [{wch:20},{wch:32},{wch:14},{wch:12},{wch:16},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws2, '품목별 분류');
+
+  const today = new Date().toISOString().slice(0,10);
+  const out = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+  const url = URL.createObjectURL(new Blob([out], { type:'application/octet-stream' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = `판매분석_${today}.xlsx`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /* ---------- 샘플 데이터 (상품·거래처 포함, 약 18개월) ---------- */
 function makeSampleData() {
   const products = [
@@ -613,6 +662,7 @@ $('#tabs').addEventListener('click', e=>{ const t=e.target.closest('.tab'); if(!
 $('#dimSelect').addEventListener('change', e=>{ currentDim=e.target.value; rebuildFilter(); render(); });
 $('#dimFilter').addEventListener('change', e=>{ currentFilter=e.target.value; render(); });
 $('#uploadBtn').addEventListener('click', ()=>$('#fileInput').click());
+$('#exportBtn').addEventListener('click', exportExcel);
 $('#fileInput').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) readFile(f); e.target.value=''; });
 $('#sampleBtn').addEventListener('click', ()=>{ RAW=makeSampleData(); window.__lastMapping='<b>샘플 데이터</b> (상품 6종 · 거래처 6곳)'; setupDims(); render('샘플 데이터 (상품 6종 · 거래처 6곳 · 약 18개월)'); });
 window.addEventListener('resize', ()=>render());
