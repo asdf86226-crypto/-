@@ -535,7 +535,7 @@ function renderDimTable(items, dimLabel) {
   const showCode = currentDim === 'product';
   const maxQty = Math.max(1,...items.map(p=>p.qty));
   $('#prodTable').querySelector('thead').innerHTML =
-    `<tr>${showCode ? '<th>품목코드</th>' : ''}<th>${dimLabel}</th><th>판매량</th><th>매출</th><th>평균 단가</th><th>비중</th></tr>`;
+    `<tr>${showCode ? '<th style="text-align:left">품목코드</th>' : ''}<th style="text-align:left">${dimLabel}</th><th>판매량</th><th>매출</th><th>평균 단가</th><th>비중</th></tr>`;
   $('#prodTable').querySelector('tbody').innerHTML = items.map(p=>{
     const w = (p.qty/maxQty*100).toFixed(1);
     const unit = p.qty ? KRW.format(Math.round(p.amount/p.qty)) : '-';
