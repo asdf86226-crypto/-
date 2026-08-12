@@ -95,7 +95,7 @@
   <header class="top">
     <div>
       <h1>판매현황 분석 대시보드</h1>
-      <p class="sub">이카운트(ECOUNT) 엑셀을 올려 주별 · 월별 · 분기별 · 연별 × 상품 · 상품그룹 · 거래처별로 분석</p>
+      <p class="sub">이카운트(ECOUNT) 엑셀을 올려 주별 · 월별 · 분기별 · 연별 × 상품 · 상품분류 · 거래처별로 분석</p>
       <p class="meta" id="meta"></p>
     </div>
     <div class="toolbar">
@@ -116,7 +116,7 @@
       <label style="display:flex;align-items:center;gap:8px">분석 기준
         <select id="dimSelect">
           <option value="product">상품</option>
-          <option value="group">상품그룹</option>
+          <option value="group">상품분류</option>
           <option value="customer">거래처</option>
         </select>
       </label>
@@ -130,7 +130,7 @@
 
   <div class="card">
     <h2 id="chartTitle">월별 판매량 추이</h2>
-    <p class="hint">막대는 판매량, 선은 매출(공급가액)입니다. 막대에 마우스를 올리면 상세 수치가 보입니다. 위의 필터로 특정 상품·상품그룹·거래처만 볼 수 있습니다.</p>
+    <p class="hint">막대는 판매량, 선은 매출(공급가액)입니다. 막대에 마우스를 올리면 상세 수치가 보입니다. 위의 필터로 특정 상품·상품분류·거래처만 볼 수 있습니다.</p>
     <div class="chart"><svg id="chart" width="100%" height="360" role="img" aria-label="기간별 판매 추이"></svg></div>
     <div class="legend">
       <span><i class="swatch" style="background:var(--series-1)"></i>판매량 (개)</span>
@@ -191,24 +191,24 @@ const amtOf = (r) => (amountKey && r.amounts && amountKey in r.amounts) ? r.amou
 
 const DIMS = {
   product:  { label:'상품',     all:'전체 상품' },
-  group:    { label:'상품그룹', all:'전체 그룹' },
+  group:    { label:'상품분류', all:'전체 분류' },
   customer: { label:'거래처',   all:'전체 거래처' },
 };
-// 품목명 → 그룹명: 괄호 안 등급/규격과 끝의 규격 코드를 떼어 묶음
-//   예) "황동3종잉곳(C급)"→"황동3종잉곳", "열량계 하부외갑 20E"→"열량계 하부외갑"
-function groupOf(name) {
-  let s = String(name).replace(/[\(\[（【][^\)\]）】]*[\)\]）】]/g, '');
-  s = s.replace(/\s+/g, ' ').trim();
-  const parts = s.split(' ');
-  if (parts.length > 1) {
-    const last = parts[parts.length - 1];
-    if (/^[0-9]+[A-Za-z가-힣]?$/.test(last) || /^[A-Za-z]?급$/.test(last) || /^[A-Za-z0-9]{1,3}$/.test(last)) parts.pop();
-  }
-  return parts.join(' ').trim() || String(name);
+// 품목명 + 품목코드 → 상품분류 4종 (원자재 / 수전(완제품) / 수전부속 / 악세서리, 그 외 기타)
+// 판정 순서 중요: 원자재 → 악세서리 → 수전부속(부품) → 수전(완제품) → 코드접두사 폴백
+function categoryOf(name, code) {
+  const s = (String(name) + ' ' + String(code || '')).toLowerCase();
+  if (/잉곳|ingot|광재|slag|고철|스크랩|scrap|아연|\bzn\b|\bcu|알미늄|알루미늄|\bal\b|베리|캔디|황동괴|비스무스|비쓰무트|\bbi\b|주석|납괴/.test(s)) return '원자재';
+  if (/수건걸이|옷걸이|휴지걸이|가운걸이|컵대|컵홀더|비누|선반|바스켓|코너|청소건|타올|타월|훅|디스펜서|화장지|행거|헹거|슬라이드바|면도경|거울|수건|악세/.test(s)) return '악세서리';
+  if (/몸통|바디|body|하부외갑|외갑|격판|스파우트|토수구|카트리지|편심|조절암|커넥션|감압밸브|밸브|manifold|매니폴드|슬립판|패킹|와셔|와샤|너트|핸들|캡|호스|hose|파이프|헤드|시트|스프링|오링|부속|커플링|니플|엘보|아답터|어댑터|플랜지|스핀들|기어|피스톤|자폐|뭉치|팝업|폽업|스프레이|스퀘어|와이어|가공|도금|연마|주조|다이캐스팅|반제품|핸드샤워|샤워암|매립박스|어셈블리|어셈|샹크|배수관|다이버터|노브|탑볼|컨트롤러|배터리|베터리|감지부|스크류|텝핑|칼블럭|트랩|나사|볼트|리프트|스토퍼|디스크|s\/a|에어레이터|브라켓|브래킷|가이드|drain|유가|트렌치|로드|에스커천|에스커션/.test(s)) return '수전부속';
+  if (/수전|레버식|faucet|믹서|mixer|샤워|해바라기|혼합전|비데|대변기|소변기|양변기|세척밸브|세면기|세면대|주방|싱크|꼭지|콕|원홀|투홀|1홀|2홀|3홀|1h|음수기|정수전/.test(s)) return '수전(완제품)';
+  if (/^dl[a-z]?\d|^k\d|^tf-l|^tf-k|^tf-b/i.test(String(code || ''))) return '수전(완제품)';
+  if (/^tf-ac/i.test(String(code || ''))) return '악세서리';
+  return '기타(미분류)';
 }
 function dimValue(r, dim) {
   if (dim === 'customer') return r.customer || '(미지정)';
-  if (dim === 'group')    return groupOf(r.product);
+  if (dim === 'group')    return categoryOf(r.product, r.code);
   return r.product;
 }
 const hasCustomerData = () => RAW.some(r => r.customer && r.customer !== '(미지정)');
@@ -579,12 +579,12 @@ function render(mapping, fname) {
 /* ---------- 샘플 데이터 (상품·거래처 포함, 약 18개월) ---------- */
 function makeSampleData() {
   const products = [
-    { name:'노트북 스탠드(실버)', code:'STAND-S', price:32000, w:1.0 },
-    { name:'노트북 스탠드(블랙)', code:'STAND-B', price:32000, w:0.7 },
-    { name:'무선 마우스',         code:'MOUSE-01', price:19000, w:1.4 },
-    { name:'USB-C 허브 4포트',    code:'HUB-4C', price:45000, w:0.8 },
-    { name:'기계식 키보드',       code:'KB-MECH', price:89000, w:0.6 },
-    { name:'모니터 암',           code:'ARM-01', price:68000, w:0.5 },
+    { name:'황동3종잉곳(B급)', code:'INGOT.B',   price:13000, w:1.5 },
+    { name:'원홀세면수전',     code:'DLL1001',   price:48000, w:1.0 },
+    { name:'주방수전(레버식)', code:'DLK2002',   price:62000, w:0.8 },
+    { name:'가공몸통(V14)',    code:'M34032314', price:9000,  w:1.1 },
+    { name:'카트리지S/A',      code:'P4325',     price:3200,  w:0.7 },
+    { name:'수건걸이_엘라라',  code:'TF-AC7101', price:30000, w:0.5 },
   ];
   const customers = ['가나상사','대한유통','서울상회','한빛코퍼','동양물산','미래테크'];
   const out = [], start = new Date(2024,6,1), end = new Date(2025,11,31);
