@@ -219,6 +219,7 @@ const DICT = {
   qty:  ['수량','판매수량','판매량','출고수량','개수','quantity','qty'],
   amt:  ['공급가액','매출액','판매금액','매출','합계금액','합계','금액','amount','sales','revenue'],
   prod: ['품목명','제품명','상품명','품명','품목','제품','상품','item','product'],
+  code: ['품목코드','제품코드','상품코드','품번','품목번호','코드','sku','item code'],
   cust: ['거래처명','거래처','매출처','고객명','고객','client','customer','account'],
 };
 // 부가세/단가처럼 매출로 오해하기 쉬운 열은 매출 후보에서 제외
@@ -284,6 +285,7 @@ function ingestRows(rows) {
   const qi = resolveCol(header, DICT.qty, false);
   const amtCols = resolveAmountCols(header);
   const pi = resolveCol(header, DICT.prod, true);
+  const pci = resolveCol(header, DICT.code, false);
   const ci = resolveCol(header, DICT.cust, false);
   if (di < 0) throw new Error('날짜 컬럼을 찾지 못했습니다.');
   if (qi < 0 && !amtCols.length) throw new Error('수량 또는 금액 컬럼이 필요합니다.');
@@ -298,14 +300,15 @@ function ingestRows(rows) {
     for (const c of amtCols) { const v = toNum(r[c.idx]); amounts[c.name] = v; if (v) anyAmt = true; }
     if (qty === 0 && !anyAmt) continue;           // 합계행·export시각 footer·공백행 skip
     const product  = pi >= 0 ? (String(r[pi]).trim() || '(미지정)') : '(미지정)';
+    const code     = pci >= 0 ? String(r[pci]).trim() : '';
     const customer = ci >= 0 ? (String(r[ci]).trim() || '(미지정)') : '(미지정)';
-    out.push({ date: dt, qty, amounts, product, customer });
+    out.push({ date: dt, qty, amounts, product, code, customer });
   }
   if (!out.length) throw new Error('읽을 수 있는 판매 데이터 행이 없습니다.');
   // 매출은 공급가액(부가세 제외) 우선 자동 선택
   amountKey = amtCols.length ? amtCols[0].name : null;
   const label = (i) => i >= 0 ? header[i] : '없음';
-  const mapping = `인식됨 — 날짜: <b>${label(di)}</b> · 수량: <b>${label(qi)}</b> · 매출: <b>${amountKey || '없음'}</b> · 품목: <b>${label(pi)}</b> · 거래처: <b>${label(ci)}</b>`;
+  const mapping = `인식됨 — 날짜: <b>${label(di)}</b> · 수량: <b>${label(qi)}</b> · 매출: <b>${amountKey || '없음'}</b> · 품목코드: <b>${label(pci)}</b> · 품목명: <b>${label(pi)}</b> · 거래처: <b>${label(ci)}</b>`;
   return { data: out, mapping };
 }
 
@@ -383,11 +386,16 @@ function aggregateDim(dim) {
   let total = 0;
   for (const r of RAW) {
     const k = dimValue(r, dim);
-    if (!map.has(k)) map.set(k, { name:k, qty:0, amount:0 });
+    if (!map.has(k)) map.set(k, { name:k, qty:0, amount:0, codes:new Set() });
     const g = map.get(k); g.qty += r.qty; g.amount += amtOf(r); total += r.qty;
+    if (dim === 'product' && r.code) g.codes.add(r.code);
   }
   const arr = [...map.values()].sort((a,b) => b.qty - a.qty);
-  arr.forEach(p => p.share = total ? p.qty/total*100 : 0);
+  arr.forEach(p => {
+    p.share = total ? p.qty/total*100 : 0;
+    const cs = [...p.codes];
+    p.code = cs.slice(0,2).join(', ') + (cs.length > 2 ? ` 외 ${cs.length-2}` : '');
+  });
   return arr;
 }
 
@@ -401,10 +409,13 @@ function setupDims() {
 }
 function rebuildFilter() {
   const meta = DIMS[currentDim];
-  const members = aggregateDim(currentDim).map(x => x.name);
+  const items = aggregateDim(currentDim);
   $('#filterLabel').textContent = `${meta.label} 필터`;
   $('#dimFilter').innerHTML = `<option value="__all__">${meta.all}</option>` +
-    members.map(m => `<option value="${String(m).replace(/"/g,'&quot;')}">${m}</option>`).join('');
+    items.map(x => {
+      const text = currentDim === 'product' && x.code ? `${x.name} (${x.code})` : x.name;
+      return `<option value="${String(x.name).replace(/"/g,'&quot;')}">${text}</option>`;
+    }).join('');
   currentFilter = '__all__';
 }
 
@@ -484,7 +495,7 @@ function renderRank(items) {
   svg.innerHTML = s;
   svg.querySelectorAll('rect.pbar').forEach(rect=>{
     rect.addEventListener('mousemove',e=>{ const p=top[+rect.dataset.i];
-      tip.innerHTML=`<div>${p.name}</div><div>판매량 <b>${KRW.format(p.qty)}</b> 개</div><div>매출 <b>${KRW.format(Math.round(p.amount))}</b> 원</div><div>비중 <b>${p.share.toFixed(1)}</b>%</div>`;
+      tip.innerHTML=`<div>${p.name}</div>${p.code?`<div style="opacity:.75">코드 ${p.code}</div>`:''}<div>판매량 <b>${KRW.format(p.qty)}</b> 개</div><div>매출 <b>${KRW.format(Math.round(p.amount))}</b> 원</div><div>비중 <b>${p.share.toFixed(1)}</b>%</div>`;
       tip.style.opacity=1; tip.style.left=Math.min(e.clientX+14, innerWidth-tip.offsetWidth-12)+'px'; tip.style.top=(e.clientY-10)+'px'; });
     rect.addEventListener('mouseleave',()=>{ tip.style.opacity=0; });
   });
@@ -505,13 +516,15 @@ function renderTable(rows, period) {
 
 /* ---------- 분석 기준별 상세 테이블 ---------- */
 function renderDimTable(items, dimLabel) {
+  const showCode = currentDim === 'product';
   const maxQty = Math.max(1,...items.map(p=>p.qty));
   $('#prodTable').querySelector('thead').innerHTML =
-    `<tr><th>${dimLabel}</th><th>판매량</th><th>매출</th><th>평균 단가</th><th>비중</th></tr>`;
+    `<tr>${showCode ? '<th>품목코드</th>' : ''}<th>${dimLabel}</th><th>판매량</th><th>매출</th><th>평균 단가</th><th>비중</th></tr>`;
   $('#prodTable').querySelector('tbody').innerHTML = items.map(p=>{
     const w = (p.qty/maxQty*100).toFixed(1);
     const unit = p.qty ? KRW.format(Math.round(p.amount/p.qty)) : '-';
-    return `<tr><td>${p.name}</td>
+    const codeCell = showCode ? `<td style="text-align:left;font-variant-numeric:normal;color:var(--text-2)">${p.code || '-'}</td>` : '';
+    return `<tr>${codeCell}<td style="text-align:left;font-variant-numeric:normal">${p.name}</td>
       <td class="bar-cell"><div class="fill" style="width:${w}%"></div><span>${KRW.format(p.qty)}</span></td>
       <td>${KRW.format(Math.round(p.amount))}</td><td>${unit}</td><td>${p.share.toFixed(1)}%</td></tr>`;
   }).join('');
@@ -550,12 +563,12 @@ function render(mapping, fname) {
 /* ---------- 샘플 데이터 (상품·거래처 포함, 약 18개월) ---------- */
 function makeSampleData() {
   const products = [
-    { name:'노트북 스탠드(실버)', price:32000, w:1.0 },
-    { name:'노트북 스탠드(블랙)', price:32000, w:0.7 },
-    { name:'무선 마우스',         price:19000, w:1.4 },
-    { name:'USB-C 허브 4포트',    price:45000, w:0.8 },
-    { name:'기계식 키보드',       price:89000, w:0.6 },
-    { name:'모니터 암',           price:68000, w:0.5 },
+    { name:'노트북 스탠드(실버)', code:'STAND-S', price:32000, w:1.0 },
+    { name:'노트북 스탠드(블랙)', code:'STAND-B', price:32000, w:0.7 },
+    { name:'무선 마우스',         code:'MOUSE-01', price:19000, w:1.4 },
+    { name:'USB-C 허브 4포트',    code:'HUB-4C', price:45000, w:0.8 },
+    { name:'기계식 키보드',       code:'KB-MECH', price:89000, w:0.6 },
+    { name:'모니터 암',           code:'ARM-01', price:68000, w:0.5 },
   ];
   const customers = ['가나상사','대한유통','서울상회','한빛코퍼','동양물산','미래테크'];
   const out = [], start = new Date(2024,6,1), end = new Date(2025,11,31);
@@ -571,7 +584,7 @@ function makeSampleData() {
       if (!qty) continue;
       const supply = qty*Math.round(p.price*(0.92+rnd()*0.16));
       const customer = customers[Math.floor(rnd()*customers.length)];
-      out.push({ date:new Date(d), qty, amounts:{ '공급가액':supply }, product:p.name, customer });
+      out.push({ date:new Date(d), qty, amounts:{ '공급가액':supply }, product:p.name, code:p.code, customer });
     }
   }
   amountKey = '공급가액';
