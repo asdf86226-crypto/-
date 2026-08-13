@@ -1,0 +1,3767 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>발주현황</title>
+<style>
+  :root{
+    --navy:#16233d;
+    --navy-2:#20304f;
+    --steel:#3d5a80;
+    --brass:#3f7d8c;        /* unified accent (was gold, now teal to match dashboard concept) */
+    --brass-lt:#a8d2da;
+    --paper:#f6f4ee;
+    --paper-2:#ffffff;
+    --ink:#151b22;
+    --ink-soft:#4c5a62;
+    --line:#d7dde0;
+    --ok:#2f7d5c;
+    --warn:#b8562f;
+    --stage-0:#8a93a3;
+    --stage-mid:#3f7d8c;
+    --stage-done:#1f5a5c;
+    --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+    --sans:'맑은 고딕','Malgun Gothic','Apple SD Gothic Neo','Pretendard',-apple-system,sans-serif;
+    --wordmark:var(--sans);
+    /* dashboard console tokens (muted, light) — now the app-wide accent language */
+    --console-bg:#eef2f4;
+    --console-panel:#f8fafb;
+    --console-line:#c7d5d8;
+    --console-accent:#3f7d8c;
+    --console-accent-soft:#8fb9c2;
+    --console-text:#151b22;
+    --console-text-dim:#5b6a70;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); font-size:14.5px; line-height:1.55;
+  }
+  .topbar{
+    background:var(--navy); color:#f3efe4; padding:18px 28px;
+    display:flex; align-items:center; justify-content:space-between;
+    border-bottom:3px solid var(--brass);
+  }
+  .brand{display:flex; align-items:center; gap:12px; cursor:pointer;}
+  .brand .icon{width:30px; height:30px; flex-shrink:0;}
+  .brand .logo-img{width:auto; height:24px; filter:brightness(0) invert(1);}
+  .brand h1{
+    font-family:var(--wordmark); font-size:21px; margin:0; font-weight:800;
+    letter-spacing:-0.3px; color:#fbfaf6; position:relative;
+  }
+  .brand h1 sup{font-size:11px; font-weight:600; color:var(--brass-lt); margin-left:4px; letter-spacing:.3px; font-family:var(--sans);}
+  .brand .sub{font-size:12px; color:#aab7c6; margin-left:2px; font-family:var(--sans); font-weight:600; letter-spacing:.2px; border-left:1px solid #3a4a68; padding-left:12px;}
+  .tabs{display:flex; gap:4px;}
+  .tab{
+    padding:9px 16px; border-radius:6px; cursor:pointer; font-size:13.5px; font-weight:600;
+    color:#c8cfdc; border:1px solid transparent; transition:.15s;
+  }
+  .tab:hover{background:rgba(255,255,255,.06);}
+  .tab.active{background:var(--brass); color:#fff; font-weight:700;}
+  .memo-tab{border-right:1px solid rgba(255,255,255,.15); margin-right:8px; padding-right:16px;}
+
+  .wrap{padding:24px 28px 60px; max-width:1880px; margin:0 auto;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .view-header{
+    display:flex; align-items:center; gap:10px; margin-bottom:14px;
+  }
+  .view-header .vlabel{
+    font-family:var(--sans); font-weight:800; font-size:12px; letter-spacing:.5px;
+    color:var(--console-accent); text-transform:uppercase;
+  }
+  .view-header .vlabel::before{content:"[ ";} .view-header .vlabel::after{content:" ]";}
+  .view-header::after{content:""; flex:1; height:1px; background:var(--line);}
+
+
+  /* ---------- Dashboard: console-style widget board ---------- */
+  .console-screen{
+    background:var(--console-bg); border:1px solid var(--console-line); border-radius:12px;
+    padding:22px;
+  }
+  .console-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:16px;}
+  .console-head h2{
+    font-family:var(--sans); font-weight:800; font-size:16px; letter-spacing:.3px;
+    color:var(--console-text); margin:0;
+  }
+  .console-head .stamp{font-family:var(--sans); font-weight:700; font-size:14px; color:var(--console-text);}
+  .console-grid{display:grid; grid-template-columns:repeat(12,1fr); gap:14px;}
+  .cpanel{
+    background:var(--console-panel); border:1px solid var(--console-line); border-radius:6px;
+    padding:14px 16px 16px; position:relative;
+  }
+  .cpanel .clabel{
+    font-family:var(--sans); font-weight:700; font-size:12px; letter-spacing:.2px; color:var(--console-accent);
+    margin:0 0 12px; display:block;
+  }
+  .cpanel .clabel::before{content:"[ ";} .cpanel .clabel::after{content:" ]";}
+
+  .col-2{grid-column:span 2;} .col-3{grid-column:span 3;} .col-4{grid-column:span 4;} .col-5{grid-column:span 5;}
+  .col-6{grid-column:span 6;} .col-7{grid-column:span 7;} .col-8{grid-column:span 8;}
+  .col-12{grid-column:span 12;}
+  @media (max-width:900px){ .console-grid [class^="col-"]{grid-column:span 12;} }
+
+  .kpi-num{font-family:var(--sans); font-size:26px; font-weight:700; color:var(--console-text);}
+  .kpi-lbl{font-size:12.5px; color:var(--console-text-dim); margin-top:3px; font-weight:600;}
+
+  .donut-wrap{display:flex; align-items:center; gap:16px;}
+  .donut-wrap .dnum{font-family:var(--sans); font-size:20px; font-weight:700; color:var(--console-text);}
+  .donut-wrap .dlbl{font-size:12px; color:var(--console-text-dim); font-weight:600;}
+
+  .stage-bar{display:flex; border-radius:5px; overflow:hidden; border:1px solid var(--console-line);}
+  .stage-seg{
+    position:relative;
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    padding:10px 3px; background:var(--console-panel); color:var(--console-text); font-family:var(--sans); font-weight:700;
+    cursor:default; border-right:1px solid var(--console-line); text-align:center;
+  }
+  .stage-seg:last-child{border-right:none;}
+  .stage-seg-bar{position:absolute; top:0; left:10%; width:80%; height:4px; border-radius:0 0 3px 3px;}
+  .stage-seg span.n{font-weight:800; font-size:15px; color:var(--console-accent); line-height:1;}
+  .stage-seg span.lbl{font-size:9.5px; font-weight:600; color:var(--console-text-dim); line-height:1.25; word-break:keep-all;}
+  .stage-legend{display:flex; justify-content:space-between; margin-top:6px; font-family:var(--sans); font-weight:600; font-size:11px; color:var(--console-text-dim);}
+
+  .clist{display:flex; flex-direction:column;}
+  .crow{
+    display:flex; justify-content:space-between; align-items:center; padding:8px 4px;
+    border-bottom:1px solid var(--console-line); font-size:12.5px;
+  }
+  .crow:last-child{border-bottom:none;}
+  .crow .t{color:var(--console-text);}
+  .crow .c{font-family:var(--sans); font-weight:700; color:var(--console-accent);}
+  .crow.zero .c{color:var(--console-text-dim); font-weight:400;}
+
+  .fx-row{display:flex; gap:10px; margin-bottom:12px;}
+  .fx-field{flex:1;}
+  .fx-field label{display:block; font-size:11.5px; color:var(--console-text-dim); margin-bottom:4px; font-family:var(--sans); font-weight:700;}
+  .fx-field input{
+    width:100%; padding:7px 9px; border:1px solid var(--console-line); border-radius:4px;
+    font-family:var(--sans); font-size:13px; background:#fff; color:var(--console-text);
+  }
+  .fx-totals{display:flex; flex-direction:column; gap:6px; margin-top:4px;}
+  .fx-total-row{
+    display:flex; justify-content:space-between; align-items:baseline; padding:8px 10px;
+    background:var(--console-bg); border-radius:4px; border:1px solid var(--console-line);
+  }
+  .fx-total-row .cur{font-family:var(--sans); font-size:10.5px; color:var(--console-text-dim); letter-spacing:.5px;}
+  .fx-total-row .amt{font-family:var(--sans); font-size:15px; font-weight:700; color:var(--console-text);}
+  .fx-note{font-size:11.5px; color:var(--console-text-dim); margin-top:8px; line-height:1.6;}
+
+  /* ---------- 발주서 작성 ---------- */
+  .poc-filters{
+    display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; margin-bottom:20px;
+    background:var(--console-panel); border:1px solid var(--console-line); border-radius:10px; padding:16px;
+  }
+  .poc-filters .fgroup{margin-bottom:0; min-width:150px;}
+  .poc-group{
+    background:var(--paper-2); border:1px solid var(--line); border-radius:10px; margin-bottom:18px; overflow:hidden;
+  }
+  .poc-group-head{
+    background:var(--navy); color:#f3efe4; padding:10px 16px; font-weight:800; font-size:13.5px;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .poc-group-head .sub{font-size:11.5px; font-weight:600; color:#c8cfdc;}
+  .poc-table{width:100%; border-collapse:collapse; table-layout:fixed;}
+  .poc-table th{background:#eef2f4; color:var(--ink-soft); font-size:11.5px; font-weight:700; text-align:left; padding:8px 12px; border-bottom:1px solid var(--line);}
+  .poc-table td{padding:9px 12px; border-bottom:1px solid var(--line); font-size:13px;}
+  .poc-table tr:last-child td{border-bottom:none;}
+  .poc-empty{padding:50px 20px; text-align:center; color:var(--ink-soft);}
+  .poc-doc-title, .poc-doc-meta, .poc-print-only{display:none;}
+  @media print{
+    .topbar, .tabs, .view-header, .poc-filters, .toolbar, body > .wrap > *:not(.view.active){display:none !important;}
+    .view.active{display:block !important;}
+    .view.active .cal-hint{display:none;}
+    .poc-doc-title{display:block; font-size:20px; font-weight:800; margin-bottom:4px;}
+    .poc-doc-meta{display:block; font-size:12px; color:#555; margin-bottom:18px;}
+    .poc-group{break-inside:avoid; border:1px solid #999;}
+    .poc-group-head{background:#eee !important; color:#111 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    .item-badge{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    #pocResult{display:none !important;}
+    .poc-print-only{display:block !important;}
+    .no-print{display:none !important;}
+    .appr-line-table th{background:#eee !important; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  }
+
+  /* ---------- 결재 (Approval) ---------- */
+  .appr-toolbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;}
+  .appr-batch-table{width:100%; border-collapse:collapse; background:var(--paper-2); border:1px solid var(--line); border-radius:10px; overflow:hidden;}
+  .appr-batch-table th{background:var(--navy); color:#f3efe4; font-size:12px; font-weight:700; text-align:left; padding:10px 12px;}
+  .appr-batch-table td{padding:10px 12px; border-bottom:1px solid var(--line); font-size:13px; cursor:pointer;}
+  .appr-batch-table tr:hover td{background:#faf8f2;}
+  .appr-status{display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; color:#fff;}
+  .appr-status.draft{background:#94a3b8;}
+  .appr-status.approved{background:#16a34a;}
+  .appr-status.rejected{background:var(--warn);}
+  .appr-select-row{display:flex; align-items:flex-start; gap:10px; padding:9px 8px; border-bottom:1px solid var(--line);}
+  .appr-select-row:last-child{border-bottom:none;}
+  .appr-select-row input[type="checkbox"]{margin-top:3px;}
+  .appr-select-row .info{flex:1;}
+  .appr-select-row .name{font-weight:700; font-size:13px;}
+  .appr-select-row .sub{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
+  .appr-doc-title{font-size:22px; font-weight:800; text-align:center; margin-bottom:6px;}
+  .appr-doc-sub{text-align:center; color:var(--ink-soft); font-size:12.5px; margin-bottom:20px;}
+  .appr-line-table{border-collapse:collapse; margin-left:auto; margin-bottom:24px;}
+  .appr-line-table th, .appr-line-table td{border:1px solid #999; padding:6px 16px; font-size:12px; text-align:center; min-width:76px;}
+  .appr-line-table th{background:#eef2f4; font-weight:700;}
+  .appr-line-table td{height:38px;}
+  .appr-meta-row{display:flex; gap:24px; margin-bottom:16px; font-size:13px; color:var(--ink-soft);}
+  .appr-item-table{width:100%; border-collapse:collapse; margin-bottom:16px;}
+  .appr-item-table th{background:#eef2f4; color:var(--ink-soft); font-size:11.5px; font-weight:700; text-align:left; padding:8px 10px; border:1px solid var(--line);}
+  .appr-item-table td{padding:8px 10px; border:1px solid var(--line); font-size:12.5px;}
+  .appr-item-table tfoot td{font-weight:800; background:#f7f9f8;}
+  .appr-actions{display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;}
+
+  /* ---------- shared stage-color legend (used on PO tracker) ---------- */
+  .cal-legend{display:flex; flex-wrap:wrap; gap:9px 14px; margin-bottom:12px; font-size:11.5px; font-weight:600; color:var(--ink-soft);}
+  .cal-legend .li{display:flex; align-items:center; gap:5px;}
+  .cal-legend .dot{width:9px; height:9px; border-radius:50%; flex-shrink:0;}
+
+  /* ---------- Calendar (simple: dot + count per day, click for list) ---------- */
+  .cal-toolbar{display:flex; align-items:center; gap:12px; margin-bottom:14px;}
+  .cal-month{font-family:var(--sans); font-weight:800; font-size:16px; color:var(--ink); min-width:120px; text-align:center;}
+  .cal-hint{font-size:12px; color:var(--ink-soft); margin-bottom:14px; font-weight:600;}
+  .cal-wrap{border:1px solid var(--console-line); border-radius:10px; overflow:hidden; background:var(--paper-2);}
+  .cal-dow-row{display:grid; grid-template-columns:repeat(7,1fr); background:var(--navy);}
+  .cal-dow{color:#f3efe4; text-align:center; padding:8px 0; font-size:12px; font-weight:700;}
+  .cal-week{display:grid; grid-template-columns:repeat(7,1fr); border-top:1px solid var(--console-line);}
+  .cal-daycell{
+    border-right:1px solid var(--console-line); padding:8px; background:var(--paper-2); min-height:64px;
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+  }
+  .cal-daycell:last-child{border-right:none;}
+  .cal-daycell.out{background:#f2f0ea;}
+  .cal-daycell.out .cal-daynum{color:#b7b2a3;}
+  .cal-daycell.today{outline:2px solid var(--console-accent); outline-offset:-2px; z-index:1;}
+  .cal-daynum{font-family:var(--sans); font-weight:700; font-size:13px; color:var(--ink-soft);}
+  .cal-daycell.today .cal-daynum{color:var(--console-accent);}
+  .cal-daycell.has-events{cursor:pointer;}
+  .cal-daycell.has-events:hover{background:#eef4f3;}
+  .cal-count-badge{
+    display:flex; align-items:center; gap:5px; background:var(--console-accent); color:#fff;
+    border-radius:20px; padding:3px 10px; font-size:12px; font-weight:700;
+  }
+  .cal-count-badge.overdue{background:var(--warn);}
+  .cal-count-badge .dot{width:6px; height:6px; border-radius:50%; background:#fff;}
+  #dayPanelList .day-item .ddays, #monthCostPanelList .day-item .ddays{font-size:11px; font-weight:800; padding:2px 8px; border-radius:20px; flex-shrink:0;}
+  #dayPanelList .day-item .ddays.overdue, #monthCostPanelList .day-item .ddays.overdue{background:#fbe4da; color:var(--warn);}
+  #dayPanelList .day-item .ddays.today, #monthCostPanelList .day-item .ddays.today{background:#dcebe7; color:var(--console-accent);}
+  #dayPanelList .day-item .ddays.upcoming, #monthCostPanelList .day-item .ddays.upcoming{background:#eef2f4; color:var(--ink-soft);}
+  #dayPanelList .day-item, #monthCostPanelList .day-item{
+    display:flex; justify-content:space-between; align-items:center; gap:10px; padding:11px 12px;
+    border:1px solid var(--line); border-radius:8px; margin-bottom:8px; cursor:pointer;
+  }
+  #dayPanelList .day-item:hover, #monthCostPanelList .day-item:hover{background:#f7f9f8; border-color:var(--console-accent);}
+  #dayPanelList .day-item .info, #monthCostPanelList .day-item .info{display:flex; flex-direction:column; gap:2px;}
+  #dayPanelList .day-item .name, #monthCostPanelList .day-item .name{font-weight:700; font-size:13.5px; color:var(--ink);}
+  #dayPanelList .day-item .sub, #monthCostPanelList .day-item .sub{font-size:11.5px; color:var(--ink-soft);}
+  #dayPanelList .day-empty{padding:30px; text-align:center; color:var(--ink-soft); font-size:13px;}
+
+  /* ---------- Monthly Cost Forecast ---------- */
+  .mc-grand-row{
+    display:flex; justify-content:space-between; align-items:center; padding:14px 16px; margin-bottom:16px;
+    background:#dcebe7; border:1px solid var(--console-accent); border-radius:10px;
+  }
+  .mc-grand-label{font-size:12.5px; font-weight:700; color:var(--console-accent);}
+  .mc-grand-total{font-family:var(--sans); font-size:20px; font-weight:800; color:var(--console-accent);}
+  .mc-list{display:flex; flex-direction:column; gap:8px;}
+  .mc-row{
+    border:1px solid var(--line); border-radius:10px; background:var(--paper-2); overflow:hidden;
+  }
+  .mc-row-top{
+    display:flex; align-items:center; gap:16px; padding:14px 16px; cursor:pointer;
+  }
+  .mc-row-top:hover{background:#f7f9f8;}
+  .mc-month.past{color:var(--warn);}
+  .mc-month{font-family:var(--sans); font-weight:700; font-size:14px; color:var(--ink); min-width:110px;}
+  .mc-overdue{font-size:10.5px; font-weight:800; background:#fbe4da; color:var(--warn); border-radius:20px; padding:2px 8px; margin-left:6px;}
+  .mc-count{font-size:12px; color:var(--ink-soft); min-width:44px;}
+  .mc-breakdown{display:flex; flex-direction:column; gap:2px; font-size:11.5px; color:var(--ink-soft); flex:1;}
+  .mc-total{font-family:var(--sans); font-weight:800; font-size:16px; color:var(--console-accent); text-align:right; min-width:120px;}
+  .mc-deposit-list{border-top:1px solid var(--line); padding:10px 16px 12px; background:var(--console-bg);}
+  .mc-deposit-heading{font-size:10.5px; font-weight:800; color:var(--ink-soft); margin-bottom:6px; letter-spacing:0.02em;}
+  .mc-deposit-row{
+    display:flex; align-items:center; gap:10px; font-size:12px; padding:4px 0;
+  }
+  .mc-deposit-label{color:var(--ink); font-weight:600; flex:1;}
+  .mc-deposit-date{color:var(--ink-soft); font-size:11px; white-space:nowrap;}
+  .mc-deposit-amt{font-family:var(--sans); font-weight:700; color:var(--console-accent); min-width:100px; text-align:right;}
+  @media (max-width:640px){
+    .mc-row-top{flex-wrap:wrap;}
+    .mc-total{text-align:left;}
+    .mc-deposit-row{flex-wrap:wrap;}
+    .mc-deposit-amt{text-align:left;}
+  }
+
+
+  /* ---------- PO Tracker ---------- */
+
+  .toolbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; flex-wrap:wrap;}
+  .filter-banner{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:#dcebe7; border:1px solid var(--console-accent); border-radius:8px;
+    padding:9px 14px; margin-bottom:12px; font-size:12.5px; font-weight:700; color:var(--console-accent);
+  }
+  .filter-banner button{
+    background:none; border:1px solid var(--console-accent); color:var(--console-accent); border-radius:5px;
+    padding:4px 10px; font-size:11.5px; font-weight:700; cursor:pointer;
+  }
+  .btn{
+    background:var(--navy); color:#f3efe4; border:none; padding:10px 18px; border-radius:6px;
+    font-size:13px; font-weight:600; cursor:pointer; letter-spacing:.2px;
+  }
+  .btn:hover{background:var(--navy-2);}
+  .btn.brass{background:var(--brass); color:var(--navy);}
+  .btn.ghost{background:transparent; color:var(--ink-soft); border:1px solid var(--line);}
+  .search{
+    padding:9px 12px; border:1px solid var(--line); border-radius:6px; font-size:13px; width:240px; background:var(--paper-2);
+  }
+  .table-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:10px; background:var(--paper-2);}
+  .po-totals{
+    display:flex; gap:12px; margin-top:12px; flex-wrap:wrap;
+  }
+  .po-totals .ptcard{
+    flex:1; min-width:220px; background:var(--console-panel); border:1px solid var(--console-line); border-radius:8px;
+    padding:12px 16px;
+  }
+  .po-totals .ptlabel{font-size:11.5px; font-weight:700; color:var(--console-accent); margin-bottom:8px;}
+  .po-totals .pt-line{display:flex; align-items:baseline; gap:8px; margin-bottom:4px;}
+  .po-totals .pt-line:last-child{margin-bottom:0;}
+  .po-totals .pt-line-lbl{font-size:11px; font-weight:700; color:var(--ink-soft); min-width:34px;}
+  .po-totals .ptval{font-family:var(--sans); font-size:15px; font-weight:700; color:var(--console-text);}
+  .po-totals .ptval.paid{color:var(--ok);}
+  .po-totals .ptval.unpaid{color:var(--warn);}
+  .po-totals .ptsub{font-family:var(--sans); font-size:11px; color:var(--console-text-dim);}
+  table{border-collapse:collapse; width:100%; min-width:1400px;}
+  th{
+    background:var(--navy); color:#f3efe4; font-size:12px; font-weight:700; text-align:left;
+    padding:10px 10px; white-space:nowrap; position:sticky; top:0;
+  }
+  td{padding:9px 10px; border-bottom:1px solid var(--line); font-size:13px; white-space:nowrap; color:var(--ink);}
+  tbody tr:hover{background:#faf8f2; cursor:pointer;}
+  tbody tr.pi-grouped-row{background:#f3f7f6;}
+  tbody tr.pi-grouped-row:hover{background:#e9f2f0;}
+  tbody tr.row-highlighted{background:#fff2cc !important; box-shadow:inset 0 0 0 2px var(--brass);}
+  tbody tr.row-highlighted td{font-weight:700;}
+  .badge{
+    display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600;
+    color:#fff; font-family:var(--sans);
+  }
+  .money{font-family:var(--sans); white-space:normal; line-height:1.35;}
+  .empty-state{padding:60px 20px; text-align:center; color:var(--ink-soft);}
+  .empty-state .big{font-size:15px; margin-bottom:6px; color:var(--ink);}
+
+  /* ---------- Panel (add/edit) ---------- */
+  .overlay{
+    display:none; position:fixed; inset:0; background:rgba(22,35,61,.45); z-index:50;
+    align-items:stretch; justify-content:flex-end;
+  }
+  .overlay.active{display:flex;}
+  .panel{
+    width:min(560px,94vw); background:var(--paper); height:100%; overflow-y:auto;
+    box-shadow:-8px 0 30px rgba(0,0,0,.2); border-left:3px solid var(--brass);
+  }
+  .panel-head{
+    background:var(--navy); color:#f3efe4; padding:18px 24px; display:flex; justify-content:space-between; align-items:center;
+    position:sticky; top:0; z-index:2;
+  }
+  .panel-head h2{margin:0; font-size:16px;}
+  .panel-close{cursor:pointer; color:#c8cfdc; font-size:20px; line-height:1; background:none; border:none;}
+  .panel-body{padding:20px 24px 40px;}
+  .fgroup{margin-bottom:14px;}
+  .fgroup label{display:block; font-size:12px; font-weight:700; color:var(--ink-soft); margin-bottom:5px; letter-spacing:.2px;}
+  .fgroup input, .fgroup select, .fgroup textarea{
+    width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:6px; font-size:13px; font-family:var(--sans);
+    background:var(--paper-2);
+  }
+  .fgroup input.field-key{
+    border:2px solid var(--brass); background:#fff8ec; font-weight:800; font-size:14px; color:var(--navy);
+    letter-spacing:.3px;
+  }
+  .fgroup input.field-key::placeholder{font-weight:400;}
+  .frow{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .item-tag-row{display:flex; gap:14px; margin-top:8px;}
+  .item-tag{display:flex; align-items:center; gap:5px; font-size:12.5px; font-weight:700; color:var(--ink-soft); cursor:pointer;}
+  .item-tag input{width:auto; margin:0;}
+  .item-tag.checked{color:var(--console-accent);}
+  .item-badge{
+    display:inline-block; font-size:10px; font-weight:700; padding:1px 6px; border-radius:3px; margin-left:6px;
+    background:var(--console-accent); color:#fff; vertical-align:middle;
+  }
+  .item-badge.sample{background:#8b5cf6;}
+  .item-badge.urgent{background:#dc2626;}
+  .appr-dot{
+    display:inline-block; width:8px; height:8px; border-radius:50%; background:#16a34a;
+    margin-left:6px; vertical-align:middle;
+  }
+  .note-dot{cursor:help; font-size:21px; filter:grayscale(0.15);}
+  .doc-link{
+    display:inline-flex; align-items:center; justify-content:center;
+    font-family:var(--sans); font-size:9px; font-weight:800; letter-spacing:0.02em;
+    text-decoration:none; color:#fff; border-radius:4px; padding:2px 5px;
+    margin:2px 3px 2px 0; line-height:1.4; white-space:nowrap;
+  }
+  .doc-link:hover{filter:brightness(1.15);}
+  .doc-link-wrap{display:flex; flex-wrap:wrap; align-items:center; gap:0; max-width:120px;}
+  .doc-link.doc-pi{background:#3b6ea5;}
+  .doc-link.doc-ci{background:#2f8f7a;}
+  .doc-link.doc-bl{background:#8a5cc7;}
+  .doc-link.doc-pl{background:#c77b2f;}
+  .doc-link.doc-co{background:#c74545;}
+  .pi-group-tag{
+    display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700; padding:1px 7px; border-radius:10px;
+    margin-left:6px; background:#e2e8f0; color:var(--ink-soft); vertical-align:middle; cursor:pointer; border:1px solid var(--line);
+  }
+  .pi-group-tag.mismatch{background:#fbe4da; color:var(--warn); border-color:var(--warn); font-weight:800;}
+  .pi-group-banner{
+    display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 14px; border-radius:8px;
+    background:#eef2f4; border:1px solid var(--console-line); margin-bottom:14px; font-size:12.5px;
+  }
+  .pi-group-banner.mismatch{background:#fbe4da; border-color:var(--warn);}
+  .pi-group-banner .pgb-text{color:var(--ink-soft); font-weight:600;}
+  .pi-group-banner.mismatch .pgb-text{color:var(--warn);}
+  .pi-group-banner button{flex-shrink:0;}
+  #piGroupList .pg-item{
+    display:flex; justify-content:space-between; align-items:flex-start; gap:10px; padding:11px 12px;
+    border:1px solid var(--line); border-radius:8px; margin-bottom:8px; cursor:pointer;
+  }
+  #piGroupList .pg-item .badge{font-size:9.9px; white-space:nowrap; flex-shrink:0;}
+  #piGroupList .pg-item:hover{background:#f7f9f8; border-color:var(--console-accent);}
+  #piGroupList .pg-item .info{display:flex; flex-direction:column; gap:2px;}
+  #piGroupList .pg-item .name{font-weight:700; font-size:13.5px; color:var(--ink);}
+  #piGroupList .pg-item .sub{font-size:11.5px; color:var(--ink-soft);}
+  #piGroupList .pg-chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;}
+  #piGroupList .pg-chip{
+    position:relative; display:inline-block; background:#eef4f3; color:var(--console-accent);
+    border:1px solid var(--console-accent); border-radius:12px; padding:3px 10px 3px 9px;
+    font-size:11px; font-weight:700; white-space:nowrap;
+  }
+  .pg-ci-cluster{border:1px solid var(--console-accent); border-radius:8px; margin-bottom:8px; overflow:hidden;}
+  .pg-ci-cluster-head{background:#dcebe7; color:var(--console-accent); font-size:11.5px; font-weight:800; padding:7px 12px;}
+  .pg-ci-cluster .pg-item{border:none; border-radius:0; border-bottom:1px solid var(--line); margin-bottom:0;}
+  .pg-ci-cluster .pg-item:last-child{border-bottom:none;}
+  .pg-pi-cluster{border:1px solid #c77b2f; border-radius:8px; margin-bottom:10px; overflow:hidden;}
+  .pg-pi-cluster-head{background:#f5e6d3; color:#c77b2f; font-size:12px; font-weight:800; padding:8px 12px;}
+  .pg-pi-cluster .pg-ci-cluster{margin:8px; margin-bottom:8px; border-color:var(--console-accent);}
+  .pg-pi-cluster > .pg-item{margin:8px;}
+  #piGroupMismatchNote{
+    background:#fbe4da; color:var(--warn); border:1px solid var(--warn); border-radius:8px; padding:10px 12px;
+    font-size:12px; font-weight:700; margin-bottom:14px;
+  }
+  .share-status{
+    padding:9px 12px; border-radius:6px; font-size:13px; font-weight:700; font-family:var(--sans);
+    background:#eef1f2; color:var(--ink-soft); border:1px solid var(--line);
+  }
+  .share-status.on{background:#dcebe7; color:var(--console-accent); border-color:var(--console-accent);}
+  .share-status.on::before{content:"✓ ";}
+  .fieldset{
+    border:1px solid var(--line); border-radius:8px; padding:14px 16px 4px; margin-bottom:16px; background:var(--paper-2);
+    transition:background .25s, border-color .25s;
+  }
+  .fieldset.filled{
+    background:#dcebe7; border-color:var(--console-accent);
+  }
+  .fieldset legend{
+    font-size:11px; font-weight:700; color:var(--brass); text-transform:uppercase; letter-spacing:1px; padding:0 6px;
+  }
+  .fieldset.filled legend{color:var(--console-accent);}
+  .fieldset.filled legend::after{content:" ✓ 입력완료"; font-size:10px; font-weight:600; color:var(--console-accent); text-transform:none; letter-spacing:0;}
+  .computed{
+    background:#dcebe7; border-radius:6px; padding:10px 12px; font-family:var(--sans); font-size:13px; margin-bottom:14px;
+    color:var(--ink-soft); border:1px solid var(--console-line);
+  }
+  .computed .clabel-title{display:block; font-size:11px; font-weight:700; color:var(--console-accent); margin-bottom:4px;}
+  .computed b{color:var(--ink); font-size:13.5px; font-weight:700; font-family:var(--sans); line-height:1.7;}
+  .panel-actions{
+    display:flex; gap:8px; margin-top:18px;
+    position:sticky; bottom:0; background:var(--paper); padding:14px 0 4px;
+    box-shadow:0 -8px 14px -6px rgba(0,0,0,.12);
+  }
+  .panel-actions .btn{flex:1;}
+  .del-link{
+    text-align:center; margin-top:14px; font-size:12px; color:var(--warn); cursor:pointer; text-decoration:underline;
+  }
+
+  /* ---------- Suppliers ---------- */
+  .supp-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px;}
+  .supp-card{background:var(--paper-2); border:1px solid var(--line); border-radius:10px; padding:16px 18px;}
+  .supp-card h3{margin:0 0 4px; font-size:15.5px; color:var(--navy); font-weight:700;}
+  .supp-card .loc{font-size:12px; color:var(--ink-soft); margin-bottom:8px; font-weight:600;}
+  .supp-card .row{font-size:13px; margin-bottom:4px;}
+  .supp-card .row b{color:var(--ink-soft); font-weight:700; margin-right:4px;}
+  .supp-card .note{margin-top:8px; padding-top:8px; border-top:1px dashed var(--line); font-size:12px; color:var(--ink-soft);}
+
+  .dhl-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:16px;}
+  .dhl-card{background:var(--paper-2); border:1px solid var(--line); border-radius:10px; padding:18px 20px;}
+  .dhl-card-head{
+    font-size:16px; font-weight:800; color:var(--navy); margin-bottom:12px; padding-bottom:10px;
+    border-bottom:2px solid var(--console-accent);
+  }
+  .dhl-row{display:flex; gap:10px; padding:6px 0; border-bottom:1px solid var(--line); font-size:13px;}
+  .dhl-row:last-of-type{border-bottom:none;}
+  .dhl-row .k{min-width:100px; flex-shrink:0; font-weight:700; color:var(--ink-soft);}
+  .dhl-row .v{color:var(--ink);}
+  .dhl-copy-btn{margin-top:14px; width:100%;}
+
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); opacity:0;
+    background:var(--navy); color:#f3efe4; padding:11px 20px; border-radius:30px; font-size:13px;
+    transition:.25s; pointer-events:none; z-index:100; border:1px solid var(--brass);
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .storage-banner{
+    background:#fbe9d9; border:1px solid var(--brass); color:#7a4a1f; padding:10px 16px; border-radius:8px;
+    font-size:12.5px; margin-bottom:18px; display:none; align-items:center; justify-content:space-between; gap:10px;
+  }
+  .storage-banner.show{display:flex;}
+  .storage-banner b{font-weight:700;}
+  .storage-banner .btn{padding:6px 12px; font-size:12px;}
+
+  /* ---------- Share / read-only viewer mode ---------- */
+  .view-banner{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    background:#dcebe7; border:1px solid var(--console-accent); color:var(--console-accent);
+    padding:10px 16px; border-radius:8px; font-size:12.5px; font-weight:700; margin-bottom:18px;
+  }
+  .view-banner .vb-tag{
+    background:var(--console-accent); color:#fff; border-radius:5px; padding:2px 8px; font-size:11px; font-weight:800;
+  }
+  .view-banner .vb-note{color:var(--ink-soft); font-weight:600;}
+  /* hide every data-changing control when the file is opened as a shared read-only copy */
+  body.viewer #storageBanner,
+  body.viewer #btnShareExport,
+  body.viewer #btnNewPo,
+  body.viewer #btnNewDom,
+  body.viewer #btnNewSupp,
+  body.viewer .panel-actions,
+  body.viewer .del-link,
+  body.viewer .appr-actions,
+  body.viewer .appr-supplier-check,
+  body.viewer #apprDeleteBtn{ display:none !important; }
+  /* disabled fields in read-only detail panels should still look readable, not greyed out */
+  body.viewer .panel input:disabled,
+  body.viewer .panel select:disabled,
+  body.viewer .panel textarea:disabled,
+  body.viewer #memoTextarea:disabled{
+    opacity:1; -webkit-text-fill-color:var(--ink); color:var(--ink); background:var(--paper-2); cursor:default;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <img class="icon logo-img" src="data:image/png;base64,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" alt="FLOWTECH">
+    <h1>발주현황</h1>
+    <span class="sub">개인 진행 트래커</span>
+  </div>
+  <div class="tabs">
+    <div class="tab memo-tab" id="memoTab">📝 메모장</div>
+    <div class="tab active" data-view="dash">대시보드</div>
+    <div class="tab" data-view="po">해외발주건</div>
+    <div class="tab" data-view="domestic">국내발주건</div>
+    <div class="tab" data-view="poc">발주서</div>
+    <div class="tab" data-view="appr">결재</div>
+    <div class="tab" data-view="cal">캘린더</div>
+    <div class="tab" data-view="monthcost">월별비용</div>
+    <div class="tab" data-view="supp">거래처</div>
+    <div class="tab" data-view="dhl">DHL계정</div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="storage-banner" id="storageBanner">
+    <span>⚠ 이 화면은 자동저장이 연결되지 않아, <b>새로고침하면 입력한 내용이 사라집니다.</b> 작업 후에는 꼭 '저장하기'로 백업하세요.</span>
+    <div style="display:flex; gap:6px; flex-shrink:0;">
+      <button class="btn ghost" id="btnExport">⬇ 저장하기</button>
+      <button class="btn ghost" id="btnImport">⬆ 불러오기</button>
+      <input type="file" id="fileImport" accept="application/json" style="display:none;">
+    </div>
+  </div>
+
+  <!-- ===================== DASHBOARD ===================== -->
+  <div class="view active" id="view-dash">
+    <div class="console-screen">
+      <div class="console-head">
+        <h2>발주 현황판</h2>
+        <div style="display:flex; align-items:center; gap:14px;">
+          <button class="btn brass no-print" id="btnShareExport" style="padding:8px 14px; font-size:12.5px;">🔗 공유용 보기 파일 내보내기</button>
+          <span class="stamp" id="stampDate"></span>
+        </div>
+      </div>
+      <div class="console-grid">
+
+        <div class="cpanel col-2"><span class="clabel">전체 발주</span><div class="kpi-num" id="kpiTotal">0</div><div class="kpi-lbl">건</div></div>
+        <div class="cpanel col-2"><span class="clabel">진행중</span><div class="kpi-num" id="kpiProgress">0</div><div class="kpi-lbl">건</div></div>
+        <div class="cpanel col-2"><span class="clabel">선금 지급금액</span><div class="kpi-num" id="kpiDepositPaidKrw">₩0</div><div class="kpi-lbl" id="kpiDepositPaid">$0</div><div class="kpi-lbl" id="kpiDepositPaidCny">¥0</div></div>
+        <div class="cpanel col-2"><span class="clabel">결제예정금액</span><div class="kpi-num" id="kpiBalanceLeftKrw">₩0</div><div class="kpi-lbl" id="kpiBalanceLeft">$0</div><div class="kpi-lbl" id="kpiBalanceLeftCny">¥0</div></div>
+        <div class="cpanel col-2"><span class="clabel">완료건</span><div class="kpi-num" id="kpiDone">0</div><div class="kpi-lbl">건</div></div>
+        <div class="cpanel col-2"><span class="clabel">완료 금액 합계</span><div class="kpi-num" id="kpiUsdKrw">₩0</div><div class="kpi-lbl" id="kpiUsd">$0</div><div class="kpi-lbl" id="kpiUsdCny">¥0</div></div>
+        <div class="cpanel col-4">
+          <span class="clabel">종결 비율</span>
+          <div class="donut-wrap">
+            <svg width="52" height="52" viewBox="0 0 52 52">
+              <circle cx="26" cy="26" r="21" fill="none" stroke="var(--console-line)" stroke-width="7"/>
+              <circle id="donutRing" cx="26" cy="26" r="21" fill="none" stroke="var(--console-accent)" stroke-width="7"
+                stroke-dasharray="0 1000" stroke-linecap="round" transform="rotate(-90 26 26)"/>
+            </svg>
+            <div><div class="dnum" id="donutPct">0%</div><div class="dlbl">ERP입력완료</div></div>
+          </div>
+        </div>
+
+        <div class="cpanel col-8">
+          <span class="clabel">단계별 분포 (해외)</span>
+          <div class="stage-bar" id="stageBar"></div>
+        </div>
+
+        <div class="cpanel col-4" style="grid-row: span 2;">
+          <span class="clabel">기간별 금액 조회 (환율 환산)</span>
+          <div class="fx-row">
+            <div class="fx-field"><label>USD → KRW</label><input type="number" id="fxKrw" step="0.01"></div>
+            <div class="fx-field"><label>CNY(위안) → KRW</label><input type="number" id="fxCny" step="0.01" placeholder="예: 190"></div>
+          </div>
+          <div class="fx-row">
+            <div class="fx-field"><label>요청일 시작</label><input type="date" id="fxDateStart"></div>
+            <div class="fx-field"><label>요청일 종료</label><input type="date" id="fxDateEnd"></div>
+          </div>
+          <div class="fx-totals">
+            <div class="fx-total-row"><span class="cur">건수</span><span class="amt" id="fxCount">0건</span></div>
+            <div class="fx-total-row"><span class="cur">KRW</span><span class="amt" id="totKrw">₩0</span></div>
+            <div class="fx-total-row"><span class="cur">USD</span><span class="amt" id="totUsd">$0.00</span></div>
+            <div class="fx-total-row"><span class="cur">CNY(위안)</span><span class="amt" id="totCny">¥0.00</span></div>
+          </div>
+          <div class="fx-note">환율은 매일 직접 입력하는 값입니다(자동 조회 없음). 요청일 기준으로 기간을 지정하면 그 기간 발주 금액 합계(USD, CI금액이 있으면 CI금액 기준)를 환율로 환산해 보여줍니다. 기간을 비워두면 전체 발주가 대상입니다.</div>
+        </div>
+
+        <div class="cpanel col-8">
+          <span class="clabel">단계별 분포 (국내)</span>
+          <div class="stage-bar" id="domStageBar"></div>
+        </div>
+
+        <div class="cpanel col-8">
+          <span class="clabel">주의 필요 항목</span>
+          <div class="clist" id="alertList"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== PO TRACKER ===================== -->
+  <div class="view" id="view-po">
+    <div class="view-header"><span class="vlabel">해외발주 목록</span></div>
+    <div class="toolbar">
+      <input class="search" id="poSearch" placeholder="품명 / 공급사 / 품목코드 / 요청자 검색">
+      <div style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
+        <div class="fgroup" style="margin-bottom:0;"><label>요청일 시작</label><input type="date" id="poDateStart"></div>
+        <div class="fgroup" style="margin-bottom:0;"><label>요청일 종료</label><input type="date" id="poDateEnd"></div>
+        <button class="btn ghost" id="btnResetPoFilter">↻ 새로고침 (전체보기)</button>
+        <button class="btn ghost" id="btnDownloadPo">⬇ 목록 다운로드</button>
+        <button class="btn brass" id="btnNewPo">+ 새 해외발주 등록</button>
+      </div>
+    </div>
+    <div class="cal-legend" id="poStageLegend"></div>
+    <div class="filter-banner" id="poFilterBanner" style="display:none;"></div>
+    <div class="table-wrap">
+      <table id="poTable">
+        <thead>
+          <tr>
+            <th>요청일</th><th>요청자</th><th>품명</th><th>품목코드</th><th>수량</th><th>공급사</th>
+            <th>PI금액</th><th>선금액</th><th>잔금액</th><th>납기요청일</th><th>상태</th><th>입고일</th><th>특이사항</th>
+          </tr>
+        </thead>
+        <tbody id="poTbody"></tbody>
+      </table>
+      <div class="empty-state" id="poEmpty" style="display:none;">
+        <div class="big">등록된 발주가 없습니다</div>
+        <div>‘+ 새 발주 등록’ 버튼으로 첫 발주를 추가해보세요.</div>
+      </div>
+    </div>
+    <div class="po-totals" id="poTotals"></div>
+  </div>
+
+  <!-- ===================== 국내발주건 ===================== -->
+  <div class="view" id="view-domestic">
+    <div class="view-header"><span class="vlabel">국내발주 목록</span></div>
+    <div class="toolbar">
+      <input class="search" id="domSearch" placeholder="품명 / 공급사 / 품목코드 / 요청자 검색">
+      <div style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
+        <div class="fgroup" style="margin-bottom:0;"><label>요청일 시작</label><input type="date" id="domDateStart"></div>
+        <div class="fgroup" style="margin-bottom:0;"><label>요청일 종료</label><input type="date" id="domDateEnd"></div>
+        <button class="btn ghost" id="btnResetDomFilter">↻ 새로고침 (전체보기)</button>
+        <button class="btn ghost" id="btnDownloadDom">⬇ 목록 다운로드</button>
+        <button class="btn brass" id="btnNewDom">+ 새 국내발주 등록</button>
+      </div>
+    </div>
+    <div class="cal-legend" id="domStageLegend"></div>
+    <div class="filter-banner" id="domFilterBanner" style="display:none;"></div>
+    <div class="table-wrap">
+      <table id="domTable">
+        <thead>
+          <tr>
+            <th>요청일</th><th>요청자</th><th>품명</th><th>품목코드</th><th>수량</th><th>공급사</th>
+            <th>발주금액(KRW)</th><th>선금액</th><th>잔금액</th><th>납기요청일</th><th>상태</th><th>입고일</th><th>특이사항</th>
+          </tr>
+        </thead>
+        <tbody id="domTbody"></tbody>
+      </table>
+      <div class="empty-state" id="domEmpty" style="display:none;">
+        <div class="big">등록된 국내발주가 없습니다</div>
+        <div>‘+ 새 국내발주 등록’ 버튼으로 첫 발주를 추가해보세요.</div>
+      </div>
+    </div>
+    <div class="po-totals" id="domTotals"></div>
+  </div>
+
+  <!-- ===================== 발주서 작성 ===================== -->
+  <div class="view" id="view-poc">
+    <div class="view-header"><span class="vlabel">발주서 작성</span></div>
+    <div class="cal-hint">아직 발주 전인 "요청등록" 단계 건을 해외·국내 모두 모아서 보여줍니다. 공급사를 지정해 필요한 품목만 골라 발주서로 뽑아보세요.</div>
+    <div class="poc-filters">
+      <div class="fgroup"><label>공급사</label><select id="pocSupplier"><option value="">전체</option></select></div>
+      <div class="fgroup" style="display:flex; align-items:flex-end; gap:8px;">
+        <button class="btn ghost" id="pocReset">초기화</button>
+        <button class="btn ghost" id="pocDownload">⬇ CSV 다운로드</button>
+        <button class="btn brass" id="pocPrint">🖨 발주서 인쇄/PDF</button>
+      </div>
+    </div>
+
+    <div class="poc-doc-title">PURCHASE ORDER</div>
+    <div class="poc-doc-meta" id="pocDocMeta"></div>
+    <div id="pocResult"></div>
+    <div id="pocResultPrint" class="poc-print-only"></div>
+  </div>
+
+  <!-- ===================== 결재 ===================== -->
+  <div class="view" id="view-appr">
+    <div class="view-header"><span class="vlabel">결재</span></div>
+    <div id="apprContent"></div>
+  </div>
+
+  <!-- ===================== CALENDAR ===================== -->
+  <div class="view" id="view-cal">
+    <div class="view-header"><span class="vlabel">발주 캘린더</span></div>
+    <div class="cal-toolbar">
+      <button class="btn ghost" id="calPrev">‹ 이전달</button>
+      <div class="cal-month" id="calMonthLabel">2026년 7월</div>
+      <button class="btn ghost" id="calNext">다음달 ›</button>
+      <button class="btn ghost" id="calToday" style="margin-left:auto;">오늘</button>
+    </div>
+    <div class="cal-hint">각 발주의 납기요청일에 점과 건수가 표시됩니다. 날짜를 클릭하면 그날 목록을 볼 수 있어요. (종결된 건은 표시하지 않습니다)</div>
+    <div class="cal-wrap">
+      <div class="cal-dow-row" id="calDowRow"></div>
+      <div id="calWeeks"></div>
+    </div>
+  </div>
+
+  <!-- ===================== CALENDAR DAY DETAIL PANEL ===================== -->
+  <div class="overlay" id="dayOverlay">
+    <div class="panel" style="width:min(440px,94vw);">
+      <div class="panel-head">
+        <h2 id="dayPanelTitle">2026-07-22</h2>
+        <button class="panel-close" id="dayPanelClose">&times;</button>
+      </div>
+      <div class="panel-body">
+        <div id="dayPanelList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== PI GROUP DETAIL PANEL ===================== -->
+  <div class="overlay" id="piGroupOverlay">
+    <div class="panel" style="width:min(460px,94vw);">
+      <div class="panel-head">
+        <h2 id="piGroupPanelTitle">PI 그룹</h2>
+        <button class="panel-close" id="piGroupPanelClose">&times;</button>
+      </div>
+      <div class="panel-body">
+        <div id="piGroupMismatchNote" style="display:none;"></div>
+        <div id="piGroupList"></div>
+        <div id="piGroupTotals" class="po-totals" style="margin-top:16px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MONTHLY COST FORECAST ===================== -->
+  <div class="view" id="view-monthcost">
+    <div class="view-header"><span class="vlabel">월별 예상 비용</span></div>
+    <div class="cal-hint">각 발주의 납기요청일 기준으로 월별 예상 지출 합계를 보여줍니다. 해외는 CI금액(없으면 PI금액)을 환율로 환산, 국내는 실제입고금액(없으면 발주금액) 기준입니다. 선금이 이미 지급된 건은 남은 잔금만 합계에 반영됩니다(지급된 선금은 아래 "선금 지급내역"에서 확인). 종결(ERP입력완료)된 건은 자동으로 제외됩니다.</div>
+    <div class="mc-grand-row">
+      <span class="mc-grand-label">진행중인 전체 예상 비용 합계</span>
+      <span class="mc-grand-total" id="monthCostGrandTotal">₩0</span>
+    </div>
+    <div class="mc-list" id="monthCostList"></div>
+    <div class="empty-state" id="monthCostEmpty" style="display:none;">납기요청일이 있는 진행중인 발주가 없습니다.</div>
+  </div>
+
+  <!-- ===================== MONTHLY COST DETAIL PANEL ===================== -->
+  <div class="overlay" id="monthCostOverlay">
+    <div class="panel" style="width:min(440px,94vw);">
+      <div class="panel-head">
+        <h2 id="monthCostPanelTitle">2026년 7월</h2>
+        <button class="panel-close" id="monthCostPanelClose">&times;</button>
+      </div>
+      <div class="panel-body">
+        <div id="monthCostPanelList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== MEMO PAD ===================== -->
+  <div class="overlay" id="memoOverlay">
+    <div class="panel" style="width:min(440px,94vw);">
+      <div class="panel-head">
+        <h2>📝 메모장</h2>
+        <button class="panel-close" id="memoPanelClose">&times;</button>
+      </div>
+      <div class="panel-body">
+        <textarea id="memoTextarea" placeholder="기억하고 싶은 내용을 자유롭게 적어두세요..." style="width:100%; min-height:60vh; resize:vertical; padding:12px 14px; border:1px solid var(--line); border-radius:8px; font-family:var(--sans); font-size:14px; line-height:1.6; color:var(--ink);"></textarea>
+        <div style="margin-top:8px; font-size:11.5px; color:var(--ink-soft);">입력하는 대로 자동 저장됩니다.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== SUPPLIERS ===================== -->
+  <div class="view" id="view-supp">
+    <div class="view-header"><span class="vlabel">거래처 마스터</span></div>
+    <div class="toolbar">
+      <div style="font-size:13px;color:var(--ink-soft); font-weight:600;">해외 제조사 담당자 · 결제조건 · 특이사항 (카드를 클릭하면 수정할 수 있어요)</div>
+      <button class="btn brass" id="btnNewSupp">+ 거래처 추가</button>
+    </div>
+    <div class="supp-grid" id="suppGrid"></div>
+  </div>
+
+  <!-- ===================== DHL ACCOUNT ===================== -->
+  <div class="view" id="view-dhl">
+    <div class="view-header"><span class="vlabel">DHL 계정 정보</span></div>
+    <div class="dhl-grid">
+      <div class="dhl-card">
+        <div class="dhl-card-head">태성정밀</div>
+        <div class="dhl-row"><span class="k">EX. CARRIER</span><span class="v">DHL (account : 966893553)</span></div>
+        <div class="dhl-row"><span class="k">COMPANY</span><span class="v">TAESUNG PRECISION CO.,LTD</span></div>
+        <div class="dhl-row"><span class="k">ADDRESS</span><span class="v">42-31, Dongsan-ro 27beon-gil, Danwon-gu, Ansan-si, Gyeonggi-do, Republic of Korea</span></div>
+        <div class="dhl-row"><span class="k">POSTAL CODE</span><span class="v">15433</span></div>
+        <div class="dhl-row"><span class="k">C.P</span><span class="v">J.M Oh (+82 10 6655 4706)</span></div>
+        <button class="btn ghost dhl-copy-btn">⧉ 복사</button>
+      </div>
+      <div class="dhl-card">
+        <div class="dhl-card-head">플로우텍</div>
+        <div class="dhl-row"><span class="k">EX. CARRIER</span><span class="v">DHL (account : 965251112)</span></div>
+        <div class="dhl-row"><span class="k">COMPANY</span><span class="v">FLOWTECH CO.,LTD</span></div>
+        <div class="dhl-row"><span class="k">ADDRESS</span><span class="v">309-8, Haean-ro, Danwon-gu, Ansan-si, Gyeonggi-do, Republic of Korea</span></div>
+        <div class="dhl-row"><span class="k">POSTAL CODE</span><span class="v">15613</span></div>
+        <div class="dhl-row"><span class="k">C.P</span><span class="v">J.M Oh (+82 10 6655 4706)</span></div>
+        <button class="btn ghost dhl-copy-btn">⧉ 복사</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== PO PANEL ===================== -->
+<div class="overlay" id="poOverlay">
+  <div class="panel">
+    <div class="panel-head">
+      <h2 id="poPanelTitle">새 발주 등록</h2>
+      <button class="panel-close" id="poPanelClose">&times;</button>
+    </div>
+    <div class="panel-body">
+      <form id="poForm">
+        <fieldset class="fieldset" id="fs1">
+          <legend>① 요청 정보</legend>
+          <div class="frow">
+            <div class="fgroup"><label>요청일</label><input type="date" name="reqDate"></div>
+            <div class="fgroup"><label>요청자</label><input type="text" name="requester" placeholder="예: 정명재"></div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>품목코드</label><input type="text" name="itemCode"></div>
+            <div class="fgroup"><label>수량</label><input type="number" name="qty" min="0"></div>
+          </div>
+          <div class="fgroup">
+            <label>품명</label>
+            <input type="text" name="itemName">
+            <div class="item-tag-row">
+              <label class="item-tag"><input type="checkbox" name="isFirstBatch"> 초도제품</label>
+              <label class="item-tag"><input type="checkbox" name="isSample"> 샘플제품</label>
+              <label class="item-tag"><input type="checkbox" name="isUrgent"> 긴급</label>
+            </div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>납기요청일</label><input type="date" name="dueDate"></div>
+            <div class="fgroup"><label>공급사</label><select name="supplier" id="supplierSelect"></select></div>
+          </div>
+        </fieldset>
+
+        <fieldset class="fieldset" id="fs2">
+          <legend>② PI / 선금</legend>
+          <div class="frow">
+            <div class="fgroup"><label>PI번호</label><input type="text" name="piNo" class="field-key"></div>
+            <div class="fgroup"><label>PI수령일</label><input type="date" name="piDate"></div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>PI금액</label><input type="number" step="0.01" name="piAmount"></div>
+            <div class="fgroup"><label>선금 비율 (%)</label><input type="number" name="depositPct" placeholder="예: 30"></div>
+          </div>
+          <div class="item-tag-row" style="margin-top:-6px; margin-bottom:14px;">
+            <label class="item-tag"><input type="radio" name="currencyPi" value="USD" checked> USD로 송금</label>
+            <label class="item-tag"><input type="radio" name="currencyPi" value="CNY"> CNY(위안)로 송금</label>
+            <input type="hidden" name="currency" value="USD">
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>선금지급 예정일</label><input type="date" name="depositPlannedDate"></div>
+            <div class="fgroup">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                <label style="margin-bottom:0;">선금지급일</label>
+                <label style="display:flex; align-items:center; gap:4px; font-weight:400; text-transform:none; color:var(--console-accent); cursor:pointer; font-size:11px; margin-bottom:0;">
+                  <input type="checkbox" name="depositDeferred" style="width:auto; margin:0;"> 입고 후 지급
+                </label>
+              </div>
+              <input type="date" name="depositDate">
+            </div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>선금 공유(정향미)</label>
+              <div class="share-status" id="depositSharedDisplay">미공유</div>
+              <input type="hidden" name="depositShared">
+            </div>
+            <div class="fgroup"><label>생산완료 예정일</label><input type="date" name="prodDueDate"></div>
+          </div>
+          <div class="fgroup"><label>PI 문서 링크 <span style="font-weight:400; color:var(--ink-soft); text-transform:none;">(구글드라이브)</span></label><input type="url" name="piDocUrl" placeholder="https://drive.google.com/..."></div>
+        </fieldset>
+
+        <fieldset class="fieldset" id="fs3">
+          <legend>③ 생산 / 선적 / 잔금</legend>
+          <div class="frow">
+            <div class="fgroup"><label>CI번호</label><input type="text" name="ciNo" class="field-key"></div>
+            <div class="fgroup"><label>CI수령일</label><input type="date" name="ciDate"></div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label style="color:#dc2626; font-weight:800;">CI 수량<span style="display:block; font-weight:800; color:#dc2626; text-transform:none; font-size:11px; margin-top:2px;">불량/재고 등으로 바뀐 경우만</span></label><input type="number" name="ciQty" min="0" placeholder="예: 750"></div>
+            <div class="fgroup"><label style="color:#dc2626; font-weight:800;">CI 금액<span style="display:block; font-weight:800; color:#dc2626; text-transform:none; font-size:11px; margin-top:2px;">입력 시 잔금에 자동 반영</span></label><input type="number" step="0.01" name="ciAmount" placeholder="예: 750.00"></div>
+          </div>
+          <div class="item-tag-row" style="margin-top:-6px; margin-bottom:14px;">
+            <label class="item-tag"><input type="radio" name="currencyCi" value="USD"> USD로 송금</label>
+            <label class="item-tag"><input type="radio" name="currencyCi" value="CNY"> CNY(위안)로 송금</label>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>잔금지급 예정일</label><input type="date" name="balancePlannedDate"></div>
+            <div class="fgroup">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                <label style="margin-bottom:0;">잔금지급일</label>
+                <label style="display:flex; align-items:center; gap:4px; font-weight:400; text-transform:none; color:var(--console-accent); cursor:pointer; font-size:11px; margin-bottom:0;">
+                  <input type="checkbox" name="balanceDeferred" style="width:auto; margin:0;"> 입고 후 지급
+                </label>
+              </div>
+              <input type="date" name="balanceDate">
+            </div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>잔금 공유(정향미)</label>
+              <div class="share-status" id="balanceSharedDisplay">미공유</div>
+              <input type="hidden" name="balanceShared">
+            </div>
+            <div class="fgroup"><label>선적일</label><input type="date" name="shipDate"></div>
+          </div>
+          <div class="fgroup"><label>BL NO. (참고용)</label><input type="text" name="blNo"></div>
+          <div class="frow">
+            <div class="fgroup"><label>항구 도착 예정일</label><input type="date" name="etaPlanned"></div>
+            <div class="fgroup"><label>공장 입고 예정일 <span style="font-weight:400; color:var(--ink-soft); text-transform:none;">(자동: 영업일 +5일)</span></label><input type="date" name="warehousePlanned"></div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>CI 문서 링크 <span style="font-weight:400; color:var(--ink-soft); text-transform:none;">(구글드라이브)</span></label><input type="url" name="ciDocUrl" placeholder="https://drive.google.com/..."></div>
+            <div class="fgroup"><label>BL 문서 링크</label><input type="url" name="blDocUrl" placeholder="https://drive.google.com/..."></div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>패킹리스트(PL) 링크</label><input type="url" name="plDocUrl" placeholder="https://drive.google.com/..."></div>
+            <div class="fgroup"><label>원산지증명서 링크</label><input type="url" name="coDocUrl" placeholder="https://drive.google.com/..."></div>
+          </div>
+        </fieldset>
+
+        <fieldset class="fieldset" id="fs4">
+          <legend>④ 통관 / 입고 / 검수 / ERP</legend>
+          <div class="frow">
+            <div class="fgroup"><label>항구도착일(ETA)</label><input type="date" name="etaDate"></div>
+            <div class="fgroup"><label>통관비용 (KRW)</label><input type="number" name="customsCost"></div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>공장입고일</label><input type="date" name="warehouseDate"></div>
+            <div class="fgroup"><label>입고 공유(정명재)</label>
+              <div class="share-status" id="warehouseSharedDisplay">미공유</div>
+              <input type="hidden" name="warehouseShared">
+            </div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>품질검수완료일</label><input type="date" name="qcDate"></div>
+            <div class="fgroup"><label>ERP입력일</label><input type="date" name="erpDate"></div>
+          </div>
+        </fieldset>
+
+        <div class="fgroup"><label>특이사항</label><textarea name="note" rows="2" placeholder="이 발주 건의 특이사항을 적어주세요"></textarea></div>
+        <div class="fgroup"><label>변경사항</label><textarea name="changeLog" rows="2" placeholder="일정/수량/금액 변경 등 이력을 적어주세요"></textarea></div>
+
+        <div class="computed">
+          <span class="clabel-title">예상 선금 / 잔금 (USD · KRW)</span>
+          <b id="computedAmounts">$0.00 / $0.00</b>
+        </div>
+
+        <div class="panel-actions">
+          <button type="button" class="btn ghost" id="poCancelBtn">취소</button>
+          <button type="button" class="btn ghost" id="poDuplicateBtn" style="display:none;">⧉ 이 건 복제하기 (분할 입고용)</button>
+          <button type="submit" class="btn brass">저장</button>
+        </div>
+        <div class="del-link" id="poDeleteLink" style="display:none;">이 발주 삭제</div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 국내발주 PANEL ===================== -->
+<div class="overlay" id="domOverlay">
+  <div class="panel">
+    <div class="panel-head">
+      <h2 id="domPanelTitle">새 국내발주 등록</h2>
+      <button class="panel-close" id="domPanelClose">&times;</button>
+    </div>
+    <div class="panel-body">
+      <form id="domForm">
+        <fieldset class="fieldset" id="dfs1">
+          <legend>① 요청 정보</legend>
+          <div class="frow">
+            <div class="fgroup"><label>요청일</label><input type="date" name="reqDate"></div>
+            <div class="fgroup"><label>요청자</label><input type="text" name="requester" placeholder="예: 정명재"></div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>품목코드</label><input type="text" name="itemCode"></div>
+            <div class="fgroup"><label>수량</label><input type="number" name="qty" min="0"></div>
+          </div>
+          <div class="fgroup"><label>품명</label><input type="text" name="itemName"></div>
+          <div class="frow">
+            <div class="fgroup"><label>납기요청일</label><input type="date" name="dueDate"></div>
+            <div class="fgroup"><label>공급사</label><select name="supplier" id="domSupplierSelect"></select></div>
+          </div>
+        </fieldset>
+
+        <fieldset class="fieldset" id="dfs2">
+          <legend>② 발주금액 / 선금</legend>
+          <div class="frow">
+            <div class="fgroup"><label>발주금액 (KRW)</label><input type="number" step="1" name="poAmount"></div>
+            <div class="fgroup"><label>선금 비율 (%)</label><input type="number" name="depositPct" placeholder="예: 30"></div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>선금지급 예정일</label><input type="date" name="depositPlannedDate"></div>
+            <div class="fgroup">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                <label style="margin-bottom:0;">선금지급일</label>
+                <label style="display:flex; align-items:center; gap:4px; font-weight:400; text-transform:none; color:var(--console-accent); cursor:pointer; font-size:11px; margin-bottom:0;">
+                  <input type="checkbox" name="depositDeferred" style="width:auto; margin:0;"> 입고 후 지급
+                </label>
+              </div>
+              <input type="date" name="depositDate">
+            </div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>선금 공유(정향미)</label>
+              <div class="share-status" id="domDepositSharedDisplay">미공유</div>
+              <input type="hidden" name="depositShared">
+            </div>
+            <div class="fgroup"></div>
+          </div>
+        </fieldset>
+
+        <fieldset class="fieldset" id="dfs3">
+          <legend>③ 입고 / 잔금</legend>
+          <div class="frow">
+            <div class="fgroup"><label>입고 예정일</label><input type="date" name="warehousePlanned"></div>
+            <div class="fgroup"><label>입고일</label><input type="date" name="warehouseDate"></div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label style="color:#dc2626; font-weight:800;">실제 입고수량<span style="display:block; font-weight:800; color:#dc2626; text-transform:none; font-size:11px; margin-top:2px;">불량/재고 등으로 바뀐 경우만</span></label><input type="number" name="actualQty" min="0" placeholder="예: 950"></div>
+            <div class="fgroup"><label style="color:#dc2626; font-weight:800;">실제 입고금액 (KRW)<span style="display:block; font-weight:800; color:#dc2626; text-transform:none; font-size:11px; margin-top:2px;">입력 시 잔금에 자동 반영</span></label><input type="number" step="1" name="actualAmount" placeholder="예: 9500000"></div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>입고 공유(정명재)</label>
+              <div class="share-status" id="domWarehouseSharedDisplay">미공유</div>
+              <input type="hidden" name="warehouseShared">
+            </div>
+            <div class="fgroup"></div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>잔금지급 예정일</label><input type="date" name="balancePlannedDate"></div>
+            <div class="fgroup">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                <label style="margin-bottom:0;">잔금지급일</label>
+                <label style="display:flex; align-items:center; gap:4px; font-weight:400; text-transform:none; color:var(--console-accent); cursor:pointer; font-size:11px; margin-bottom:0;">
+                  <input type="checkbox" name="balanceDeferred" style="width:auto; margin:0;"> 입고 후 지급
+                </label>
+              </div>
+              <input type="date" name="balanceDate">
+            </div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>잔금 공유(정향미)</label>
+              <div class="share-status" id="domBalanceSharedDisplay">미공유</div>
+              <input type="hidden" name="balanceShared">
+            </div>
+            <div class="fgroup"></div>
+          </div>
+        </fieldset>
+
+        <fieldset class="fieldset" id="dfs4">
+          <legend>④ 검수 / ERP</legend>
+          <div class="frow">
+            <div class="fgroup"><label>품질검수완료일</label><input type="date" name="qcDate"></div>
+            <div class="fgroup"><label>ERP입력일</label><input type="date" name="erpDate"></div>
+          </div>
+        </fieldset>
+
+        <div class="fgroup"><label>특이사항</label><textarea name="note" rows="2" placeholder="이 발주 건의 특이사항을 적어주세요"></textarea></div>
+        <div class="fgroup"><label>변경사항</label><textarea name="changeLog" rows="2" placeholder="일정/수량/금액 변경 등 이력을 적어주세요"></textarea></div>
+
+        <div class="computed">
+          <span class="clabel-title">예상 선금 / 잔금 (KRW)</span>
+          <b id="domComputedAmounts">₩0 / ₩0</b>
+        </div>
+
+        <div class="panel-actions">
+          <button type="button" class="btn ghost" id="domCancelBtn">취소</button>
+          <button type="button" class="btn ghost" id="domDuplicateBtn" style="display:none;">⧉ 이 건 복제하기 (분할 입고용)</button>
+          <button type="submit" class="btn brass">저장</button>
+        </div>
+        <div class="del-link" id="domDeleteLink" style="display:none;">이 발주 삭제</div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SUPPLIER PANEL ===================== -->
+<div class="overlay" id="suppOverlay">
+  <div class="panel">
+    <div class="panel-head">
+      <h2 id="suppPanelTitle">거래처 추가</h2>
+      <button class="panel-close" id="suppPanelClose">&times;</button>
+    </div>
+    <div class="panel-body">
+      <form id="suppForm">
+        <div class="fgroup"><label>구분</label>
+          <select name="type">
+            <option value="overseas">해외</option>
+            <option value="domestic">국내</option>
+          </select>
+        </div>
+        <div class="fgroup"><label>회사명</label><input type="text" name="name" required></div>
+        <div class="fgroup"><label>업종 / 취급품목 특징</label><input type="text" name="category"></div>
+        <div class="frow">
+          <div class="fgroup"><label>담당자명</label><input type="text" name="contact"></div>
+          <div class="fgroup"><label>연락처(Wechat ID)</label><input type="text" name="wechat"></div>
+        </div>
+        <div class="frow">
+          <div class="fgroup"><label>위치</label><input type="text" name="location"></div>
+          <div class="fgroup"><label>결제방식</label><input type="text" name="payMethod" placeholder="예: FOB"></div>
+        </div>
+        <div class="fgroup"><label>주요품목</label><input type="text" name="items"></div>
+        <div class="fgroup"><label>결제조건(대금지급)</label><input type="text" name="payTerms" placeholder="예: 30%선금(PI)/입고 후 70% 잔금(CI)"></div>
+        <div class="fgroup"><label>특이사항 / 업체평가</label><textarea name="note" rows="2"></textarea></div>
+        <div class="panel-actions">
+          <button type="button" class="btn ghost" id="suppCancelBtn">취소</button>
+          <button type="submit" class="btn brass">저장</button>
+        </div>
+        <div class="del-link" id="suppDeleteLink" style="display:none;">이 거래처 삭제</div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// 공유용 보기 파일로 내보낸 경우, 데이터 스냅샷이 <head>에 window.__SHARED_SNAPSHOT__ 으로 주입된다.
+// 이 값이 있으면 "읽기전용 공유 열람 모드"로 동작한다(저장 없음, 편집 UI 숨김).
+const SHARED = (typeof window !== 'undefined' && window.__SHARED_SNAPSHOT__ && typeof window.__SHARED_SNAPSHOT__ === 'object') ? window.__SHARED_SNAPSHOT__ : null;
+const VIEWER = !!SHARED;
+
+const STAGE_LABELS = ["①요청등록","②PI수령","③선금지급완료","④CI수령","⑤잔금지급완료","⑥선적완료","⑦항구도착","⑧공장입고","⑨품질검수완료","⑩ERP입력완료"];
+let poStageFilter = null; // set by clicking a stage-distribution number on the dashboard
+let domStageFilter = null; // 국내발주건용
+// one shared, highly distinguishable multi-hue palette (grey start -> warm -> cool -> green finish)
+// used everywhere: table badges, stage bar, calendar dots/events
+const STAGE_COLORS = ["#94a3b8","#ea580c","#d97706","#ca8a04","#65a30d","#0d9488","#0284c7","#2563eb","#7c3aed","#16a34a"];
+const STAGE_COLORS_CONSOLE = STAGE_COLORS;
+function stripStageNum(label){ return label.replace(/^[①-⑩]\s*/, ''); }
+// 발주 건에 연결된 구글드라이브 문서 링크(PI/CI/BL/PL/원산지증명서)를 텍스트 배지 형태로 표시 (이모지는 기기별로 깨질 수 있어 사용하지 않음)
+const DOC_LINK_DEFS = [
+  {key:'piDocUrl', cls:'doc-pi', text:'PI', label:'PI 문서'},
+  {key:'ciDocUrl', cls:'doc-ci', text:'CI', label:'CI 문서'},
+  {key:'blDocUrl', cls:'doc-bl', text:'BL', label:'BL 문서'},
+  {key:'plDocUrl', cls:'doc-pl', text:'PL', label:'패킹리스트(PL)'},
+  {key:'coDocUrl', cls:'doc-co', text:'CO', label:'원산지증명서'},
+];
+function docLinksHtml(p){
+  const links = DOC_LINK_DEFS.filter(d=>p[d.key]);
+  if(links.length===0) return '';
+  return `<span class="doc-link-wrap">${links.map(d=>`<a class="doc-link ${d.cls}" href="${p[d.key]}" target="_blank" rel="noopener" title="${d.label} 열기">${d.text}</a>`).join('')}</span>`;
+}
+// 입고 후 지급으로 체크된 건은 아직 실제로 지급된 게 아니므로, "지급완료"가 아니라 "입고후지급예정"으로 표시
+function stageLabelText(po, stageIdx, isDom){
+  if(!isDom){
+    if(stageIdx===2 && po.depositDeferred && !po.depositDate) return '입고후지급예정(선금)';
+    if(stageIdx===4 && po.balanceDeferred && !po.balanceDate) return '입고후지급예정(잔금)';
+  }else{
+    if(stageIdx===1 && po.depositDeferred && !po.depositDate) return '입고후지급예정(선금)';
+    if(stageIdx===3 && po.balanceDeferred && !po.balanceDate) return '입고후지급예정(잔금)';
+  }
+  return stripStageNum((isDom?DOM_STAGE_LABELS:STAGE_LABELS)[stageIdx]);
+}
+
+let fxRates = {krw: 1475, cny: 190}; // 기본값(참고용) — 매일 사용자가 직접 갱신. cny는 CNY(위안)→KRW 환율
+
+const DEFAULT_SUPPLIERS = [
+  {type:"overseas", id:"s1", name:"Huihang", category:"아연,SUS-수전바디,스파우트(SUS)", contact:"Ms.June", wechat:"mo_oncake", location:"광저우 카이핑", items:"레버핸들/스파우트/주물바디/포장백", payMethod:"FOB", payTerms:"입고 후 70% 잔금 지급(CI)", note:"모든 면에서 가장 적극적인 협조"},
+  {type:"overseas", id:"s2", name:"Jiali", category:"황동소재, 몸통(가공위주)", contact:"Mr.Edwin", wechat:"Edwin-1990", location:"광저우 카이핑", items:"황동스파우트, 원홀센서바디 외", payMethod:"FOB", payTerms:"30%선금(PI)/입고 후 70% 잔금(CI)", note:"납기에 주의 필요 · 발주량 적음"},
+  {type:"overseas", id:"s3", name:"Lianyang", category:"SUS파이프,SUS수전", contact:"Mr.Jason", wechat:"kpjason1002", location:"광저우 카이핑", items:"슬라이드바, 씽크하부부속, LED거울 외", payMethod:"FOB", payTerms:"30%선금(PI)/입고 후 70% 잔금(CI)", note:"제품에 대한 책임감 강함"},
+  {type:"overseas", id:"s4", name:"Hideep", category:"유통(공장 보유)", contact:"Ms.Ella", wechat:"HideepEllaYe", location:"광저우 카이핑", items:"폽업, 트랩, 유가 외", payMethod:"FOB", payTerms:"40%선금(PI)/입고 후 60% 잔금(CI)", note:"발주량 적음"},
+  {type:"overseas", id:"s5", name:"Derui", category:"수전공장, 자체제조(가공/조립)", contact:"Ms.Emmy", wechat:"Emmy-DERUI", location:"광저우 카이핑", items:"스파우트(매립샤워), 각도조절행거", payMethod:"FOB", payTerms:"30%선금(PI)/입고 후 70% 잔금(CI)", note:"직접 제조 업체 - 수전"},
+  {type:"overseas", id:"s6", name:"Watersino", category:"융성상사(유럽 수출 제조사)", contact:"Ms.Violet", wechat:"watersino12", location:"광저우 카이핑", items:"4Hole 수전 진행 중", payMethod:"FOB", payTerms:"", note:"호텔용 120셋트 구매(Gessi형), 2차구매 가능성"},
+  {type:"overseas", id:"s7", name:"Wanhai", category:"카트리지", contact:"Ms.Allison/Mr.Shafqat", wechat:"yo_yo7778", location:"절강 닝보", items:"센서킷트, 카트리지 외", payMethod:"FOB", payTerms:"30%선금/입고 후 70% 잔금", note:"독점공급 요구"},
+  {type:"overseas", id:"s8", name:"Genrim", category:"스탠제품, 사출도 함", contact:"Ms.Cherry", wechat:"wxid_5ne3r38hg0a722", location:"광저우 카이핑", items:"라인헤드", payMethod:"FOB", payTerms:"", note:"라인헤드만"},
+];
+
+let pos = [];
+let domesticPos = [];
+let approvalBatches = [];
+let suppliers = [];
+let memoNote = '';
+let editingPoId = null;
+let poPanelReturnToPiGroup = null; // PI그룹 팝업에서 건을 눌러 들어온 경우, 닫을 때 다시 그 그룹으로 되돌아가기 위한 값
+let editingDomId = null;
+let hasStorage = false;
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+// 패널(수정/PI그룹 등)이 열려있는 동안, 뒤쪽 목록에서 해당 건(들)의 행을 진하게 표시해준다
+function clearRowHighlights(){
+  document.querySelectorAll('tr.row-highlighted').forEach(tr=> tr.classList.remove('row-highlighted'));
+}
+function highlightRows(ids){
+  clearRowHighlights();
+  ids.forEach(id=>{
+    const tr = document.querySelector(`tr[data-id="${id}"]`);
+    if(tr) tr.classList.add('row-highlighted');
+  });
+}
+
+function updateStorageBanner(){
+  const banner = document.getElementById('storageBanner');
+  if(hasStorage){
+    banner.classList.remove('show');
+  }else{
+    banner.classList.add('show');
+  }
+}
+
+// 공유 열람 모드: 편집/저장 UI를 모두 잠그고, 상단에 안내 배너를 붙인다.
+function applyViewerMode(){
+  document.body.classList.add('viewer');
+  const banner = document.getElementById('storageBanner');
+  if(banner) banner.classList.remove('show');
+  const sub = document.querySelector('.brand .sub');
+  if(sub) sub.textContent = '공유 열람용 · 읽기전용';
+  // 상세 패널(해외/국내/거래처)과 메모는 열람은 되지만 값은 못 바꾸도록 입력요소를 잠근다.
+  document.querySelectorAll(
+    '#poForm input, #poForm select, #poForm textarea, #poForm button,'
+    + '#domForm input, #domForm select, #domForm textarea, #domForm button,'
+    + '#suppForm input, #suppForm select, #suppForm textarea, #suppForm button,'
+    + '#memoTextarea'
+  ).forEach(el=>{ el.disabled = true; });
+  // 대시보드 상단에 읽기전용 안내 배너 삽입
+  const wrap = document.querySelector('.wrap');
+  if(wrap && !document.getElementById('viewerBanner')){
+    const b = document.createElement('div');
+    b.id = 'viewerBanner';
+    b.className = 'view-banner';
+    const stamp = SHARED && SHARED.__sharedAt ? new Date(SHARED.__sharedAt).toLocaleString('ko-KR') : '';
+    b.innerHTML = '<span class="vb-tag">공유 보기</span>'
+      + '<span>이 화면은 공유받은 <b>읽기전용</b> 발주현황 대시보드입니다. 모든 탭을 열람할 수 있지만 추가·수정·삭제는 되지 않습니다.</span>'
+      + (stamp ? '<span class="vb-note">· 데이터 기준 시점: ' + stamp + '</span>' : '');
+    wrap.insertBefore(b, wrap.firstChild);
+  }
+}
+
+async function loadData(){
+  if(VIEWER){
+    pos            = Array.isArray(SHARED.pos)             ? SHARED.pos             : [];
+    domesticPos    = Array.isArray(SHARED.domesticPos)    ? SHARED.domesticPos    : [];
+    approvalBatches= Array.isArray(SHARED.approvalBatches)? SHARED.approvalBatches: [];
+    suppliers      = Array.isArray(SHARED.suppliers)      ? SHARED.suppliers      : DEFAULT_SUPPLIERS.slice();
+    if(SHARED.fxRates) fxRates = SHARED.fxRates;
+    if(typeof SHARED.memoNote === 'string') memoNote = SHARED.memoNote;
+    hasStorage = false; // 저장 함수들은 모두 no-op
+    document.getElementById('fxKrw').value = fxRates.krw;
+    document.getElementById('fxCny').value = fxRates.cny;
+    renderMemoPreview();
+    applyViewerMode();
+    render();
+    return;
+  }
+
+  hasStorage = !!(window.storage && typeof window.storage.get === 'function');
+
+  if(hasStorage){
+    try{
+      const r = await window.storage.get('pos', false);
+      pos = r ? JSON.parse(r.value) : [];
+    }catch(e){ pos = []; }
+    try{
+      const r = await window.storage.get('domesticPos', false);
+      domesticPos = r ? JSON.parse(r.value) : [];
+    }catch(e){ domesticPos = []; }
+    try{
+      const r = await window.storage.get('approvalBatches', false);
+      approvalBatches = r ? JSON.parse(r.value) : [];
+    }catch(e){ approvalBatches = []; }
+    try{
+      const r = await window.storage.get('suppliers', false);
+      suppliers = r ? JSON.parse(r.value) : DEFAULT_SUPPLIERS.slice();
+    }catch(e){ suppliers = DEFAULT_SUPPLIERS.slice(); }
+    try{
+      const r = await window.storage.get('fxRates', false);
+      fxRates = r ? JSON.parse(r.value) : fxRates;
+    }catch(e){ /* keep default */ }
+    try{
+      const r = await window.storage.get('memoNote', false);
+      memoNote = r ? r.value : '';
+    }catch(e){ memoNote = ''; }
+  }else{
+    pos = [];
+    domesticPos = [];
+    approvalBatches = [];
+    suppliers = DEFAULT_SUPPLIERS.slice();
+  }
+  document.getElementById('fxKrw').value = fxRates.krw;
+  document.getElementById('fxCny').value = fxRates.cny;
+  renderMemoPreview();
+  updateStorageBanner();
+  render();
+}
+async function saveFxRates(){
+  if(!hasStorage) return;
+  try{ await window.storage.set('fxRates', JSON.stringify(fxRates), false); }catch(e){ console.error(e); }
+}
+async function savePos(){
+  if(!hasStorage) return; // in-memory only; user backs up via 내보내기
+  try{
+    await window.storage.set('pos', JSON.stringify(pos), false);
+  }catch(e){ console.error(e); }
+}
+async function saveDomesticPos(){
+  if(!hasStorage) return;
+  try{
+    await window.storage.set('domesticPos', JSON.stringify(domesticPos), false);
+  }catch(e){ console.error(e); }
+}
+async function saveApprovalBatches(){
+  if(!hasStorage) return;
+  try{
+    await window.storage.set('approvalBatches', JSON.stringify(approvalBatches), false);
+  }catch(e){ console.error(e); }
+}
+async function saveSuppliers(){
+  if(!hasStorage) return;
+  try{
+    await window.storage.set('suppliers', JSON.stringify(suppliers), false);
+  }catch(e){ console.error(e); }
+}
+async function saveMemoNote(){
+  if(!hasStorage) return;
+  try{
+    await window.storage.set('memoNote', memoNote, false);
+  }catch(e){ console.error(e); }
+}
+function renderMemoPreview(){
+  const el = document.getElementById('memoPreview');
+  if(!el) return;
+  el.textContent = memoNote.trim() ? memoNote : '클릭해서 메모 작성';
+}
+
+function exportData(){
+  const payload = {exportedAt: new Date().toISOString(), pos, domesticPos, approvalBatches, suppliers, fxRates, memoNote};
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `발주관리_백업_${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast('백업 파일을 내려받았습니다');
+}
+
+function importData(file){
+  const reader = new FileReader();
+  reader.onload = async (e)=>{
+    try{
+      const payload = JSON.parse(e.target.result);
+      if(!Array.isArray(payload.pos) || !Array.isArray(payload.suppliers)){
+        throw new Error('형식이 올바르지 않습니다');
+      }
+      pos = payload.pos;
+      domesticPos = Array.isArray(payload.domesticPos) ? payload.domesticPos : [];
+      approvalBatches = Array.isArray(payload.approvalBatches) ? payload.approvalBatches : [];
+      suppliers = payload.suppliers;
+      if(payload.fxRates) fxRates = payload.fxRates;
+      if(typeof payload.memoNote === 'string') memoNote = payload.memoNote;
+      await savePos();
+      await saveDomesticPos();
+      await saveApprovalBatches();
+      await saveSuppliers();
+      await saveFxRates();
+      await saveMemoNote();
+      document.getElementById('fxKrw').value = fxRates.krw;
+      document.getElementById('fxCny').value = fxRates.cny;
+      renderMemoPreview();
+      render();
+      toast('데이터를 불러왔습니다');
+    }catch(err){
+      toast('가져오기 실패: 올바른 백업 파일이 아닙니다');
+    }
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('btnExport').addEventListener('click', exportData);
+document.getElementById('btnImport').addEventListener('click', ()=> document.getElementById('fileImport').click());
+
+// 현재 데이터를 통째로 안에 담은 "읽기전용 공유 보기" HTML 파일을 하나 생성해 내려받는다.
+// 받은 사람은 로그인·인터넷 없이 파일만 열면 대시보드를 그대로 볼 수 있다(편집 불가).
+function exportSharedView(){
+  const snapshot = {
+    __sharedAt: new Date().toISOString(),
+    pos, domesticPos, approvalBatches, suppliers, fxRates, memoNote,
+  };
+  const htmlEl = document.documentElement.cloneNode(true);
+  // 이전에 주입된 스냅샷/뷰어 흔적 제거 (공유 파일을 다시 공유해도 중첩되지 않도록)
+  htmlEl.querySelectorAll('#__sharedSnapshot, #viewerBanner').forEach(n=> n.remove());
+  htmlEl.classList.remove('viewer');
+  if(htmlEl.querySelector('body')) htmlEl.querySelector('body').classList.remove('viewer');
+  // 열려 있을 수 있는 오버레이/배너/토스트의 임시 상태 초기화
+  htmlEl.querySelectorAll('.overlay.active').forEach(n=> n.classList.remove('active'));
+  const sb = htmlEl.querySelector('#storageBanner'); if(sb) sb.classList.remove('show');
+  const tt = htmlEl.querySelector('#toast'); if(tt){ tt.classList.remove('show'); tt.textContent = ''; }
+  // 데이터 스냅샷을 <head> 맨 앞에 주입 → 재오픈 시 VIEWER 모드로 로드됨
+  const head = htmlEl.querySelector('head');
+  const s = document.createElement('script');
+  s.id = '__sharedSnapshot';
+  s.textContent = 'window.__SHARED_SNAPSHOT__ = '
+    + JSON.stringify(snapshot).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')
+    + ';';
+  head.insertBefore(s, head.firstChild);
+  const html = '<!DOCTYPE html>\n' + htmlEl.outerHTML;
+  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `발주현황_공유보기_${stamp}.html`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast('공유용 보기 파일을 내려받았습니다 · 이 파일을 상대방에게 보내세요');
+}
+const btnShareExport = document.getElementById('btnShareExport');
+if(btnShareExport) btnShareExport.addEventListener('click', exportSharedView);
+document.getElementById('fileImport').addEventListener('change', (e)=>{
+  if(e.target.files[0]) importData(e.target.files[0]);
+  e.target.value = '';
+});
+
+function fmtMoney(n){
+  if(n === null || n === undefined || isNaN(n)) return "$0.00";
+  return "$" + Number(n).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function fmtQty(n){
+  if(n===null || n===undefined || n==='' || isNaN(n)) return '-';
+  return Number(n).toLocaleString();
+}
+function krwSub(usdAmount){
+  const rate = fxRates.krw || 0;
+  if(!rate || !usdAmount) return '';
+  return `<br><span style="font-family:var(--sans); font-weight:600; font-size:10.5px; color:var(--console-text-dim);">₩${Math.round(usdAmount*rate).toLocaleString()}</span>`;
+}
+// 결제 통화(USD/CNY)에 따른 표시·환산 헬퍼 — PI/CI금액은 USD 또는 CNY(위안)로 송금할 수 있음 (국내발주는 KRW)
+function curSymbol(cur){
+  if(cur==='CNY') return '¥';
+  if(cur==='KRW') return '₩';
+  return '$';
+}
+function fmtMoneyCur(n, cur){
+  if(n === null || n === undefined || isNaN(n)) return curSymbol(cur) + (cur==='KRW' ? '0' : '0.00');
+  if(cur==='KRW') return '₩' + Math.round(n).toLocaleString();
+  return curSymbol(cur) + Number(n).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function fxRateFor(cur){ return cur==='CNY' ? (fxRates.cny||0) : (fxRates.krw||0); }
+function toKrwCur(amount, cur){ return (parseFloat(amount)||0) * fxRateFor(cur); }
+function krwSubCur(amount, cur){
+  const rate = fxRateFor(cur);
+  if(!rate || !amount) return '';
+  return `<br><span style="font-family:var(--sans); font-weight:600; font-size:10.5px; color:var(--console-text-dim);">₩${Math.round(amount*rate).toLocaleString()}</span>`;
+}
+function computeAmounts(po){
+  const piAmt = parseFloat(po.piAmount)||0;
+  const ciAmt = parseFloat(po.ciAmount)||0;
+  const pct = (parseFloat(po.depositPct)||0)/100;
+  const deposit = piAmt*pct; // 선금은 항상 원래 PI금액 기준 — 이미 지급된 선금은 CI금액이 나중에 달라져도 바뀌지 않음
+  const finalAmt = ciAmt>0 ? ciAmt : piAmt; // CI금액이 입력되면(불량/재고 등으로 수량이 바뀐 경우) 그걸 최종 금액으로 사용
+  const balance = finalAmt-deposit;
+  return {deposit, balance};
+}
+function isDepositDone(po){ return !!po.depositDate || !!po.depositDeferred; }
+function isDepositShared(po){ return po.depositShared==='O'; }
+function isBalanceDone(po){ return !!po.balanceDate || !!po.balanceDeferred; }
+
+// PI 문서 자체와 관련된 항목: 같은 PI번호면 반드시 같아야 함 (자동 동기화 대상)
+const PI_DOC_FIELDS = [
+  {key:'supplier',            label:'공급사'},
+  {key:'currency',            label:'결제통화'},
+  {key:'piDate',              label:'PI수령일'},
+  {key:'depositPlannedDate',  label:'선금지급 예정일'},
+  {key:'depositDate',         label:'선금지급일'},
+  {key:'piDocUrl',            label:'PI 문서 링크'},
+];
+// 실제 화물/선적 관련 항목: 같은 PI라도 생산 일정이나 긴급 여부에 따라 나눠서(분할선적) 진행될 수 있어
+// 서로 달라도 정상일 수 있음 — 불일치 경고 대상에서는 제외하고, 필요할 때만 수동으로 일괄 적용
+const PI_SHIPMENT_FIELDS = [
+  {key:'ciDate',              label:'CI수령일'},
+  {key:'ciNo',                label:'CI번호'},
+  {key:'shipDate',            label:'선적일'},
+  {key:'blNo',                label:'BL NO.'},
+  {key:'etaDate',             label:'항구도착일'},
+  {key:'warehouseDate',       label:'공장입고일'},
+  {key:'customsCost',         label:'통관비용'},
+];
+function getPiGroup(piNo, excludeId){
+  const key = (piNo||'').trim();
+  if(!key) return [];
+  return pos.filter(p => (p.piNo||'').trim() === key && p.id !== excludeId);
+}
+// PI번호로 시작해서, 같은 CI번호를 공유하는 다른 PI의 건들까지 전부 포함해 확장한다.
+// (예: PI가 여러 개인데 실제 선적은 CI 하나로 합쳐진 경우, 그 CI를 공유하는 모든 PI의 건을 하나의 묶음으로 본다)
+function getExpandedGroupByPiCi(startPiNo){
+  const startKey = (startPiNo||'').trim();
+  if(!startKey) return [];
+  const piKeys = new Set([startKey]);
+  const ciKeys = new Set();
+  let changed = true;
+  while(changed){
+    changed = false;
+    pos.forEach(p=>{
+      const pPi = (p.piNo||'').trim();
+      const pCi = (p.ciNo||'').trim();
+      if(pPi && piKeys.has(pPi) && pCi && !ciKeys.has(pCi)){ ciKeys.add(pCi); changed = true; }
+      if(pCi && ciKeys.has(pCi) && pPi && !piKeys.has(pPi)){ piKeys.add(pPi); changed = true; }
+    });
+  }
+  return pos.filter(p=>{
+    const pPi = (p.piNo||'').trim();
+    const pCi = (p.ciNo||'').trim();
+    return (pPi && piKeys.has(pPi)) || (pCi && ciKeys.has(pCi));
+  });
+}
+function checkPiGroupMismatch(piNo){
+  const key = (piNo||'').trim();
+  if(!key) return [];
+  const group = pos.filter(p => (p.piNo||'').trim() === key);
+  if(group.length < 2) return [];
+  const mismatches = [];
+  PI_DOC_FIELDS.forEach(f=>{ // PI/선금처럼 문서 단위 항목만 불일치 검사 (선적 관련 항목은 분할선적일 수 있어 제외)
+    const values = group.map(p=> (p[f.key]||'').toString().trim());
+    const nonBlank = values.filter(v=>v!=='');
+    if(nonBlank.length>0 && new Set(values).size>1) mismatches.push(f.label);
+  });
+  return mismatches;
+}
+
+function computeStageIndex(po){
+  const milestones = [po.piDate, isDepositDone(po), po.ciDate, isBalanceDone(po), po.shipDate, po.etaDate, po.warehouseDate, po.qcDate, po.erpDate];
+  let count = 0;
+  milestones.forEach(m=>{ if(m) count++; });
+  return count; // 0..9 -> index into STAGE_LABELS
+}
+function supplierById(id){ return suppliers.find(s=>s.id===id); }
+function supplierByName(name){ return suppliers.find(s=>s.name===name); }
+
+/* ---------------- Rendering ---------------- */
+function render(){
+  renderDashboard();
+  renderPoTable();
+  renderDomTable();
+  renderCalendar();
+  renderMonthCost();
+  renderSuppliers();
+  renderSupplierSelect();
+  renderDomSupplierSelect();
+  renderPocSupplierSelect();
+  renderPocResult();
+  renderApprView();
+}
+
+function renderDashboard(){
+  const total = pos.length;
+  const done = pos.filter(p=>computeStageIndex(p)===9).length;
+  const inProgress = total - done;
+
+  // 선금 지급금액: 실제로 이미 지급된 선금만 합산 (각 건의 결제 통화에 맞춰 KRW로 환산 후 합산)
+  const depositPaidKrwTotal = pos.reduce((s,p)=>{
+    if(!isDepositDone(p)) return s;
+    return s + toKrwCur(computeAmounts(p).deposit, p.currency);
+  }, 0);
+  // 남은 잔금액: 아직 지급하지 않은 잔금만 합산
+  const balanceLeftKrwTotal = pos.reduce((s,p)=>{
+    if(p.balanceDate) return s;
+    return s + toKrwCur(computeAmounts(p).balance, p.currency);
+  }, 0);
+  // 완료 금액 합계: ERP입력완료 건만, CI금액이 있으면 CI금액(최종금액) 기준
+  const doneAmountKrwTotal = pos.filter(p=>computeStageIndex(p)===9)
+    .reduce((s,p)=>{
+      const ciAmt = parseFloat(p.ciAmount)||0;
+      const piAmt = parseFloat(p.piAmount)||0;
+      return s + toKrwCur(ciAmt>0 ? ciAmt : piAmt, p.currency);
+    }, 0);
+
+  document.getElementById('stampDate').textContent = new Date().toLocaleDateString('ko-KR', {year:'numeric', month:'2-digit', day:'2-digit', weekday:'short'});
+  document.getElementById('kpiTotal').textContent = total;
+  document.getElementById('kpiProgress').textContent = inProgress;
+  document.getElementById('kpiDone').textContent = done;
+  { // 세 금액 카드: 한화(KRW, 각 건의 실제 결제 통화 기준 환산 합계)를 큰 숫자로, USD·위안(CNY)은 그 합계를 다시 환율로 나눈 참고값
+    const krwRate = fxRates.krw || 0;
+    const cnyRate = fxRates.cny || 0; // CNY(위안) → KRW 환율 (예: 1위안=190원)
+    const setAmountKpi = (base, krwTotal) => {
+      document.getElementById(base+'Krw').textContent = '₩' + Math.round(krwTotal).toLocaleString();
+      document.getElementById(base).textContent = '$' + Math.round(krwRate>0 ? krwTotal/krwRate : 0).toLocaleString();
+      document.getElementById(base+'Cny').textContent = '¥' + Math.round(cnyRate>0 ? krwTotal/cnyRate : 0).toLocaleString();
+    };
+    setAmountKpi('kpiDepositPaid', depositPaidKrwTotal);
+    setAmountKpi('kpiBalanceLeft', balanceLeftKrwTotal);
+    setAmountKpi('kpiUsd', doneAmountKrwTotal);
+  }
+
+  // donut: 종결 비율
+  const pct = total>0 ? Math.round((done/total)*100) : 0;
+  const circumference = 2*Math.PI*21;
+  const ring = document.getElementById('donutRing');
+  ring.setAttribute('stroke-dasharray', `${(pct/100)*circumference} ${circumference}`);
+  document.getElementById('donutPct').textContent = pct + '%';
+
+  // stage bar — short colored bar at the top of each box (not connected across boxes) + count/label
+  const bar = document.getElementById('stageBar');
+  bar.innerHTML = '';
+  STAGE_LABELS.forEach((label, idx)=>{
+    const count = pos.filter(p=>computeStageIndex(p)===idx).length;
+    const seg = document.createElement('div');
+    seg.className = 'stage-seg';
+    const cleanLabel = stripStageNum(label);
+    seg.title = cleanLabel + ' : ' + count + '건 (클릭하면 해외발주건에서 확인)';
+    seg.innerHTML = `<span class="stage-seg-bar" style="background:${STAGE_COLORS[idx]}"></span><span class="n" style="cursor:pointer;">${count}</span><span class="lbl">${cleanLabel}</span>`;
+    seg.querySelector('.n').addEventListener('click', ()=>{
+      poStageFilter = idx;
+      switchToView('po');
+      renderPoTable();
+    });
+    bar.appendChild(seg);
+  });
+
+  // 국내발주 단계별 분포 바
+  const domBar = document.getElementById('domStageBar');
+  domBar.innerHTML = '';
+  DOM_STAGE_LABELS.forEach((label, idx)=>{
+    const count = domesticPos.filter(p=>computeDomStageIndex(p)===idx).length;
+    const seg = document.createElement('div');
+    seg.className = 'stage-seg';
+    const cleanLabel = stripStageNum(label);
+    seg.title = cleanLabel + ' : ' + count + '건 (클릭하면 국내발주건에서 확인)';
+    seg.innerHTML = `<span class="stage-seg-bar" style="background:${DOM_STAGE_COLORS[idx]}"></span><span class="n" style="cursor:pointer;">${count}</span><span class="lbl">${cleanLabel}</span>`;
+    seg.querySelector('.n').addEventListener('click', ()=>{
+      domStageFilter = idx;
+      switchToView('domestic');
+      renderDomTable();
+    });
+    domBar.appendChild(seg);
+  });
+
+  updateFxTotals();
+
+  // 주의 필요 항목 (6개) — 발주 1건은 정확히 1개 버킷에만 속함 (중복 집계 없음, 가장 진행된 단계 기준)
+  const CHECKPOINT_LABELS = [
+    "PI 미발행 대기중",
+    "PI 발행 : 선금 미지급",
+    "선급 지급",
+    "CI 발행 : 잔금 미지급",
+    "잔금 지급",
+    "CI 및 패킹리스트 정명재 매니저 미공유",
+  ];
+  const CHECKPOINT_IS_ALERT = [true, true, false, true, false, true];
+  function getCheckpointBucket(p){
+    if(!p.piDate) return 0;
+    if(!isDepositDone(p) || !isDepositShared(p)) return 1;
+    if(!p.ciDate) return 2;
+    if(!p.balanceDate || p.balanceShared!=="O") return 3;
+    if(p.warehouseDate && p.warehouseShared!=="O") return 5;
+    return 4;
+  }
+  const bucketCounts = [0,0,0,0,0,0];
+  pos.forEach(p=> bucketCounts[getCheckpointBucket(p)]++);
+  const alerts = CHECKPOINT_LABELS.map((label, i)=>({label, count: bucketCounts[i], isAlert: CHECKPOINT_IS_ALERT[i]}));
+  const alertEl = document.getElementById('alertList');
+  alertEl.innerHTML = alerts.map(a=>`
+    <div class="crow ${a.isAlert && a.count===0?'zero':''}">
+      <span class="t">${a.label}</span>
+      <span class="c">${a.count}건</span>
+    </div>
+  `).join('');
+}
+
+document.getElementById('fxKrw').addEventListener('input', ()=>{
+  fxRates.krw = parseFloat(document.getElementById('fxKrw').value)||0;
+  renderDashboard();
+  renderPoTable();
+  saveFxRates();
+});
+document.getElementById('fxCny').addEventListener('input', ()=>{
+  fxRates.cny = parseFloat(document.getElementById('fxCny').value)||0;
+  renderDashboard();
+  saveFxRates();
+});
+document.getElementById('fxDateStart').addEventListener('input', updateFxTotals);
+document.getElementById('fxDateEnd').addEventListener('input', updateFxTotals);
+
+// 기간별 금액 조회 (환율 환산 패널) — 요청일 기준으로 필터링해 KRW/USD/CNY(위안) 총액을 보여준다
+function updateFxTotals(){
+  const start = document.getElementById('fxDateStart').value;
+  const end = document.getElementById('fxDateEnd').value;
+  const filtered = pos.filter(p=>{
+    if(start && (!p.reqDate || p.reqDate < start)) return false;
+    if(end && (!p.reqDate || p.reqDate > end)) return false;
+    return true;
+  });
+  const krw = parseFloat(document.getElementById('fxKrw').value) || 0;
+  const cny = parseFloat(document.getElementById('fxCny').value) || 0; // CNY(위안) → KRW 환율
+  // 각 건은 실제 결제 통화(USD 또는 CNY)가 다를 수 있으므로, 건별로 KRW로 환산한 뒤 합산한다
+  const krwTotal = filtered.reduce((s,p)=>{
+    const ciAmt = parseFloat(p.ciAmount)||0;
+    const piAmt = parseFloat(p.piAmount)||0;
+    const amt = ciAmt>0 ? ciAmt : piAmt;
+    return s + toKrwCur(amt, p.currency);
+  }, 0);
+  document.getElementById('fxCount').textContent = filtered.length + '건';
+  document.getElementById('totKrw').textContent = '₩' + Math.round(krwTotal).toLocaleString();
+  document.getElementById('totUsd').textContent = '$' + (krw>0 ? (krwTotal/krw).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2}) : '0.00');
+  document.getElementById('totCny').textContent = '¥' + (cny>0 ? (krwTotal/cny).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2}) : '0.00');
+}
+
+function getFilteredPos(){
+  const search = (document.getElementById('poSearch').value||'').toLowerCase();
+  const dateStart = document.getElementById('poDateStart').value;
+  const dateEnd = document.getElementById('poDateEnd').value;
+  let filtered = pos.filter(p=>{
+    if(!search) return true;
+    return (p.itemName||'').toLowerCase().includes(search) ||
+           (p.supplier||'').toLowerCase().includes(search) ||
+           (p.itemCode||'').toLowerCase().includes(search) ||
+           (p.requester||'').toLowerCase().includes(search);
+  });
+  if(poStageFilter !== null){
+    filtered = filtered.filter(p=> computeStageIndex(p) === poStageFilter);
+  }
+  if(dateStart){
+    filtered = filtered.filter(p=> p.reqDate && p.reqDate >= dateStart);
+  }
+  if(dateEnd){
+    filtered = filtered.filter(p=> p.reqDate && p.reqDate <= dateEnd);
+  }
+  // 같은 PI번호를 쓰는 건들은 하나로 묶어, 그 묶음 안의 가장 최근 요청일을 기준으로 정렬 위치를 정한다
+  const groupKeyOf = p => (p.piNo||'').trim();
+  const groupMaxDate = {};
+  filtered.forEach(p=>{
+    const key = groupKeyOf(p);
+    if(!key) return; // PI번호가 없는 건은 그룹화하지 않음
+    if(!groupMaxDate[key] || (p.reqDate||'') > groupMaxDate[key]) groupMaxDate[key] = p.reqDate||'';
+  });
+  const sortDateOf = p => { const key = groupKeyOf(p); return key ? groupMaxDate[key] : (p.reqDate||''); };
+  return filtered.sort((a,b)=>{
+    const d = sortDateOf(b).localeCompare(sortDateOf(a));
+    if(d !== 0) return d;
+    const gA = groupKeyOf(a), gB = groupKeyOf(b);
+    if(gA !== gB) return gA.localeCompare(gB); // 같은 정렬기준일이면 그룹끼리 흩어지지 않도록 묶어줌
+    return (b.reqDate||'').localeCompare(a.reqDate||'');
+  });
+}
+
+function renderPoTable(){
+  const tbody = document.getElementById('poTbody');
+  const filtered = getFilteredPos();
+
+  document.getElementById('poStageLegend').innerHTML = STAGE_LABELS.map((label, idx)=>`
+    <span class="li"><span class="dot" style="background:${STAGE_COLORS[idx]}"></span>${stripStageNum(label)}</span>
+  `).join('');
+
+  const banner = document.getElementById('poFilterBanner');
+  if(poStageFilter !== null){
+    banner.style.display = 'flex';
+    banner.innerHTML = `<span>"${stripStageNum(STAGE_LABELS[poStageFilter])}" 단계만 보는 중 (${filtered.length}건)</span><button id="poFilterClearBtn">전체보기</button>`;
+    document.getElementById('poFilterClearBtn').addEventListener('click', resetPoFilter);
+  }else{
+    banner.style.display = 'none';
+    banner.innerHTML = '';
+  }
+
+  document.getElementById('poEmpty').style.display = pos.length===0 ? 'block' : 'none';
+  document.querySelector('#poTable').style.display = pos.length===0 ? 'none' : 'table';
+
+  tbody.innerHTML = filtered.map(p=>{
+    const {deposit, balance} = computeAmounts(p);
+    const stageIdx = computeStageIndex(p);
+    const stageLabel = stageLabelText(p, stageIdx, false);
+    let unsharedNote = '';
+    if(stageLabel === 'PI수령' && !isDepositShared(p)) unsharedNote = ' · 미공유';
+    else if(stageLabel === 'CI수령' && p.balanceShared !== 'O') unsharedNote = ' · 미공유';
+    else if(stageLabel === '선적완료' && (p.balanceShared !== 'O' || p.warehouseShared !== 'O')) unsharedNote = ' · 미공유';
+    const piGroupSize = getPiGroup(p.piNo, null).filter(x=>!x.duplicatedFrom).length; // 복제본은 건수에 포함하지 않음 (같은 라인의 분할입고일 뿐)
+    const piMismatches = piGroupSize>1 ? checkPiGroupMismatch(p.piNo) : [];
+    const piTag = piGroupSize>1
+      ? `<span class="pi-group-tag ${piMismatches.length?'mismatch':''}" data-pino="${p.piNo}" title="${piMismatches.length? 'PI/선금 정보 불일치: '+piMismatches.join(', ') : '같은 PI로 함께 들어온 건 (선적은 나눠 진행될 수 있어요)'}">${piMismatches.length?'⚠':'🔗'} PI ${piGroupSize}건</span>`
+      : '';
+    const dupArrow = p.duplicatedFrom ? `<span style="color:var(--console-accent); font-weight:800; margin-right:5px;" title="위 건에서 분할입고용으로 복제된 건입니다">↳</span>` : '';
+    return `<tr data-id="${p.id}" class="${piGroupSize>1?'pi-grouped-row':''}">
+      <td>${p.reqDate||'-'}</td>
+      <td>${p.requester||'-'}</td>
+      <td>${dupArrow}${p.itemName||'-'}${p.isFirstBatch?'<span class="item-badge">초도</span>':''}${p.isSample?'<span class="item-badge sample">샘플</span>':''}${p.isUrgent?'<span class="item-badge urgent">긴급</span>':''}${piTag}${apprBadge(p)}</td>
+      <td style="font-family:var(--sans)">${p.itemCode||'-'}</td>
+      <td style="font-family:var(--sans)">${p.ciQty && parseFloat(p.ciQty)!==parseFloat(p.qty) ? `<span style="color:#dc2626; text-decoration:line-through;">${fmtQty(p.qty)}</span> → <b style="color:#dc2626; font-size:14px;">${fmtQty(p.ciQty)}</b>` : fmtQty(p.qty)}</td>
+      <td>${p.supplier||'-'}</td>
+      <td class="money">${p.piAmount? (p.ciAmount && parseFloat(p.ciAmount)!==parseFloat(p.piAmount) ? `<span style="color:#dc2626; text-decoration:line-through;">${fmtMoneyCur(p.piAmount, p.currency)}</span> → <b style="color:#dc2626; font-size:14px;">${fmtMoneyCur(p.ciAmount, p.currency)}</b>` : fmtMoneyCur(p.piAmount, p.currency)) : '-'}</td>
+      <td class="money">${p.piAmount? fmtMoneyCur(deposit, p.currency) + krwSubCur(deposit, p.currency) : '-'}</td>
+      <td class="money">${p.piAmount? fmtMoneyCur(balance, p.currency) + krwSubCur(balance, p.currency) : '-'}</td>
+      <td>${p.dueDate||'-'}</td>
+      <td><span class="badge" style="background:${STAGE_COLORS[stageIdx]}">${stageLabel}${unsharedNote}</span></td>
+      <td>${p.warehouseDate||'-'}</td>
+      <td>${p.note ? `<span class="note-dot" title="${p.note.replace(/"/g,'&quot;')}">📝</span>` : ''}${docLinksHtml(p)}</td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('tr').forEach(tr=>{
+    tr.addEventListener('click', ()=>{ poPanelReturnToPiGroup = null; openPoPanel(tr.dataset.id); });
+  });
+  tbody.querySelectorAll('.pi-group-tag').forEach(tag=>{
+    tag.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      openPiGroupPanel(tag.dataset.pino);
+    });
+  });
+  tbody.querySelectorAll('.doc-link').forEach(a=>{
+    a.addEventListener('click', (e)=> e.stopPropagation());
+  });
+
+  // totals for the currently filtered set — 총액 vs 지급(완료)액 구분
+  let depositTotal = 0, depositPaid = 0, balanceTotal = 0, balancePaid = 0;
+  filtered.forEach(p=>{
+    const {deposit, balance} = computeAmounts(p);
+    depositTotal += deposit;
+    balanceTotal += balance;
+    if(isDepositDone(p)) depositPaid += deposit;
+    if(p.balanceDate) balancePaid += balance;
+  });
+  const depositUnpaid = depositTotal - depositPaid;
+  const balanceUnpaid = balanceTotal - balancePaid;
+  const grandTotal = depositTotal + balanceTotal;
+  const grandUnpaid = depositUnpaid + balanceUnpaid;
+  const krw = fxRates.krw || 0;
+  const krwLine = n => krw ? `<span class="ptsub">₩${Math.round(n*krw).toLocaleString()}</span>` : '';
+  const totalsEl = document.getElementById('poTotals');
+  if(filtered.length === 0){
+    totalsEl.innerHTML = '';
+  }else{
+    totalsEl.innerHTML = `
+      <div class="ptcard">
+        <div class="ptlabel">선금액 (${filtered.length}건)</div>
+        <div class="pt-line"><span class="pt-line-lbl">총</span><span class="ptval">${fmtMoney(depositTotal)}</span>${krwLine(depositTotal)}</div>
+        <div class="pt-line"><span class="pt-line-lbl">지급됨</span><span class="ptval paid">${fmtMoney(depositPaid)}</span>${krwLine(depositPaid)}</div>
+      </div>
+      <div class="ptcard">
+        <div class="ptlabel">잔금액 (${filtered.length}건)</div>
+        <div class="pt-line"><span class="pt-line-lbl">총</span><span class="ptval">${fmtMoney(balanceTotal)}</span>${krwLine(balanceTotal)}</div>
+        <div class="pt-line"><span class="pt-line-lbl">지급됨</span><span class="ptval paid">${fmtMoney(balancePaid)}</span>${krwLine(balancePaid)}</div>
+      </div>
+      <div class="ptcard">
+        <div class="ptlabel">선금+잔금 합계</div>
+        <div class="pt-line"><span class="pt-line-lbl">총</span><span class="ptval">${fmtMoney(grandTotal)}</span>${krwLine(grandTotal)}</div>
+        <div class="pt-line"><span class="pt-line-lbl">미지급</span><span class="ptval unpaid">${fmtMoney(grandUnpaid)}</span>${krwLine(grandUnpaid)}</div>
+      </div>
+    `;
+  }
+}
+
+function renderSupplierSelect(){
+  const sel = document.getElementById('supplierSelect');
+  const current = sel.value; // 옵션을 다시 그리면 선택값이 초기화되므로 보존했다가 복원
+  const overseasSuppliers = suppliers.filter(s => s.type !== 'domestic'); // 기존 데이터(구분 없음)는 해외로 취급
+  sel.innerHTML = '<option value="">- 선택 -</option>' + overseasSuppliers.map(s=>`<option value="${s.name}">${s.name}</option>`).join('');
+  sel.value = current;
+}
+function renderDomSupplierSelect(){
+  const sel = document.getElementById('domSupplierSelect');
+  if(!sel) return;
+  const current = sel.value;
+  const domesticSuppliers = suppliers.filter(s => s.type === 'domestic');
+  sel.innerHTML = '<option value="">- 선택 -</option>' + domesticSuppliers.map(s=>`<option value="${s.name}">${s.name}</option>`).join('');
+  sel.value = current;
+}
+
+function renderSuppliers(){
+  const grid = document.getElementById('suppGrid');
+  grid.innerHTML = suppliers.map(s=>`
+    <div class="supp-card" data-id="${s.id}" style="cursor:pointer;">
+      <h3>${s.name} <span class="item-badge" style="background:${s.type==='domestic'?'#2563eb':'#0d9488'};">${s.type==='domestic'?'국내':'해외'}</span> <span style="font-size:11px; color:var(--console-accent); font-weight:600;">✎ 수정</span></h3>
+      <div class="loc">${s.location||''}</div>
+      <div class="row"><b>담당</b>${s.contact||'-'} ${s.wechat? '· '+s.wechat:''}</div>
+      <div class="row"><b>품목</b>${s.items||'-'}</div>
+      <div class="row"><b>결제</b>${s.payMethod||'-'} ${s.payTerms? '/ '+s.payTerms:''}</div>
+      ${s.note? `<div class="note">${s.note}</div>` : ''}
+    </div>
+  `).join('');
+  grid.querySelectorAll('.supp-card').forEach(card=>{
+    card.addEventListener('click', ()=> openSuppPanel(card.dataset.id));
+  });
+}
+
+/* ---------------- Calendar (simple) ---------------- */
+let calState = (()=>{ const d = new Date(); return {year:d.getFullYear(), month:d.getMonth()}; })();
+
+function isoDate(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+// 영업일(월~금) 기준으로 N일 뒤 날짜 계산 (주말은 세지 않음)
+function addBusinessDays(dateStr, days){
+  const d = new Date(dateStr + 'T00:00:00');
+  let added = 0;
+  while(added < days){
+    d.setDate(d.getDate()+1);
+    const dow = d.getDay(); // 0=일, 6=토
+    if(dow !== 0 && dow !== 6) added++;
+  }
+  return isoDate(d);
+}
+// 캘린더에는 각 발주의 납기요청일 하나만 표시 (종결/ERP입력완료 건은 제외)
+function getActiveDueList(){
+  return pos.filter(po => computeStageIndex(po) !== 9 && po.dueDate);
+}
+
+function renderCalendar(){
+  const {year, month} = calState;
+  document.getElementById('calMonthLabel').textContent = `${year}년 ${month+1}월`;
+
+  const dow = ['일','월','화','수','목','금','토'];
+  document.getElementById('calDowRow').innerHTML = dow.map(d=>`<div class="cal-dow">${d}</div>`).join('');
+
+  // 6주 x 7일 실제 날짜 계산
+  const firstOfMonth = new Date(year, month, 1);
+  const gridStart = new Date(firstOfMonth);
+  gridStart.setDate(gridStart.getDate() - firstOfMonth.getDay());
+  const todayStr = isoDate(new Date());
+
+  const weeks = [];
+  let cursor = new Date(gridStart);
+  for(let w=0; w<6; w++){
+    const week = [];
+    for(let d=0; d<7; d++){
+      const dt = new Date(cursor);
+      week.push({dateStr: isoDate(dt), day: dt.getDate(), out: dt.getMonth()!==month});
+      cursor.setDate(cursor.getDate()+1);
+    }
+    weeks.push(week);
+  }
+
+  const dueList = getActiveDueList();
+  const weeksEl = document.getElementById('calWeeks');
+  weeksEl.innerHTML = '';
+
+  weeks.forEach(week=>{
+    const weekEl = document.createElement('div');
+    weekEl.className = 'cal-week';
+    week.forEach(c=>{
+      const count = dueList.filter(p => p.dueDate === c.dateStr).length;
+      const isOverdue = count>0 && c.dateStr < todayStr;
+      const cell = document.createElement('div');
+      cell.className = `cal-daycell ${c.out?'out':''} ${c.dateStr===todayStr?'today':''} ${count>0?'has-events':''}`;
+      cell.innerHTML = `<div class="cal-daynum">${c.day}</div>` +
+        (count>0 ? `<div class="cal-count-badge ${isOverdue?'overdue':''}"><span class="dot"></span>${count}건 · ${ddayLabel(c.dateStr).short}</div>` : '');
+      if(count>0){
+        cell.addEventListener('click', ()=> openDayPanel(c.dateStr));
+      }
+      weekEl.appendChild(cell);
+    });
+    weeksEl.appendChild(weekEl);
+  });
+}
+
+/* ---------------- Calendar day-detail panel ---------------- */
+const dayOverlay = document.getElementById('dayOverlay');
+function ddayLabel(dueDateStr){
+  const today = new Date(); today.setHours(0,0,0,0);
+  const due = new Date(dueDateStr + 'T00:00:00');
+  const diffDays = Math.round((today - due) / 86400000); // 오늘 - 납기일 (양수면 지남)
+  if(diffDays > 0) return {text:`+${diffDays}일 지남`, short:`+${diffDays}일`, cls:'overdue'};
+  if(diffDays === 0) return {text:'오늘 마감', short:'D-DAY', cls:'today'};
+  return {text:`D${diffDays}`, short:`D${diffDays}`, cls:'upcoming'}; // diffDays는 음수라 자동으로 D-N 형태
+}
+function openDayPanel(dateStr){
+  document.getElementById('dayPanelTitle').textContent = dateStr + ' 납기요청';
+  const dueList = getActiveDueList().filter(p => p.dueDate === dateStr);
+  const listEl = document.getElementById('dayPanelList');
+  if(dueList.length === 0){
+    listEl.innerHTML = `<div class="day-empty">이 날짜에 납기요청일인 발주가 없습니다.</div>`;
+  }else{
+    const dd = ddayLabel(dateStr);
+    listEl.innerHTML = dueList.map(p=>{
+      const stageIdx = computeStageIndex(p);
+      return `<div class="day-item" data-id="${p.id}">
+        <div class="info">
+          <span class="name">${p.itemName || '(품명 미입력)'}</span>
+          <span class="sub">${p.supplier||'-'} · 요청일 ${p.reqDate||'-'}</span>
+        </div>
+        <span class="ddays ${dd.cls}">${dd.text}</span>
+        <span class="badge" style="background:${STAGE_COLORS[stageIdx]}">${stageLabelText(p, stageIdx, false)}</span>
+      </div>`;
+    }).join('');
+    listEl.querySelectorAll('.day-item').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        dayOverlay.classList.remove('active');
+        poPanelReturnToPiGroup = null;
+        openPoPanel(el.dataset.id);
+      });
+    });
+  }
+  dayOverlay.classList.add('active');
+}
+document.getElementById('dayPanelClose').addEventListener('click', ()=> dayOverlay.classList.remove('active'));
+
+/* ---------------- 월별 예상 비용 ---------------- */
+// 해외: CI금액이 있으면 CI금액, 없으면 PI금액을 환율로 환산. 국내: 실제입고금액이 있으면 그 금액, 없으면 발주금액(원화)
+function finalPoAmountKrw(p){
+  const piAmt = parseFloat(p.piAmount)||0;
+  const ciAmt = parseFloat(p.ciAmount)||0;
+  const finalAmt = ciAmt>0 ? ciAmt : piAmt;
+  return toKrwCur(finalAmt, p.currency||'USD');
+}
+function finalDomAmountKrw(p){
+  const poAmt = parseFloat(p.poAmount)||0;
+  const actualAmt = parseFloat(p.actualAmount)||0;
+  return actualAmt>0 ? actualAmt : poAmt;
+}
+// 종결(ERP입력완료)되지 않았고 납기요청일이 있는 건만 대상 — 해외/국내 통합
+function getActiveMonthCostList(){
+  const overseas = pos.filter(p=>computeStageIndex(p)!==9 && p.dueDate).map(p=>{
+    const fullAmountKrw = finalPoAmountKrw(p);
+    const depositPaid = !!p.depositDate; // 체크만 해둔 "입고 후 지급"은 아직 실제 지급이 아니므로 제외
+    const depositAmountKrw = toKrwCur(computeAmounts(p).deposit, p.currency||'USD');
+    return {
+      id:p.id, source:'overseas', itemName:p.itemName, itemCode:p.itemCode, supplier:p.supplier, dueDate:p.dueDate,
+      fullAmountKrw,
+      // 선금이 이미 지급됐다면 그 금액은 이미 나간 돈이므로, 이 달 비용 합계에서는 남은 금액(잔금)만 반영
+      amountKrw: depositPaid ? Math.max(0, fullAmountKrw - depositAmountKrw) : fullAmountKrw,
+      piNo: p.piNo,
+      depositPaid, depositDate: p.depositDate, depositAmountKrw,
+    };
+  });
+  const domestic = domesticPos.filter(p=>computeDomStageIndex(p)!==5 && p.dueDate).map(p=>{
+    const fullAmountKrw = finalDomAmountKrw(p);
+    const depositPaid = !!p.depositDate;
+    const depositAmountKrw = computeDomAmounts(p).deposit;
+    return {
+      id:p.id, source:'domestic', itemName:p.itemName, itemCode:p.itemCode, supplier:p.supplier, dueDate:p.dueDate,
+      fullAmountKrw,
+      amountKrw: depositPaid ? Math.max(0, fullAmountKrw - depositAmountKrw) : fullAmountKrw,
+      piNo: '',
+      depositPaid, depositDate: p.depositDate, depositAmountKrw,
+    };
+  });
+  return [...overseas, ...domestic];
+}
+// 선금이 지급된 건들을 PI번호 기준으로 종합(같은 PI면 하나로 묶어서 합산) — 국내는 PI 개념이 없어 건별로 표시
+function buildDepositPaidSummary(items){
+  const piMap = {}; // piNo -> {label, depositDate, amountKrw}
+  const standalone = [];
+  items.forEach(it=>{
+    if(!it.depositPaid) return;
+    if(it.source==='overseas' && (it.piNo||'').trim()){
+      const key = it.piNo.trim();
+      if(!piMap[key]) piMap[key] = {label:'PI '+key, depositDate:it.depositDate, amountKrw:0};
+      piMap[key].amountKrw += it.depositAmountKrw;
+      if(it.depositDate && (!piMap[key].depositDate || it.depositDate < piMap[key].depositDate)) piMap[key].depositDate = it.depositDate;
+    }else{
+      standalone.push({label: it.itemName||'(품명 미입력)', depositDate: it.depositDate, amountKrw: it.depositAmountKrw});
+    }
+  });
+  return [...Object.values(piMap), ...standalone].sort((a,b)=>(a.depositDate||'').localeCompare(b.depositDate||''));
+}
+const monthCostOverlay = document.getElementById('monthCostOverlay');
+let monthCostGroupsCache = {};
+function renderMonthCost(){
+  const list = getActiveMonthCostList();
+  const groups = {};
+  list.forEach(item=>{
+    const month = (item.dueDate||'').slice(0,7); // YYYY-MM
+    if(!month) return;
+    if(!groups[month]) groups[month] = {items:[], krw:0, overseasKrw:0, domesticKrw:0};
+    groups[month].items.push(item);
+    groups[month].krw += item.amountKrw;
+    if(item.source==='overseas') groups[month].overseasKrw += item.amountKrw;
+    else groups[month].domesticKrw += item.amountKrw;
+  });
+  monthCostGroupsCache = groups;
+  const months = Object.keys(groups).sort();
+  const todayMonth = isoDate(new Date()).slice(0,7);
+  const listEl = document.getElementById('monthCostList');
+  const emptyEl = document.getElementById('monthCostEmpty');
+  if(months.length===0){
+    listEl.innerHTML = '';
+    emptyEl.style.display = 'block';
+  }else{
+    emptyEl.style.display = 'none';
+    listEl.innerHTML = months.map(m=>{
+      const g = groups[m];
+      const [y, mm] = m.split('-');
+      const isPast = m < todayMonth;
+      const depositEntries = buildDepositPaidSummary(g.items);
+      const depositHtml = depositEntries.length ? `
+        <div class="mc-deposit-list">
+          <div class="mc-deposit-heading">선금 지급내역</div>
+          ${depositEntries.map(d=>`
+            <div class="mc-deposit-row">
+              <span class="mc-deposit-label">${d.label}</span>
+              <span class="mc-deposit-date">${d.depositDate||'-'} 지급</span>
+              <span class="mc-deposit-amt">${fmtKrw(d.amountKrw)}</span>
+            </div>
+          `).join('')}
+        </div>` : '';
+      return `<div class="mc-row" data-month="${m}">
+        <div class="mc-row-top">
+          <div class="mc-month ${isPast?'past':''}">${y}년 ${parseInt(mm,10)}월${isPast?'<span class="mc-overdue">지남</span>':''}</div>
+          <div class="mc-count">${g.items.length}건</div>
+          <div class="mc-breakdown">
+            <span>해외 ${fmtKrw(g.overseasKrw)}</span>
+            <span>국내 ${fmtKrw(g.domesticKrw)}</span>
+          </div>
+          <div class="mc-total">${fmtKrw(g.krw)}</div>
+        </div>
+        ${depositHtml}
+      </div>`;
+    }).join('');
+    listEl.querySelectorAll('.mc-row').forEach(row=>{
+      row.querySelector('.mc-row-top').addEventListener('click', ()=> openMonthCostDetail(row.dataset.month));
+    });
+  }
+  const grandTotal = months.reduce((sum,m)=> sum+groups[m].krw, 0);
+  document.getElementById('monthCostGrandTotal').textContent = fmtKrw(grandTotal);
+}
+function openMonthCostDetail(month){
+  const group = monthCostGroupsCache[month];
+  if(!group) return;
+  const [y, mm] = month.split('-');
+  document.getElementById('monthCostPanelTitle').textContent = `${y}년 ${parseInt(mm,10)}월 · ${group.items.length}건`;
+  const listEl = document.getElementById('monthCostPanelList');
+  const sorted = [...group.items].sort((a,b)=>(a.dueDate||'').localeCompare(b.dueDate||''));
+  listEl.innerHTML = sorted.map(it=>`
+    <div class="day-item" data-id="${it.id}" data-source="${it.source}">
+      <div class="info">
+        <span class="name">${it.itemName || '(품명 미입력)'}${it.itemCode ? `<span style="font-weight:700; font-size:13.5px; color:#b7bec7; margin-left:6px;">/ ${it.itemCode}</span>` : ''}</span>
+        <span class="sub">${it.supplier||'-'} · 납기 ${it.dueDate||'-'} · ${it.source==='overseas'?'해외':'국내'}</span>
+      </div>
+      <span class="ddays upcoming">${fmtKrw(it.amountKrw)}</span>
+    </div>
+  `).join('');
+  listEl.querySelectorAll('.day-item').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      monthCostOverlay.classList.remove('active');
+      if(el.dataset.source==='overseas'){
+        poPanelReturnToPiGroup = null;
+        openPoPanel(el.dataset.id);
+      }else{
+        openDomPanel(el.dataset.id);
+      }
+    });
+  });
+  monthCostOverlay.classList.add('active');
+}
+document.getElementById('monthCostPanelClose').addEventListener('click', ()=> monthCostOverlay.classList.remove('active'));
+
+/* ---------------- PI Group detail panel ---------------- */
+const piGroupOverlay = document.getElementById('piGroupOverlay');
+// 진행 단계에 따라 가장 최근에 확정된 날짜 하나만 골라서 보여줌 (공장입고 > 항구도착 > 선적)
+function getLatestShipmentInfo(po){
+  if(po.warehouseDate) return {label:'공장입고일', value:po.warehouseDate};
+  if(po.etaDate) return {label:'항구도착일', value:po.etaDate};
+  if(po.shipDate) return {label:'선적일', value:po.shipDate};
+  return null;
+}
+function openPiGroupPanel(piNo){
+  const group = getExpandedGroupByPiCi(piNo);
+  const distinctPiNos = [...new Set(group.map(p=>(p.piNo||'').trim()).filter(Boolean))];
+  const extraPiCount = distinctPiNos.filter(k=>k!==(piNo||'').trim()).length;
+  document.getElementById('piGroupPanelTitle').textContent = extraPiCount>0
+    ? `PI ${piNo} 외 ${extraPiCount}건 (같은 CI로 연결됨) · 총 ${group.length}건`
+    : `PI ${piNo} · ${group.length}건`;
+  highlightRows(group.map(p=>p.id));
+  const mismatches = checkPiGroupMismatch(piNo);
+  const noteEl = document.getElementById('piGroupMismatchNote');
+  if(mismatches.length){
+    noteEl.style.display = 'block';
+    noteEl.textContent = `⚠ 이 PI 묶음 안에서 PI/선금 정보(${mismatches.join(', ')})가 서로 다르게 입력되어 있어요. 이 항목들은 같은 PI라면 원래 같아야 하니 확인해주세요. (CI수령일·선적일·공장입고일 등 선적 관련 정보는 분할선적일 수 있어 서로 달라도 정상일 수 있습니다)`;
+  }else{
+    noteEl.style.display = 'none';
+  }
+  const listEl = document.getElementById('piGroupList');
+
+  function renderPgItem(p, showCiChip){
+    const stageIdx = computeStageIndex(p);
+    const shipInfo = getLatestShipmentInfo(p);
+    const chips = [];
+    if(showCiChip && p.ciNo) chips.push(`<span class="pg-chip">CI ${p.ciNo}</span>`);
+    if(p.ciQty && parseFloat(p.ciQty)!==parseFloat(p.qty)) chips.push(`<span class="pg-chip" style="border-color:#dc2626; color:#dc2626;">수량 <span style="text-decoration:line-through;">${fmtQty(p.qty)}</span>→${fmtQty(p.ciQty)}</span>`);
+    if(p.ciAmount && parseFloat(p.ciAmount)!==parseFloat(p.piAmount)) chips.push(`<span class="pg-chip" style="border-color:#dc2626; color:#dc2626;">금액 <span style="text-decoration:line-through;">${fmtMoneyCur(p.piAmount, p.currency)}</span>→${fmtMoneyCur(p.ciAmount, p.currency)}</span>`);
+    if(shipInfo) chips.push(`<span class="pg-chip">${shipInfo.label} ${shipInfo.value}</span>`);
+    return `<div class="pg-item" data-id="${p.id}">
+      <div class="info">
+        <span class="name">${p.itemName || '(품명 미입력)'}${p.itemCode ? `<span style="font-weight:700; font-size:13.5px; color:#b7bec7; margin-left:6px;">/ ${p.itemCode}</span>` : ''}${docLinksHtml(p) ? ` <span onclick="event.stopPropagation()">${docLinksHtml(p)}</span>` : ''}</span>
+        <span class="sub">${p.supplier||'-'} · 요청일 ${p.reqDate||'-'} · 요청자 ${p.requester||'-'}</span>
+        ${chips.length? `<div class="pg-chips">${chips.join('')}</div>` : ''}
+      </div>
+      <span class="badge" style="background:${STAGE_COLORS[stageIdx]}">${stageLabelText(p, stageIdx, false)}</span>
+    </div>`;
+  }
+  // CI번호로 서브 그룹핑 (CI가 같으면 실제로 같은 선적묶음일 가능성이 높음)
+  function renderCiClustered(items){
+    const ciGroups = {}; // key: ciNo 또는 '__none__'
+    const ciOrder = [];
+    items.forEach(p=>{
+      const key = (p.ciNo||'').trim() || '__none__';
+      if(!ciGroups[key]){ ciGroups[key] = []; ciOrder.push(key); }
+      ciGroups[key].push(p);
+    });
+    // CI가 있는 그룹을 먼저, 없는 것(__none__)은 마지막에
+    ciOrder.sort((a,b)=> (a==='__none__')-(b==='__none__'));
+    return ciOrder.map(key=>{
+      const ciItems = ciGroups[key];
+      if(key === '__none__'){
+        // CI 미입력 건들은 묶지 않고 개별 표시
+        return ciItems.map(p=> renderPgItem(p, true)).join('');
+      }
+      if(ciItems.length === 1){
+        return renderPgItem(ciItems[0], true);
+      }
+      // CI가 같은 2건 이상은 하나의 묶음으로 감싸서 표시
+      return `<div class="pg-ci-cluster">
+        <div class="pg-ci-cluster-head">CI ${key} · ${ciItems.length}건</div>
+        ${ciItems.map(p=> renderPgItem(p, false)).join('')}
+      </div>`;
+    }).join('');
+  }
+
+  if(distinctPiNos.length > 1){
+    // 여러 PI가 같은 CI로 묶여있는 경우: PI별로 한 번 더 감싸서 어느 PI 소속인지 명확히 보여준다
+    const piGroups = {};
+    const piOrder = [];
+    group.forEach(p=>{
+      const key = (p.piNo||'').trim() || '__none__';
+      if(!piGroups[key]){ piGroups[key] = []; piOrder.push(key); }
+      piGroups[key].push(p);
+    });
+    piOrder.sort((a,b)=> (a===(piNo||'').trim())? -1 : (b===(piNo||'').trim())? 1 : 0);
+    listEl.innerHTML = piOrder.map(key=>`
+      <div class="pg-pi-cluster">
+        <div class="pg-pi-cluster-head">PI ${key === '__none__' ? '(미입력)' : key} · ${piGroups[key].length}건</div>
+        ${renderCiClustered(piGroups[key])}
+      </div>
+    `).join('');
+  }else{
+    listEl.innerHTML = renderCiClustered(group);
+  }
+
+  listEl.querySelectorAll('.pg-item').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      piGroupOverlay.classList.remove('active');
+      poPanelReturnToPiGroup = piNo;
+      openPoPanel(el.dataset.id);
+    });
+  });
+
+  // 그룹 전체 PI금액/선금/잔금 합계 (건별 결제통화가 USD/CNY로 다를 수 있어 통화별로 나눠 더하고, KRW는 항상 환산해 같이 보여줌)
+  const fmtMixed = (usd, cny) => {
+    const parts = [];
+    if(usd) parts.push('$'+usd.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
+    if(cny) parts.push('¥'+cny.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
+    return parts.join(' + ') || '$0.00';
+  };
+  let piUsd=0, piCny=0, piKrw=0, depUsd=0, depCny=0, depKrw=0, balUsd=0, balCny=0, balKrw=0;
+  group.forEach(p=>{
+    const cur = p.currency || 'USD';
+    const piAmt = parseFloat(p.piAmount)||0;
+    const {deposit, balance} = computeAmounts(p);
+    if(cur==='CNY'){ piCny+=piAmt; depCny+=deposit; balCny+=balance; } else { piUsd+=piAmt; depUsd+=deposit; balUsd+=balance; }
+    piKrw += toKrwCur(piAmt, cur);
+    depKrw += toKrwCur(deposit, cur);
+    balKrw += toKrwCur(balance, cur);
+  });
+  document.getElementById('piGroupTotals').innerHTML = `
+    <div class="ptcard">
+      <div class="ptlabel">PI금액 합계 (${group.length}건)</div>
+      <div class="pt-line"><span class="pt-line-lbl">총</span><span class="ptval">${fmtMixed(piUsd, piCny)}</span><span class="ptsub">₩${Math.round(piKrw).toLocaleString()}</span></div>
+    </div>
+    <div class="ptcard">
+      <div class="ptlabel">선금+잔금 합계</div>
+      <div class="pt-line"><span class="pt-line-lbl">선금</span><span class="ptval">${fmtMixed(depUsd, depCny)}</span><span class="ptsub">₩${Math.round(depKrw).toLocaleString()}</span></div>
+      <div class="pt-line"><span class="pt-line-lbl">잔금</span><span class="ptval">${fmtMixed(balUsd, balCny)}</span><span class="ptsub">₩${Math.round(balKrw).toLocaleString()}</span></div>
+    </div>
+  `;
+
+  piGroupOverlay.classList.add('active');
+}
+document.getElementById('piGroupPanelClose').addEventListener('click', ()=>{ piGroupOverlay.classList.remove('active'); clearRowHighlights(); });
+// 이 팝업은 발주 수정 화면과 달리 입력 중인 내용이 없으므로, 바깥(어두운 배경) 클릭으로도 닫히게 한다
+piGroupOverlay.addEventListener('click', (e)=>{
+  if(e.target === piGroupOverlay){ piGroupOverlay.classList.remove('active'); clearRowHighlights(); }
+});
+
+/* ---------------- 메모장 ---------------- */
+const memoOverlay = document.getElementById('memoOverlay');
+const memoTextarea = document.getElementById('memoTextarea');
+let memoSaveTimer = null;
+document.getElementById('memoTab').addEventListener('click', ()=>{
+  memoTextarea.value = memoNote;
+  memoOverlay.classList.add('active');
+  memoTextarea.focus();
+});
+function closeMemoOverlay(){
+  memoOverlay.classList.remove('active');
+}
+document.getElementById('memoPanelClose').addEventListener('click', closeMemoOverlay);
+// 입력 중인 메모는 자동저장되므로, 바깥(어두운 배경) 클릭으로 바로 닫혀도 안전하다
+memoOverlay.addEventListener('click', (e)=>{
+  if(e.target === memoOverlay) closeMemoOverlay();
+});
+memoTextarea.addEventListener('input', ()=>{
+  memoNote = memoTextarea.value;
+  renderMemoPreview();
+  clearTimeout(memoSaveTimer);
+  memoSaveTimer = setTimeout(()=>{ saveMemoNote(); }, 400);
+});
+
+document.getElementById('calPrev').addEventListener('click', ()=>{
+  calState.month--; if(calState.month<0){ calState.month=11; calState.year--; }
+  renderCalendar();
+});
+document.getElementById('calNext').addEventListener('click', ()=>{
+  calState.month++; if(calState.month>11){ calState.month=0; calState.year++; }
+  renderCalendar();
+});
+document.getElementById('calToday').addEventListener('click', ()=>{
+  const d = new Date(); calState = {year:d.getFullYear(), month:d.getMonth()};
+  renderCalendar();
+});
+
+/* ---------------- PO Panel ---------------- */
+const poOverlay = document.getElementById('poOverlay');
+const poForm = document.getElementById('poForm');
+
+const FIELDSET_KEY_FIELDS = {
+  fs1: ['reqDate','itemName','supplier','dueDate'],
+  fs2: ['piDate','depositDate'],
+  fs3: ['ciDate','balanceDate','shipDate'],
+  fs4: ['etaDate','warehouseDate','qcDate','erpDate'],
+};
+function updateFieldsetFillState(){
+  Object.entries(FIELDSET_KEY_FIELDS).forEach(([fsId, keys])=>{
+    const fs = document.getElementById(fsId);
+    if(!fs) return;
+    const allFilled = keys.every(k=>{
+      if(k === 'depositDate' && poForm.elements['depositDeferred'] && poForm.elements['depositDeferred'].checked) return true;
+      if(k === 'balanceDate' && poForm.elements['balanceDeferred'] && poForm.elements['balanceDeferred'].checked) return true;
+      const el = poForm.elements[k];
+      return el && el.value && el.value.trim() !== '';
+    });
+    fs.classList.toggle('filled', allFilled);
+  });
+}
+
+function syncShareDisplays(){
+  const map = [
+    ['depositShared','depositSharedDisplay'],
+    ['balanceShared','balanceSharedDisplay'],
+    ['warehouseShared','warehouseSharedDisplay'],
+  ];
+  map.forEach(([field, dispId])=>{
+    const val = poForm.elements[field].value;
+    const disp = document.getElementById(dispId);
+    const on = val === 'O';
+    disp.textContent = on ? '공유완료' : '미공유';
+    disp.classList.toggle('on', on);
+  });
+}
+
+function openPoPanel(id){
+  editingPoId = id || null;
+  poForm.reset();
+  // form.reset()은 JS로 값을 넣어둔 hidden input(공유 상태)까지는 초기화하지 않으므로 직접 비워줌
+  ['depositShared','balanceShared','warehouseShared'].forEach(name=>{
+    poForm.elements[name].value = '';
+  });
+  document.getElementById('poPanelTitle').textContent = id ? '발주 수정' : '새 발주 등록';
+  document.getElementById('poDeleteLink').style.display = id ? 'block' : 'none';
+  document.getElementById('poDuplicateBtn').style.display = id ? 'inline-block' : 'none';
+  let poCurrencyVal = 'USD';
+  if(id){
+    const po = pos.find(p=>p.id===id);
+    Object.keys(po).forEach(k=>{
+      const el = poForm.elements[k];
+      if(!el) return;
+      if(el.type === 'checkbox'){ el.checked = !!po[k]; }
+      else{ el.value = po[k] ?? ''; }
+    });
+    poCurrencyVal = po.currency || 'USD';
+  }
+  setPoCurrency(poCurrencyVal);
+  poForm.querySelectorAll('.item-tag').forEach(lbl=>{
+    const cb = lbl.querySelector('input');
+    lbl.classList.toggle('checked', cb.checked);
+  });
+  updateComputedPreview();
+  updateFieldsetFillState();
+  syncShareDisplays();
+  if(id) highlightRows([id]); else clearRowHighlights();
+  poOverlay.classList.add('active');
+}
+function closePoPanel(){
+  poOverlay.classList.remove('active');
+  editingPoId = null;
+  clearRowHighlights();
+  if(poPanelReturnToPiGroup){
+    const piNo = poPanelReturnToPiGroup;
+    poPanelReturnToPiGroup = null;
+    openPiGroupPanel(piNo);
+  }
+}
+// PI섹션/CI섹션에 각각 있는 통화 라디오 두 쌍과, 실제 제출되는 hidden 필드를 모두 한 값으로 맞춘다
+function setPoCurrency(value){
+  poForm.querySelectorAll('input[name="currencyPi"]').forEach(r=>{ r.checked = (r.value === value); });
+  poForm.querySelectorAll('input[name="currencyCi"]').forEach(r=>{ r.checked = (r.value === value); });
+  poForm.elements['currency'].value = value;
+}
+function updateComputedPreview(){
+  const piAmt = parseFloat(poForm.elements['piAmount'].value)||0;
+  const ciAmt = parseFloat(poForm.elements['ciAmount'].value)||0;
+  const pct = (parseFloat(poForm.elements['depositPct'].value)||0)/100;
+  const deposit = piAmt*pct;
+  const finalAmt = ciAmt>0 ? ciAmt : piAmt;
+  const balance = finalAmt-deposit;
+  const curEl = poForm.elements['currency'];
+  const cur = curEl && curEl.value ? curEl.value : 'USD';
+  const rate = fxRateFor(cur);
+  const krwFmt = n => '₩' + Math.round(n*rate).toLocaleString();
+  document.getElementById('computedAmounts').innerHTML =
+    `선금 ${fmtMoneyCur(deposit, cur)} <span style="color:var(--console-text-dim); font-weight:400;">(${krwFmt(deposit)})</span>` +
+    ` &nbsp;/&nbsp; 잔금 ${fmtMoneyCur(balance, cur)} <span style="color:var(--console-text-dim); font-weight:400;">(${krwFmt(balance)})</span>` +
+    (ciAmt>0 ? ` <span style="color:var(--console-accent); font-weight:600;">· CI금액 기준</span>` : '');
+}
+function refreshDepositShare(){
+  const hasDate = !!poForm.elements['depositDate'].value;
+  const hasPlanned = !!poForm.elements['depositPlannedDate'].value;
+  const isDeferred = poForm.elements['depositDeferred'].checked;
+  poForm.elements['depositShared'].value = (hasDate || hasPlanned || isDeferred) ? 'O' : '';
+}
+function refreshBalanceShare(){
+  const hasDate = !!poForm.elements['balanceDate'].value;
+  const hasPlanned = !!poForm.elements['balancePlannedDate'].value;
+  const isDeferred = poForm.elements['balanceDeferred'].checked;
+  poForm.elements['balanceShared'].value = (hasDate || hasPlanned || isDeferred) ? 'O' : '';
+}
+// 선금지급(예정)일도 상태·공유 표시에 직접 영향을 주므로 PI수령일과 마찬가지로 자동 반영 (지우면 같이 지워짐)
+// PI번호를 입력했는데 이 항목엔 선금지급(예정)일이 비어있고 같은 PI를 쓰는 다른 건엔 있다면, 그 값을 가져와 채운다.
+// (이걸 안 하면 새 건을 추가할 때 빈 값이 그대로 autoSyncDeposit으로 넘어가 기존 건들의 값을 지워버리게 됨)
+function autoFillDepositFromGroup(){
+  const piNo = (poForm.elements['piNo'].value||'').trim();
+  if(!piNo) return;
+  const others = getPiGroup(piNo, editingPoId);
+  if(others.length === 0) return;
+  let filled = false;
+  ['depositDate','depositPlannedDate'].forEach(key=>{
+    const el = poForm.elements[key];
+    if(el.value) return;
+    const match = others.find(p=>p[key]);
+    if(match){ el.value = match[key]; filled = true; }
+  });
+  if(!poForm.elements['depositDeferred'].checked){
+    const match = others.find(p=>p.depositDeferred);
+    if(match){ poForm.elements['depositDeferred'].checked = true; filled = true; }
+  }
+  if(filled){ updateFieldsetFillState(); syncShareDisplays(); }
+}
+async function autoSyncDeposit(){
+  const piNo = (poForm.elements['piNo'].value||'').trim();
+  if(!piNo) return;
+  const depositDateVal = poForm.elements['depositDate'].value;
+  const depositPlannedVal = poForm.elements['depositPlannedDate'].value;
+  const depositDeferredVal = poForm.elements['depositDeferred'].checked;
+  const others = getPiGroup(piNo, editingPoId);
+  const toUpdate = others.filter(p => p.depositDate !== depositDateVal || p.depositPlannedDate !== depositPlannedVal || !!p.depositDeferred !== depositDeferredVal);
+  if(toUpdate.length === 0) return;
+  toUpdate.forEach(op=>{
+    const idx = pos.findIndex(p=>p.id===op.id);
+    if(idx===-1) return;
+    pos[idx].depositDate = depositDateVal;
+    pos[idx].depositPlannedDate = depositPlannedVal;
+    pos[idx].depositDeferred = depositDeferredVal;
+    const hasDate = !!depositDateVal;
+    const hasPlanned = !!depositPlannedVal;
+    pos[idx].depositShared = (hasDate || hasPlanned || depositDeferredVal) ? 'O' : '';
+  });
+  await savePos();
+  render();
+  toast((depositDateVal || depositPlannedVal || depositDeferredVal)
+    ? `같은 PI번호를 쓰는 ${toUpdate.length}건에도 선금 지급(예정)일을 자동 반영했습니다`
+    : `같은 PI번호를 쓰는 ${toUpdate.length}건의 선금 지급(예정)일도 함께 지웠습니다`);
+}
+
+// PI번호를 입력했는데 이미 같은 PI번호를 쓰는 다른 건에 PI 문서 링크가 있다면, 그 링크를 그대로 가져와 채운다.
+function autoFillPiDocUrlFromGroup(){
+  const piNo = (poForm.elements['piNo'].value||'').trim();
+  if(!piNo) return;
+  if(poForm.elements['piDocUrl'].value) return; // 이미 입력되어 있으면 덮어쓰지 않음
+  const others = getPiGroup(piNo, editingPoId);
+  const match = others.find(p=>p.piDocUrl);
+  if(match){
+    poForm.elements['piDocUrl'].value = match.piDocUrl;
+    updateFieldsetFillState();
+  }
+}
+// PI 문서 링크는 같은 PI를 쓰는 다른 건들에도 자동으로 반영한다 (지우면 같이 지워짐).
+async function autoSyncPiDocUrl(){
+  const piNo = (poForm.elements['piNo'].value||'').trim();
+  if(!piNo) return;
+  const piDocUrlVal = poForm.elements['piDocUrl'].value;
+  const others = getPiGroup(piNo, editingPoId);
+  const toUpdate = others.filter(p => (p.piDocUrl||'') !== piDocUrlVal);
+  if(toUpdate.length === 0) return;
+  toUpdate.forEach(op=>{
+    const idx = pos.findIndex(p=>p.id===op.id);
+    if(idx>-1) pos[idx].piDocUrl = piDocUrlVal;
+  });
+  await savePos();
+  render();
+}
+
+// PI번호를 입력했는데 이미 같은 PI번호를 쓰는 다른 건에 PI수령일이 있다면, 그 날짜를 그대로 가져와 채운다.
+function autoFillPiDateFromGroup(){
+  const piNo = (poForm.elements['piNo'].value||'').trim();
+  if(!piNo) return;
+  if(poForm.elements['piDate'].value) return; // 이미 입력되어 있으면 덮어쓰지 않음
+  const others = getPiGroup(piNo, editingPoId);
+  const match = others.find(p=>p.piDate);
+  if(match){
+    poForm.elements['piDate'].value = match.piDate;
+    updateFieldsetFillState();
+    syncShareDisplays();
+  }
+}
+
+// PI수령일은 같은 PI를 쓰는 건들 사이에서 상태(단계) 계산에 직접 영향을 주므로,
+// 확인 절차 없이 자동으로 같은 PI번호를 쓰는 다른 건들에도 반영한다 (지우면 같이 지워짐).
+async function autoSyncPiDate(){
+  const piNo = (poForm.elements['piNo'].value||'').trim();
+  if(!piNo) return;
+  const piDateVal = poForm.elements['piDate'].value;
+  const others = getPiGroup(piNo, editingPoId);
+  const toUpdate = others.filter(p => p.piDate !== piDateVal);
+  if(toUpdate.length === 0) return;
+  toUpdate.forEach(op=>{
+    const idx = pos.findIndex(p=>p.id===op.id);
+    if(idx>-1) pos[idx].piDate = piDateVal;
+  });
+  await savePos();
+  render();
+  toast(piDateVal
+    ? `같은 PI번호를 쓰는 ${toUpdate.length}건에도 PI수령일을 자동 반영했습니다`
+    : `같은 PI번호를 쓰는 ${toUpdate.length}건의 PI수령일도 함께 지웠습니다`);
+}
+
+// 같은 PI라면 같은 제조사에서 온 것이므로 공급사도 자동으로 맞춘다.
+async function autoSyncSupplier(){
+  const piNo = (poForm.elements['piNo'].value||'').trim();
+  const supplierVal = poForm.elements['supplier'].value;
+  if(!piNo || !supplierVal) return;
+  const others = getPiGroup(piNo, editingPoId);
+  const toUpdate = others.filter(p => p.supplier !== supplierVal);
+  if(toUpdate.length === 0) return;
+  toUpdate.forEach(op=>{
+    const idx = pos.findIndex(p=>p.id===op.id);
+    if(idx>-1) pos[idx].supplier = supplierVal;
+  });
+  await savePos();
+  render();
+  toast(`같은 PI번호를 쓰는 ${toUpdate.length}건에도 공급사를 자동 반영했습니다`);
+}
+
+// CI를 받은 뒤부터는 "같은 CI번호"가 실제 같은 화물 단위 — 이 항목들은 CI번호가 같은 건들끼리 자동 동기화
+const CI_SYNC_FIELDS = [
+  {key:'ciDate',             label:'CI수령일'},
+  {key:'shipDate',           label:'선적일'},
+  {key:'blNo',               label:'BL NO.'},
+  {key:'etaPlanned',         label:'항구도착예정일'},
+  {key:'etaDate',            label:'항구도착일'},
+  {key:'warehouseDate',      label:'공장입고일'},
+  {key:'customsCost',        label:'통관비용'},
+  {key:'balancePlannedDate', label:'잔금지급 예정일'},
+  {key:'balanceDate',        label:'잔금지급일'},
+  {key:'ciDocUrl',           label:'CI 문서 링크'},
+  {key:'blDocUrl',           label:'BL 문서 링크'},
+  {key:'plDocUrl',           label:'패킹리스트(PL) 링크'},
+  {key:'coDocUrl',           label:'원산지증명서 링크'},
+];
+function getCiGroup(ciNo, piNo, excludeId){
+  const ciKey = (ciNo||'').trim();
+  const piKey = (piNo||'').trim();
+  if(!ciKey) return [];
+  return pos.filter(p => (p.ciNo||'').trim()===ciKey && (p.piNo||'').trim()===piKey && p.id !== excludeId);
+}
+// CI번호를 입력했는데 이 항목엔 CI/선적/잔금 관련 필드가 비어있고 같은 CI를 쓰는 다른 건엔 있다면, 그 값을 가져와 채운다.
+// (이걸 안 하면 새 건을 추가할 때 빈 값이 그대로 autoSyncCiFields로 넘어가 기존 건들의 값을 지워버리게 됨)
+function autoFillCiFieldsFromGroup(){
+  const piNo = (poForm.elements['piNo'].value||'').trim();
+  const ciNo = (poForm.elements['ciNo'].value||'').trim();
+  if(!ciNo) return;
+  const others = getCiGroup(ciNo, piNo, editingPoId);
+  if(others.length === 0) return;
+  let filled = false;
+  let etaJustFilled = false;
+  CI_SYNC_FIELDS.forEach(f=>{
+    const el = poForm.elements[f.key];
+    if(el.value) return;
+    const match = others.find(p => (p[f.key]||'').toString().trim() !== '');
+    if(match){ el.value = match[f.key]; filled = true; if(f.key==='etaPlanned') etaJustFilled = true; }
+  });
+  // 항구도착예정일이 CI그룹에서 자동으로 채워졌다면 공장입고예정일(+5영업일)도 함께 계산
+  if(etaJustFilled && !poForm.elements['warehousePlanned'].value){
+    poForm.elements['warehousePlanned'].value = addBusinessDays(poForm.elements['etaPlanned'].value, 5);
+  }
+  if(!poForm.elements['balanceDeferred'].checked){
+    const match = others.find(p=>p.balanceDeferred);
+    if(match){ poForm.elements['balanceDeferred'].checked = true; filled = true; }
+  }
+  if(filled){ updateFieldsetFillState(); syncShareDisplays(); }
+}
+async function autoSyncCiFields(){
+  const piNo = (poForm.elements['piNo'].value||'').trim();
+  const ciNo = (poForm.elements['ciNo'].value||'').trim();
+  if(!ciNo) return;
+  const others = getCiGroup(ciNo, piNo, editingPoId);
+  if(others.length === 0) return;
+  const balanceDeferredVal = poForm.elements['balanceDeferred'].checked;
+  const toUpdate = others.filter(p => CI_SYNC_FIELDS.some(f => (p[f.key]||'') !== (poForm.elements[f.key].value||'')) || !!p.balanceDeferred !== balanceDeferredVal);
+  if(toUpdate.length === 0) return;
+  toUpdate.forEach(op=>{
+    const idx = pos.findIndex(p=>p.id===op.id);
+    if(idx===-1) return;
+    CI_SYNC_FIELDS.forEach(f=>{
+      pos[idx][f.key] = poForm.elements[f.key].value;
+    });
+    // 항구도착예정일이 반영됐으니 공장입고예정일(+5영업일)도 같이 재계산
+    pos[idx].warehousePlanned = pos[idx].etaPlanned ? addBusinessDays(pos[idx].etaPlanned, 5) : '';
+    pos[idx].balanceDeferred = balanceDeferredVal;
+    // 잔금/입고 공유 상태도 날짜값에서 파생되므로 같이 재계산
+    const hasBalDate = !!pos[idx].balanceDate;
+    const hasBalPlanned = !!pos[idx].balancePlannedDate;
+    pos[idx].balanceShared = (hasBalDate || hasBalPlanned || balanceDeferredVal) ? 'O' : '';
+    pos[idx].warehouseShared = pos[idx].warehouseDate ? 'O' : '';
+  });
+  await savePos();
+  render();
+  toast(`같은 CI번호를 쓰는 ${toUpdate.length}건에도 선적·항구도착·통관·잔금 정보를 자동 반영했습니다`);
+}
+poForm.addEventListener('input', (e)=>{
+  if(e.target.name==='piAmount' || e.target.name==='depositPct' || e.target.name==='ciAmount' || e.target.name==='currencyPi' || e.target.name==='currencyCi') updateComputedPreview();
+  // PI섹션/CI섹션의 통화 선택은 서로 같은 선택을 해야 하는 값이므로, 한쪽을 누르면 다른 쪽도 같이 맞춰준다
+  if(e.target.name==='currencyPi' || e.target.name==='currencyCi'){
+    setPoCurrency(e.target.value);
+  }
+  // PI번호/CI번호를 지우면 거기 딸려서 입력했던 수령일(및 PI금액, 선금비율)도 함께 지운다
+  if(e.target.name==='piNo' && !e.target.value){
+    poForm.elements['piDate'].value = '';
+    poForm.elements['piAmount'].value = '';
+    poForm.elements['depositPct'].value = '';
+    updateComputedPreview();
+    refreshDepositShare();
+    syncShareDisplays();
+  }
+  if(e.target.name==='ciNo' && !e.target.value){
+    poForm.elements['ciDate'].value = '';
+  }
+  // 실제 지급일/입고일이 입력되면 다음 단계로 진행(상태 계산에 반영), 예정일만 입력돼도 매니저 공유는 완료로 표시
+  if(['depositDate','depositPlannedDate','depositPct','depositDeferred'].includes(e.target.name)) refreshDepositShare();
+  if(['balanceDate','balancePlannedDate','balanceDeferred'].includes(e.target.name)) refreshBalanceShare();
+  if(e.target.name==='warehouseDate'){
+    poForm.elements['warehouseShared'].value = e.target.value ? 'O' : '';
+  }
+  // 초도제품 / 샘플제품 체크박스는 동시에 체크될 수 없음
+  if(e.target.name==='isFirstBatch' && e.target.checked){
+    poForm.elements['isSample'].checked = false;
+  }
+  if(e.target.name==='isSample' && e.target.checked){
+    poForm.elements['isFirstBatch'].checked = false;
+  }
+  if(e.target.name==='isFirstBatch' || e.target.name==='isSample' || e.target.name==='isUrgent'){
+    poForm.querySelectorAll('.item-tag').forEach(lbl=>{
+      const cb = lbl.querySelector('input');
+      lbl.classList.toggle('checked', cb.checked);
+    });
+  }
+  syncShareDisplays();
+  updateFieldsetFillState();
+  if(e.target.name==='piNo'){
+    autoFillPiDateFromGroup();
+  }
+  if(e.target.name==='piDate' || e.target.name==='piNo'){
+    autoSyncPiDate();
+  }
+  if(e.target.name==='piNo'){
+    autoFillDepositFromGroup();
+  }
+  if(e.target.name==='depositDate' || e.target.name==='depositPlannedDate' || e.target.name==='depositDeferred' || e.target.name==='piNo'){
+    autoSyncDeposit();
+  }
+  if(e.target.name==='piNo'){
+    autoFillPiDocUrlFromGroup();
+  }
+  if(e.target.name==='piDocUrl' || e.target.name==='piNo'){
+    autoSyncPiDocUrl();
+  }
+  if(e.target.name==='supplier' || e.target.name==='piNo'){
+    autoSyncSupplier();
+  }
+  if(e.target.name==='ciNo'){
+    autoFillCiFieldsFromGroup();
+  }
+  if(e.target.name==='ciNo' || e.target.name==='balanceDeferred' || CI_SYNC_FIELDS.some(f=>f.key===e.target.name)){
+    autoSyncCiFields();
+  }
+  // 항구 도착 예정일 입력 시 통관(3영업일)+이동(2영업일) = 영업일 5일 뒤로 공장 입고 예정일 자동 계산
+  if(e.target.name==='etaPlanned'){
+    if(e.target.value){
+      poForm.elements['warehousePlanned'].value = addBusinessDays(e.target.value, 5);
+    }else{
+      poForm.elements['warehousePlanned'].value = '';
+    }
+  }
+});
+document.getElementById('btnNewPo').addEventListener('click', ()=>{ poPanelReturnToPiGroup = null; openPoPanel(null); });
+document.getElementById('poPanelClose').addEventListener('click', closePoPanel);
+document.getElementById('poCancelBtn').addEventListener('click', closePoPanel);
+// 오버레이 바깥 클릭으로는 닫히지 않도록 함 (X / 저장 / 취소로만 닫힘)
+
+poForm.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const saveBtn = poForm.querySelector('button[type="submit"]');
+  try{
+    saveBtn.disabled = true;
+    saveBtn.textContent = '저장 중...';
+    const fd = new FormData(poForm);
+    const data = {};
+    fd.forEach((v,k)=> data[k]=v);
+    data.isFirstBatch = poForm.elements['isFirstBatch'].checked;
+    data.isSample = poForm.elements['isSample'].checked;
+    data.isUrgent = poForm.elements['isUrgent'].checked;
+    // 체크박스는 체크 해제 시 FormData에 아예 포함되지 않으므로 명시적으로 반영해야 함
+    // (안 그러면 입고 후 지급 체크를 풀어도 기존 값이 그대로 남아있게 됨)
+    data.depositDeferred = poForm.elements['depositDeferred'].checked;
+    data.balanceDeferred = poForm.elements['balanceDeferred'].checked;
+    if(!data.itemName || !data.itemName.trim()){
+      toast('품명을 입력해주세요');
+      return;
+    }
+    if(editingPoId){
+      const idx = pos.findIndex(p=>p.id===editingPoId);
+      pos[idx] = {...pos[idx], ...data};
+    }else{
+      data.id = 'po_' + Date.now();
+      pos.push(data);
+    }
+    await savePos();
+    render();
+    closePoPanel();
+    toast('저장되었습니다');
+  }catch(err){
+    console.error(err);
+    toast('저장 중 오류가 발생했습니다: ' + (err && err.message ? err.message : '알 수 없는 오류'));
+  }finally{
+    saveBtn.disabled = false;
+    saveBtn.textContent = '저장';
+  }
+});
+document.getElementById('poDeleteLink').addEventListener('click', async ()=>{
+  if(!editingPoId) return;
+  if(!confirm('이 발주를 삭제할까요?')) return;
+  pos = pos.filter(p=>p.id!==editingPoId);
+  await savePos();
+  render();
+  closePoPanel();
+  toast('삭제되었습니다');
+});
+document.getElementById('poDuplicateBtn').addEventListener('click', async ()=>{
+  if(!editingPoId) return;
+  if(!confirm('현재 입력한 내용을 저장하고, 이 건을 복제해서 분할 입고용 새 건을 만들까요?\n\n품명·공급사·PI정보 등은 그대로 복사되고, CI·선적·입고·잔금 관련 정보는 새로 입력하도록 비워집니다.')) return;
+
+  // 1) 지금 폼에 입력된 내용을 원본 건에 먼저 저장
+  const fd = new FormData(poForm);
+  const data = {};
+  fd.forEach((v,k)=> data[k]=v);
+  data.isFirstBatch = poForm.elements['isFirstBatch'].checked;
+  data.isSample = poForm.elements['isSample'].checked;
+  data.isUrgent = poForm.elements['isUrgent'].checked;
+  data.depositDeferred = poForm.elements['depositDeferred'].checked;
+  data.balanceDeferred = poForm.elements['balanceDeferred'].checked;
+  const idx = pos.findIndex(p=>p.id===editingPoId);
+  if(idx===-1) return;
+  pos[idx] = {...pos[idx], ...data};
+
+  // 2) 복제본 생성 — CI/선적/입고/잔금 등 "이번 분할분에서 새로 정해질" 정보는 비움
+  const resetFields = [
+    'ciNo','ciDate','ciQty','ciAmount',
+    'balancePlannedDate','balanceDate','balanceShared','balanceDeferred',
+    'shipDate','blNo','etaPlanned','warehousePlanned','etaDate','customsCost',
+    'warehouseDate','warehouseShared','qcDate','erpDate',
+    'note','changeLog','approvalBatchId','approvalStatus',
+    'ciDocUrl','blDocUrl','plDocUrl','coDocUrl',
+  ];
+  const dup = {...pos[idx]};
+  resetFields.forEach(f=> dup[f] = '');
+  dup.id = 'po_' + Date.now();
+  dup.duplicatedFrom = editingPoId; // 분할입고 복제본임을 표시 — PI건수에는 안 잡히고 목록에서 화살표로만 표시됨
+
+  pos.splice(idx+1, 0, dup);
+  await savePos();
+  render();
+  openPoPanel(dup.id);
+  toast('복제된 건을 만들었습니다. 이번 분할분의 수량과 CI 정보를 입력해주세요.');
+});
+document.getElementById('poSearch').addEventListener('input', renderPoTable);
+document.getElementById('poDateStart').addEventListener('input', renderPoTable);
+document.getElementById('poDateEnd').addEventListener('input', renderPoTable);
+function resetAllFilters(){
+  poStageFilter = null;
+  document.getElementById('poSearch').value = '';
+  document.getElementById('poDateStart').value = '';
+  document.getElementById('poDateEnd').value = '';
+  domStageFilter = null;
+  document.getElementById('domSearch').value = '';
+  document.getElementById('domDateStart').value = '';
+  document.getElementById('domDateEnd').value = '';
+  renderPoTable();
+  renderDomTable();
+}
+function resetPoFilter(){ resetAllFilters(); }
+function resetDomFilter(){ resetAllFilters(); }
+document.getElementById('btnResetPoFilter').addEventListener('click', resetPoFilter);
+
+function csvEscape(val){
+  const s = (val===null || val===undefined) ? '' : String(val);
+  if(/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+function downloadPoList(){
+  const list = getFilteredPos();
+  if(list.length === 0){
+    toast('다운로드할 발주 목록이 없습니다');
+    return;
+  }
+  const headers = [
+    '요청일','요청자','구분','품명','품목코드','수량','공급사','납기요청일','결제통화',
+    'PI수령일','PI번호','PI금액','선금비율(%)','선금액','선금액(KRW)','선금지급예정일','선금지급일','선금공유(정향미)',
+    '생산완료예정일','CI수령일','CI번호','CI수량','CI금액','잔금액','잔금액(KRW)','잔금지급예정일','잔금지급일','잔금공유(정향미)',
+    'BL NO.','선적일','항구도착예정일','공장입고예정일','항구도착일(ETA)','통관비용(KRW)',
+    '공장입고일','입고공유(정명재)','품질검수완료일','ERP입력일','상태','특이사항','변경사항',
+  ];
+  const rows = list.map(p=>{
+    const {deposit, balance} = computeAmounts(p);
+    const stageIdx = computeStageIndex(p);
+    const itemType = p.isFirstBatch ? '초도제품' : (p.isSample ? '샘플제품' : '');
+    const cur = p.currency || 'USD';
+    return [
+      p.reqDate, p.requester, itemType, p.itemName, p.itemCode, p.qty, p.supplier, p.dueDate, cur,
+      p.piDate, p.piNo, p.piAmount, p.depositPct, p.piAmount?deposit.toFixed(2):'', p.piAmount?Math.round(toKrwCur(deposit,cur)):'', p.depositPlannedDate, p.depositDate, isDepositShared(p)?'공유완료':'미공유',
+      p.prodDueDate, p.ciDate, p.ciNo, p.ciQty, p.ciAmount, p.piAmount?balance.toFixed(2):'', p.piAmount?Math.round(toKrwCur(balance,cur)):'', p.balancePlannedDate, p.balanceDate, p.balanceShared==='O'?'공유완료':'미공유',
+      p.blNo, p.shipDate, p.etaPlanned, p.warehousePlanned, p.etaDate, p.customsCost,
+      p.warehouseDate, p.warehouseShared==='O'?'공유완료':'미공유', p.qcDate, p.erpDate, stageLabelText(p, stageIdx, false), p.note, p.changeLog,
+    ];
+  });
+  const csvLines = [headers, ...rows].map(row => row.map(csvEscape).join(','));
+  const csvContent = '\uFEFF' + csvLines.join('\r\n'); // BOM for Excel Hangul support
+  const blob = new Blob([csvContent], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,10);
+  const suffix = poStageFilter !== null ? `_${stripStageNum(STAGE_LABELS[poStageFilter])}` : '';
+  a.href = url;
+  a.download = `발주현황_목록${suffix}_${stamp}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast(`${list.length}건을 다운로드했습니다`);
+}
+document.getElementById('btnDownloadPo').addEventListener('click', downloadPoList);
+
+/* ---------------- 발주서 작성 (요청등록 단계 건을 기간/공급사로 모아보기) ---------------- */
+function renderPocSupplierSelect(){
+  const sel = document.getElementById('pocSupplier');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">전체</option>' + suppliers.map(s=>`<option value="${s.name}">${s.name}</option>`).join('');
+  sel.value = current; // keep selection if still valid
+}
+
+function getPocList(){
+  const supplier = document.getElementById('pocSupplier').value;
+  const overseas = pos.filter(p=>computeStageIndex(p)===0); // 아직 PI를 받지 않은, 제조사에 전달 전 단계
+  const domestic = domesticPos.filter(p=>computeDomStageIndex(p)===0); // 아직 선금을 지급하지 않은, 발주 전 단계
+  return [...overseas, ...domestic].filter(p=>{
+    if(supplier && p.supplier !== supplier) return false;
+    return true;
+  }).sort((a,b)=> (a.supplier||'').localeCompare(b.supplier||'') || (a.reqDate||'').localeCompare(b.reqDate||''));
+}
+
+function renderPocResult(){
+  const list = getPocList();
+  const supplier = document.getElementById('pocSupplier').value;
+  const todayStr = isoDate(new Date());
+  const todayDisplayEn = new Date().toLocaleDateString('en-US', {year:'numeric', month:'2-digit', day:'2-digit'});
+
+  // 화면에는 안 보이고 인쇄/PDF 시에만 나타나는 영문 메타 정보
+  const metaPartsEn = [];
+  metaPartsEn.push(`Supplier: ${supplier||'All'}`);
+  metaPartsEn.push(`PO Date: ${todayDisplayEn}`);
+  document.getElementById('pocDocMeta').textContent = metaPartsEn.join('  |  ');
+
+  const resultEl = document.getElementById('pocResult');
+  const printEl = document.getElementById('pocResultPrint');
+  if(list.length === 0){
+    resultEl.innerHTML = `<div class="poc-empty">조건에 맞는 "요청등록" 단계 건이 없습니다.<br>구매요청을 먼저 해외발주건 또는 국내발주건에 등록해주세요.</div>`;
+    printEl.innerHTML = '';
+    return;
+  }
+
+  // 공급사별로 그룹핑
+  const groups = {};
+  list.forEach(p=>{
+    const key = p.supplier || '공급사 미지정';
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(p);
+  });
+
+  // 화면 표시용 (한글)
+  resultEl.innerHTML = Object.entries(groups).map(([supName, items])=>`
+    <div class="poc-group">
+      <div class="poc-group-head">
+        <span>${supName}</span>
+        <span class="sub">${items.length}건</span>
+      </div>
+      <table class="poc-table">
+        <colgroup>
+          <col style="width:11%"><col style="width:24%"><col style="width:13%">
+          <col style="width:8%"><col style="width:13%"><col style="width:31%">
+        </colgroup>
+        <thead>
+          <tr><th>요청일</th><th>품명</th><th>품목코드</th><th>수량</th><th>납기요청일</th><th>특이사항</th></tr>
+        </thead>
+        <tbody>
+          ${items.map(p=>`
+            <tr>
+              <td>${todayStr}</td>
+              <td>${p.itemName||'-'}${p.isFirstBatch?'<span class="item-badge">초도</span>':''}${p.isSample?'<span class="item-badge sample">샘플</span>':''}${p.isUrgent?'<span class="item-badge urgent">긴급</span>':''}</td>
+              <td>${p.itemCode||'-'}</td>
+              <td>${fmtQty(p.qty)}</td>
+              <td>${p.dueDate||'-'}</td>
+              <td>${p.note || '&nbsp;'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `).join('');
+
+  // 인쇄/PDF·해외 발송용 (영문) — 화면에는 보이지 않고 인쇄 시에만 표시됨
+  printEl.innerHTML = Object.entries(groups).map(([supName, items])=>`
+    <div class="poc-group">
+      <div class="poc-group-head">
+        <span>${supName === '공급사 미지정' ? 'Supplier unassigned' : supName}</span>
+        <span class="sub">${items.length} item${items.length>1?'s':''}</span>
+      </div>
+      <table class="poc-table">
+        <colgroup>
+          <col style="width:11%"><col style="width:24%"><col style="width:13%">
+          <col style="width:8%"><col style="width:13%"><col style="width:31%">
+        </colgroup>
+        <thead>
+          <tr><th>Date</th><th>Item Name</th><th>Item Code</th><th>Qty</th><th>Requested Delivery</th><th>Remarks</th></tr>
+        </thead>
+        <tbody>
+          ${items.map(p=>`
+            <tr>
+              <td>${todayStr}</td>
+              <td>${p.itemName||'-'}${p.isFirstBatch?'<span class="item-badge">First Batch</span>':''}${p.isSample?'<span class="item-badge sample">Sample</span>':''}${p.isUrgent?'<span class="item-badge urgent">Urgent</span>':''}</td>
+              <td>${p.itemCode||'-'}</td>
+              <td>${fmtQty(p.qty)}</td>
+              <td>${p.dueDate||'-'}</td>
+              <td>${p.note || '&nbsp;'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `).join('');
+}
+
+['pocSupplier'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', renderPocResult);
+  document.getElementById(id).addEventListener('change', renderPocResult);
+});
+document.getElementById('pocReset').addEventListener('click', ()=>{
+  document.getElementById('pocSupplier').value = '';
+  renderPocResult();
+});
+document.getElementById('pocPrint').addEventListener('click', ()=>{
+  if(getPocList().length === 0){
+    toast('인쇄할 항목이 없습니다');
+    return;
+  }
+  window.print();
+});
+document.getElementById('pocDownload').addEventListener('click', ()=>{
+  const list = getPocList();
+  if(list.length === 0){
+    toast('다운로드할 항목이 없습니다');
+    return;
+  }
+  const todayStr = isoDate(new Date());
+  const headers = ['Supplier','Date','Item Name','Item Code','Qty','Requested Delivery','Remarks'];
+  const rows = list.map(p=>[p.supplier||'Supplier unassigned', todayStr, p.itemName, p.itemCode, p.qty, p.dueDate, p.note]);
+  const csvLines = [headers, ...rows].map(row => row.map(csvEscape).join(','));
+  const csvContent = '\uFEFF' + csvLines.join('\r\n');
+  const blob = new Blob([csvContent], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `PO_${stamp}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast(`${list.length}건을 다운로드했습니다`);
+});
+
+/* ---------------- 국내발주 (Domestic Orders) ---------------- */
+const DOM_STAGE_LABELS = ["①요청등록","②선금지급완료","③입고완료","④잔금지급완료","⑤품질검수완료","⑥ERP입력완료"];
+const DOM_STAGE_COLORS = ["#94a3b8","#d97706","#2563eb","#0d9488","#7c3aed","#16a34a"];
+function isDomDepositDone(po){ return !!po.depositDate || !!po.depositDeferred; }
+function isDomDepositShared(po){ return po.depositShared==='O'; }
+function isDomBalanceDone(po){ return !!po.balanceDate || !!po.balanceDeferred; }
+function computeDomStageIndex(po){
+  const milestones = [isDomDepositDone(po), po.warehouseDate, isDomBalanceDone(po), po.qcDate, po.erpDate];
+  let count = 0;
+  milestones.forEach(m=>{ if(m) count++; });
+  return count; // 0..5
+}
+function computeDomAmounts(po){
+  const poAmt = parseFloat(po.poAmount)||0;
+  const actualAmt = parseFloat(po.actualAmount)||0;
+  const pct = (parseFloat(po.depositPct)||0)/100;
+  const deposit = poAmt*pct; // 선금은 항상 원래 발주금액 기준 — 이미 지급된 선금은 실제 입고금액이 달라져도 바뀌지 않음
+  const finalAmt = actualAmt>0 ? actualAmt : poAmt; // 실제 입고금액이 입력되면(불량/재고 등으로 수량이 바뀐 경우) 그걸 최종 금액으로 사용
+  const balance = finalAmt-deposit;
+  return {deposit, balance};
+}
+function fmtKrw(n){
+  if(n===null||n===undefined||isNaN(n)) return '₩0';
+  return '₩' + Math.round(n).toLocaleString();
+}
+
+function getFilteredDom(){
+  const search = (document.getElementById('domSearch').value||'').toLowerCase();
+  const dateStart = document.getElementById('domDateStart').value;
+  const dateEnd = document.getElementById('domDateEnd').value;
+  let filtered = domesticPos.filter(p=>{
+    if(!search) return true;
+    return (p.itemName||'').toLowerCase().includes(search) ||
+           (p.supplier||'').toLowerCase().includes(search) ||
+           (p.itemCode||'').toLowerCase().includes(search) ||
+           (p.requester||'').toLowerCase().includes(search);
+  });
+  if(dateStart){
+    filtered = filtered.filter(p=> p.reqDate && p.reqDate >= dateStart);
+  }
+  if(dateEnd){
+    filtered = filtered.filter(p=> p.reqDate && p.reqDate <= dateEnd);
+  }
+  if(domStageFilter !== null){
+    filtered = filtered.filter(p=> computeDomStageIndex(p) === domStageFilter);
+  }
+  return filtered.sort((a,b)=> (b.reqDate||'').localeCompare(a.reqDate||''));
+}
+
+function renderDomTable(){
+  const tbody = document.getElementById('domTbody');
+  const filtered = getFilteredDom();
+
+  document.getElementById('domStageLegend').innerHTML = DOM_STAGE_LABELS.map((label, idx)=>`
+    <span class="li"><span class="dot" style="background:${DOM_STAGE_COLORS[idx]}"></span>${stripStageNum(label)}</span>
+  `).join('');
+
+  const domBanner = document.getElementById('domFilterBanner');
+  if(domStageFilter !== null){
+    domBanner.style.display = 'flex';
+    domBanner.innerHTML = `<span>"${stripStageNum(DOM_STAGE_LABELS[domStageFilter])}" 단계만 보는 중 (${filtered.length}건)</span><button id="domFilterClearBtn">전체보기</button>`;
+    document.getElementById('domFilterClearBtn').addEventListener('click', resetDomFilter);
+  }else{
+    domBanner.style.display = 'none';
+    domBanner.innerHTML = '';
+  }
+
+  document.getElementById('domEmpty').style.display = domesticPos.length===0 ? 'block' : 'none';
+  document.querySelector('#domTable').style.display = domesticPos.length===0 ? 'none' : 'table';
+
+  tbody.innerHTML = filtered.map(p=>{
+    const {deposit, balance} = computeDomAmounts(p);
+    const stageIdx = computeDomStageIndex(p);
+    return `<tr data-id="${p.id}">
+      <td>${p.reqDate||'-'}</td>
+      <td>${p.requester||'-'}</td>
+      <td>${p.itemName||'-'}${apprBadge(p)}</td>
+      <td style="font-family:var(--sans)">${p.itemCode||'-'}</td>
+      <td style="font-family:var(--sans)">${p.actualQty && parseFloat(p.actualQty)!==parseFloat(p.qty) ? `<span style="color:#dc2626; text-decoration:line-through;">${fmtQty(p.qty)}</span> → <b style="color:#dc2626; font-size:14px;">${fmtQty(p.actualQty)}</b>` : fmtQty(p.qty)}</td>
+      <td>${p.supplier||'-'}</td>
+      <td class="money">${p.poAmount? fmtKrw(p.poAmount):'-'}</td>
+      <td class="money">${p.poAmount? fmtKrw(deposit):'-'}</td>
+      <td class="money">${p.poAmount? fmtKrw(balance):'-'}</td>
+      <td>${p.dueDate||'-'}</td>
+      <td><span class="badge" style="background:${DOM_STAGE_COLORS[stageIdx]}">${stageLabelText(p, stageIdx, true)}</span></td>
+      <td>${p.warehouseDate||'-'}</td>
+      <td>${p.note ? `<span class="note-dot" title="${p.note.replace(/"/g,'&quot;')}">📝</span>` : ''}</td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('tr').forEach(tr=>{
+    tr.addEventListener('click', ()=> openDomPanel(tr.dataset.id));
+  });
+
+  let depositTotal=0, depositPaid=0, balanceTotal=0, balancePaid=0;
+  filtered.forEach(p=>{
+    const {deposit, balance} = computeDomAmounts(p);
+    depositTotal += deposit; balanceTotal += balance;
+    if(isDomDepositDone(p)) depositPaid += deposit;
+    if(p.balanceDate) balancePaid += balance;
+  });
+  const grandTotal = depositTotal+balanceTotal;
+  const grandUnpaid = (depositTotal-depositPaid)+(balanceTotal-balancePaid);
+  const totalsEl = document.getElementById('domTotals');
+  if(filtered.length===0){
+    totalsEl.innerHTML = '';
+  }else{
+    totalsEl.innerHTML = `
+      <div class="ptcard">
+        <div class="ptlabel">선금액 (${filtered.length}건)</div>
+        <div class="pt-line"><span class="pt-line-lbl">총</span><span class="ptval">${fmtKrw(depositTotal)}</span></div>
+        <div class="pt-line"><span class="pt-line-lbl">지급됨</span><span class="ptval paid">${fmtKrw(depositPaid)}</span></div>
+      </div>
+      <div class="ptcard">
+        <div class="ptlabel">잔금액 (${filtered.length}건)</div>
+        <div class="pt-line"><span class="pt-line-lbl">총</span><span class="ptval">${fmtKrw(balanceTotal)}</span></div>
+        <div class="pt-line"><span class="pt-line-lbl">지급됨</span><span class="ptval paid">${fmtKrw(balancePaid)}</span></div>
+      </div>
+      <div class="ptcard">
+        <div class="ptlabel">선금+잔금 합계</div>
+        <div class="pt-line"><span class="pt-line-lbl">총</span><span class="ptval">${fmtKrw(grandTotal)}</span></div>
+        <div class="pt-line"><span class="pt-line-lbl">미지급</span><span class="ptval unpaid">${fmtKrw(grandUnpaid)}</span></div>
+      </div>
+    `;
+  }
+}
+document.getElementById('domSearch').addEventListener('input', renderDomTable);
+document.getElementById('domDateStart').addEventListener('input', renderDomTable);
+document.getElementById('domDateEnd').addEventListener('input', renderDomTable);
+document.getElementById('btnResetDomFilter').addEventListener('click', resetDomFilter);
+
+/* ---- Domestic panel open/close/save ---- */
+const domOverlay = document.getElementById('domOverlay');
+const domForm = document.getElementById('domForm');
+
+function syncDomShareDisplays(){
+  const map = [
+    ['depositShared','domDepositSharedDisplay'],
+    ['balanceShared','domBalanceSharedDisplay'],
+    ['warehouseShared','domWarehouseSharedDisplay'],
+  ];
+  map.forEach(([field, dispId])=>{
+    const val = domForm.elements[field].value;
+    const disp = document.getElementById(dispId);
+    const on = val === 'O';
+    disp.textContent = on ? '공유완료' : '미공유';
+    disp.classList.toggle('on', on);
+  });
+}
+function updateDomComputedPreview(){
+  const poAmt = parseFloat(domForm.elements['poAmount'].value)||0;
+  const actualAmt = parseFloat(domForm.elements['actualAmount'].value)||0;
+  const pct = (parseFloat(domForm.elements['depositPct'].value)||0)/100;
+  const deposit = poAmt*pct;
+  const finalAmt = actualAmt>0 ? actualAmt : poAmt;
+  const balance = finalAmt-deposit;
+  document.getElementById('domComputedAmounts').textContent =
+    `${fmtKrw(deposit)} / ${fmtKrw(balance)}` + (actualAmt>0 ? ' · 실제입고금액 기준' : '');
+}
+function openDomPanel(id){
+  editingDomId = id || null;
+  domForm.reset();
+  ['depositShared','balanceShared','warehouseShared'].forEach(name=>{ domForm.elements[name].value = ''; });
+  document.getElementById('domPanelTitle').textContent = id ? '국내발주 수정' : '새 국내발주 등록';
+  document.getElementById('domDeleteLink').style.display = id ? 'block' : 'none';
+  document.getElementById('domDuplicateBtn').style.display = id ? 'inline-block' : 'none';
+  if(id){
+    const po = domesticPos.find(p=>p.id===id);
+    Object.keys(po).forEach(k=>{
+      const el = domForm.elements[k];
+      if(!el) return;
+      if(el.type === 'checkbox'){ el.checked = !!po[k]; }
+      else{ el.value = po[k] ?? ''; }
+    });
+  }
+  updateDomComputedPreview();
+  syncDomShareDisplays();
+  if(id) highlightRows([id]); else clearRowHighlights();
+  domOverlay.classList.add('active');
+}
+function closeDomPanel(){
+  domOverlay.classList.remove('active');
+  editingDomId = null;
+  clearRowHighlights();
+}
+document.getElementById('btnNewDom').addEventListener('click', ()=> openDomPanel(null));
+document.getElementById('domPanelClose').addEventListener('click', closeDomPanel);
+document.getElementById('domCancelBtn').addEventListener('click', closeDomPanel);
+
+domForm.addEventListener('input', (e)=>{
+  if(e.target.name==='poAmount' || e.target.name==='depositPct' || e.target.name==='actualAmount') updateDomComputedPreview();
+  if(e.target.name==='depositDate' || e.target.name==='depositPlannedDate' || e.target.name==='depositDeferred'){
+    const hasDate = !!domForm.elements['depositDate'].value;
+    const hasPlanned = !!domForm.elements['depositPlannedDate'].value;
+    const isDeferred = domForm.elements['depositDeferred'].checked;
+    domForm.elements['depositShared'].value = (hasDate || hasPlanned || isDeferred) ? 'O' : '';
+  }
+  if(e.target.name==='balanceDate' || e.target.name==='balanceDeferred'){
+    const hasDate = !!domForm.elements['balanceDate'].value;
+    const isDeferred = domForm.elements['balanceDeferred'].checked;
+    domForm.elements['balanceShared'].value = (hasDate || isDeferred) ? 'O' : '';
+  }
+  if(e.target.name==='warehouseDate'){
+    domForm.elements['warehouseShared'].value = e.target.value ? 'O' : '';
+  }
+  syncDomShareDisplays();
+});
+
+domForm.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const saveBtn = domForm.querySelector('button[type="submit"]');
+  try{
+    saveBtn.disabled = true;
+    saveBtn.textContent = '저장 중...';
+    const fd = new FormData(domForm);
+    const data = {};
+    fd.forEach((v,k)=> data[k]=v);
+    data.depositDeferred = domForm.elements['depositDeferred'].checked;
+    data.balanceDeferred = domForm.elements['balanceDeferred'].checked;
+    if(!data.itemName || !data.itemName.trim()){
+      toast('품명을 입력해주세요');
+      return;
+    }
+    if(editingDomId){
+      const idx = domesticPos.findIndex(p=>p.id===editingDomId);
+      domesticPos[idx] = {...domesticPos[idx], ...data};
+    }else{
+      data.id = 'dom_' + Date.now();
+      domesticPos.push(data);
+    }
+    await saveDomesticPos();
+    closeDomPanel();
+    render();
+    toast('저장되었습니다');
+  }catch(err){
+    console.error(err);
+    toast('저장 중 오류가 발생했습니다: ' + (err && err.message ? err.message : '알 수 없는 오류'));
+  }finally{
+    saveBtn.disabled = false;
+    saveBtn.textContent = '저장';
+  }
+});
+document.getElementById('domDeleteLink').addEventListener('click', async ()=>{
+  if(!editingDomId) return;
+  if(!confirm('이 국내발주를 삭제할까요?')) return;
+  domesticPos = domesticPos.filter(p=>p.id!==editingDomId);
+  await saveDomesticPos();
+  closeDomPanel();
+  render();
+  toast('삭제되었습니다');
+});
+document.getElementById('domDuplicateBtn').addEventListener('click', async ()=>{
+  if(!editingDomId) return;
+  if(!confirm('현재 입력한 내용을 저장하고, 이 건을 복제해서 분할 입고용 새 건을 만들까요?\n\n품명·공급사·발주금액·선금 정보 등은 그대로 복사되고, 입고·잔금 관련 정보는 새로 입력하도록 비워집니다.')) return;
+
+  // 1) 지금 폼에 입력된 내용을 원본 건에 먼저 저장
+  const fd = new FormData(domForm);
+  const data = {};
+  fd.forEach((v,k)=> data[k]=v);
+  const idx = domesticPos.findIndex(p=>p.id===editingDomId);
+  if(idx===-1) return;
+  domesticPos[idx] = {...domesticPos[idx], ...data};
+
+  // 2) 복제본 생성 — 입고/잔금 등 "이번 분할분에서 새로 정해질" 정보는 비움
+  const resetFields = [
+    'warehousePlanned','warehouseDate','actualQty','actualAmount','warehouseShared',
+    'balancePlannedDate','balanceDate','balanceShared','balanceDeferred',
+    'qcDate','erpDate','note','changeLog','approvalBatchId','approvalStatus',
+  ];
+  const dup = {...domesticPos[idx]};
+  resetFields.forEach(f=> dup[f] = '');
+  dup.id = 'dom_' + Date.now();
+
+  domesticPos.splice(idx+1, 0, dup);
+  await saveDomesticPos();
+  render();
+  openDomPanel(dup.id);
+  toast('복제된 건을 만들었습니다. 이번 분할분의 수량과 입고 정보를 입력해주세요.');
+});
+
+document.getElementById('btnDownloadDom').addEventListener('click', ()=>{
+  const list = getFilteredDom();
+  if(list.length===0){ toast('다운로드할 발주 목록이 없습니다'); return; }
+  const headers = [
+    '요청일','요청자','품명','품목코드','수량','공급사','납기요청일',
+    '발주금액(KRW)','선금비율(%)','선금액(KRW)','선금지급예정일','선금지급일','선금공유(정향미)',
+    '입고예정일','입고일','실제입고수량','실제입고금액(KRW)','입고공유(정명재)','잔금액(KRW)','잔금지급예정일','잔금지급일','잔금공유(정향미)',
+    '품질검수완료일','ERP입력일','상태','특이사항','변경사항',
+  ];
+  const rows = list.map(p=>{
+    const {deposit, balance} = computeDomAmounts(p);
+    const stageIdx = computeDomStageIndex(p);
+    return [
+      p.reqDate, p.requester, p.itemName, p.itemCode, p.qty, p.supplier, p.dueDate,
+      p.poAmount, p.depositPct, p.poAmount?deposit.toFixed(0):'', p.depositPlannedDate, p.depositDate, isDomDepositShared(p)?'공유완료':'미공유',
+      p.warehousePlanned, p.warehouseDate, p.actualQty, p.actualAmount, p.warehouseShared==='O'?'공유완료':'미공유', p.poAmount?balance.toFixed(0):'', p.balancePlannedDate, p.balanceDate, p.balanceShared==='O'?'공유완료':'미공유',
+      p.qcDate, p.erpDate, stageLabelText(p, stageIdx, true), p.note, p.changeLog,
+    ];
+  });
+  const csvLines = [headers, ...rows].map(row => row.map(csvEscape).join(','));
+  const csvContent = '\uFEFF' + csvLines.join('\r\n');
+  const blob = new Blob([csvContent], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `국내발주_목록_${stamp}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast(`${list.length}건을 다운로드했습니다`);
+});
+
+/* ---------------- 결재 (Approval) ---------------- */
+let apprMode = 'list'; // 'list' | 'detail'
+let apprCurrentBatchId = null;
+let lastDrafterName = '';
+
+function apprBadge(p){
+  if(p.approvalStatus==='approved'){
+    if(isDepositDone(p)) return ''; // 선금이 지급되면 이미 다음 단계로 넘어간 것이므로 표시하지 않음
+    return '<span class="appr-dot" title="결재완료"></span>';
+  }
+  return '';
+}
+
+function getApprPendingPool(excludeBatchId){
+  // 해외: PI만 받은 상태(그 외 어떤 단계도 진행되지 않은 상태) — 선금 지급/CI수령/선적 등 무엇으로든 이미 진행된 건은 결재 대상에서 제외
+  // 국내: 발주금액이 입력됐지만(0원이어도 입력된 것으로 취급) 아직 아무 단계도 진행되지 않은 건
+  const overseas = pos.filter(p =>
+    computeStageIndex(p) === 1 && (!p.approvalBatchId || p.approvalBatchId===excludeBatchId)
+  ).map(p=>({source:'overseas', ref:p}));
+  const domestic = domesticPos.filter(p =>
+    p.poAmount !== '' && p.poAmount !== undefined && p.poAmount !== null && computeDomStageIndex(p) === 0 && (!p.approvalBatchId || p.approvalBatchId===excludeBatchId)
+  ).map(p=>({source:'domestic', ref:p}));
+  return [...overseas, ...domestic].sort((a,b)=> (b.ref.reqDate||'').localeCompare(a.ref.reqDate||''));
+}
+
+function renderApprView(){
+  if(apprMode === 'detail' && apprCurrentBatchId && approvalBatches.some(b=>b.id===apprCurrentBatchId)){
+    renderApprDetail(apprCurrentBatchId);
+  }else{
+    apprMode = 'list';
+    renderApprList();
+  }
+}
+
+// 공급사별 그룹핑 + 소계/총계 계산 (현재 목록과 지난 기록 상세보기에서 공통으로 사용)
+function buildApprItemTable(items, opts){
+  opts = opts || {};
+  const selectable = !!opts.selectable;
+  const fmtAmt = (usd, krw, cny, krwEquiv) => {
+    const parts = [];
+    if(usd) parts.push('$'+usd.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
+    if(cny) parts.push('¥'+cny.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
+    if(krw) parts.push('₩'+Math.round(krw).toLocaleString());
+    let mainText = parts.join(' / ') || '-';
+    if((usd || cny) && krwEquiv){
+      mainText += `<span style="color:var(--ink-soft); font-weight:400; margin-left:6px;">₩${Math.round(krwEquiv).toLocaleString()}</span>`;
+    }
+    return mainText;
+  };
+  const groups = {};
+  const groupOrder = [];
+  items.forEach(i=>{
+    const key = i.supplier || '공급사 미지정';
+    if(!groups[key]){ groups[key] = []; groupOrder.push(key); }
+    groups[key].push(i);
+  });
+  let grandUsd = 0, grandKrw = 0, grandCny = 0, grandKrwEquiv = 0;
+  const bodyRows = groupOrder.map(supplier=>{
+    const gItems = groups[supplier];
+    let subUsd = 0, subKrw = 0, subCny = 0, subKrwEquiv = 0;
+    gItems.forEach(i=>{
+      if(i.currency==='USD') subUsd += parseFloat(i.amount)||0;
+      else if(i.currency==='CNY') subCny += parseFloat(i.amount)||0;
+      else subKrw += parseFloat(i.amount)||0;
+      subKrwEquiv += toKrwCur(i.amount, i.currency);
+    });
+    grandUsd += subUsd; grandKrw += subKrw; grandCny += subCny; grandKrwEquiv += subKrwEquiv;
+    const itemRows = gItems.map(i=>`
+      <tr>
+        <td>${i.source==='overseas'?'해외':'국내'}</td>
+        <td>${i.itemName||'-'}</td>
+        <td>${i.itemCode||'-'}</td>
+        <td>${fmtQty(i.qty)}</td>
+        <td>${i.piNo||'-'}</td>
+        <td>${i.amount ? fmtMoneyCur(i.amount, i.currency) + (i.currency!=='KRW' ? `<span style="color:var(--ink-soft); font-weight:400; margin-left:6px;">₩${Math.round(toKrwCur(i.amount, i.currency)).toLocaleString()}</span>` : '') : '-'}</td>
+        <td>${i.dueDate||'-'}</td>
+        <td>${i.note||''}</td>
+      </tr>`).join('');
+    const headHtml = selectable
+      ? `<label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+           <input type="checkbox" class="appr-supplier-check no-print" data-supplier="${supplier.replace(/"/g,'&quot;')}" checked>
+           <span>${supplier} <span style="font-weight:600; font-size:11px;">(${gItems.length}건)</span></span>
+         </label>`
+      : `${supplier} <span style="font-weight:600; font-size:11px;">(${gItems.length}건)</span>`;
+    return `
+      <tr><td colspan="8" style="background:#dcebe7; font-weight:800; color:var(--console-accent);">${headHtml}</td></tr>
+      ${itemRows}
+      <tr><td colspan="5" style="text-align:right; font-weight:700; background:#f7f9f8;">${supplier} 소계</td><td colspan="3" style="font-weight:700; background:#f7f9f8;">${fmtAmt(subUsd, subKrw, subCny, subKrwEquiv)}</td></tr>
+    `;
+  }).join('');
+  return {
+    groupCount: groupOrder.length,
+    grandTotalText: fmtAmt(grandUsd, grandKrw, grandCny, grandKrwEquiv),
+    html: `
+      <table class="appr-item-table">
+        <thead>
+          <tr><th>구분</th><th>품명</th><th>품목코드</th><th>수량</th><th>PI번호</th><th>금액</th><th>납기요청일</th><th>비고</th></tr>
+        </thead>
+        <tbody>${bodyRows}</tbody>
+        <tfoot><tr><td colspan="5">총 발주금액</td><td colspan="3">${fmtAmt(grandUsd, grandKrw, grandCny, grandKrwEquiv)}</td></tr></tfoot>
+      </table>
+    `,
+  };
+}
+
+function poolToItems(pool){
+  return pool.map(({source, ref})=>({
+    source, refId: ref.id,
+    itemName: ref.itemName, itemCode: ref.itemCode, qty: ref.qty,
+    supplier: ref.supplier, requester: ref.requester, dueDate: ref.dueDate,
+    piNo: source==='overseas' ? ref.piNo : '',
+    amount: source==='overseas' ? ref.piAmount : ref.poAmount,
+    currency: source==='overseas' ? (ref.currency || 'USD') : 'KRW',
+    note: ref.note,
+  }));
+}
+
+function renderApprList(){
+  const el = document.getElementById('apprContent');
+  const pool = getApprPendingPool();
+  const items = poolToItems(pool);
+  const today = isoDate(new Date());
+  const history = [...approvalBatches].sort((a,b)=> (b.createdDate||'').localeCompare(a.createdDate||''));
+  const statusLabel = {approved:'완료', rejected:'반려', draft:'완료'};
+
+  let liveSection;
+  if(items.length===0){
+    liveSection = `<div class="poc-empty">PI를 받았거나(해외) 발주금액이 입력된(국내) 건 중, 아직 선금이 나가지 않은 건이 없습니다.</div>`;
+  }else{
+    const table = buildApprItemTable(items, {selectable:true});
+    liveSection = `
+      <div class="appr-actions no-print">
+        <button class="btn brass" id="apprLivePrintBtn">🖨 인쇄/PDF</button>
+        <button class="btn ghost" id="apprLiveCompleteBtn" style="border-color:var(--ok); color:var(--ok); margin-left:auto;">✓ 선택한 공급사 완료 처리</button>
+      </div>
+      <div class="appr-doc-title">구매 상세목록</div>
+      <div class="appr-meta-row" style="justify-content:center;">
+        <span>작성일: ${today}</span>
+        <span>작성자: 오정민</span>
+        <span>총 ${items.length}건 · 공급사 ${table.groupCount}곳</span>
+      </div>
+      ${table.html}
+    `;
+  }
+
+  el.innerHTML = `
+    <div class="cal-hint no-print">PI를 받아 단가가 확정된 건(해외)과 발주금액이 입력된 건(국내)이 자동으로 이 목록에 모입니다. 공급사별 체크박스로 이번에 결재 올릴 곳만 골라 "완료 처리"하세요 (체크 해제한 공급사는 목록에 남아있다가 다음에 처리할 수 있어요).</div>
+    ${liveSection}
+
+    <div class="no-print" style="margin-top:32px;">
+      <div class="view-header"><span class="vlabel">지난 결재 기록</span></div>
+      ${history.length===0 ? `<div class="poc-empty">아직 완료 처리한 기록이 없습니다.</div>` : `
+      <table class="appr-batch-table">
+        <thead><tr><th>제목</th><th>작성일</th><th>작성자</th><th>건수</th><th>상태</th></tr></thead>
+        <tbody>
+          ${history.map(b=>`
+            <tr data-id="${b.id}">
+              <td>${b.title||'구매 상세목록'}</td>
+              <td>${b.createdDate||'-'}</td>
+              <td>${b.drafterName||'-'}</td>
+              <td>${b.items.length}건</td>
+              <td><span class="appr-status ${b.status==='rejected'?'rejected':'approved'}">${statusLabel[b.status]||'완료'}</span></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`}
+    </div>
+  `;
+
+  if(items.length>0){
+    document.getElementById('apprLivePrintBtn').addEventListener('click', ()=> window.print());
+    document.getElementById('apprLiveCompleteBtn').addEventListener('click', ()=>{
+      const checkedSuppliers = new Set(
+        [...document.querySelectorAll('.appr-supplier-check:checked')].map(cb=>cb.dataset.supplier)
+      );
+      if(checkedSuppliers.size===0){ toast('완료 처리할 공급사를 하나 이상 선택해주세요'); return; }
+      const selPool = pool.filter(({ref})=> checkedSuppliers.has(ref.supplier || '공급사 미지정'));
+      const selItems = items.filter(i=> checkedSuppliers.has(i.supplier || '공급사 미지정'));
+      finalizeApprBatch(selPool, selItems);
+    });
+  }
+  el.querySelectorAll('.appr-batch-table tr[data-id]').forEach(tr=>{
+    tr.addEventListener('click', ()=>{
+      apprMode = 'detail';
+      apprCurrentBatchId = tr.dataset.id;
+      renderApprDetail(apprCurrentBatchId);
+    });
+  });
+}
+
+async function finalizeApprBatch(pool, items){
+  if(!confirm(`선택한 ${items.length}건을 결재 기록으로 저장할까요? 저장 후에는 이 건들이 목록에서 빠지고, 체크 해제했던 건들은 그대로 남아있습니다.`)) return;
+  const batch = {
+    id: 'appr_' + Date.now(),
+    title: '구매 상세목록',
+    drafterName: '오정민',
+    createdDate: isoDate(new Date()),
+    status: 'approved',
+    items,
+  };
+  pool.forEach(({source, ref})=>{
+    const arr = source==='overseas' ? pos : domesticPos;
+    const idx = arr.findIndex(p=>p.id===ref.id);
+    if(idx>-1){ arr[idx].approvalBatchId = batch.id; arr[idx].approvalStatus = 'approved'; }
+  });
+  approvalBatches.push(batch);
+  await savePos();
+  await saveDomesticPos();
+  await saveApprovalBatches();
+  render();
+  toast('결재 기록으로 저장했습니다');
+}
+
+function renderApprDetail(batchId){
+  const batch = approvalBatches.find(b=>b.id===batchId);
+  const el = document.getElementById('apprContent');
+  if(!batch){ apprMode='list'; renderApprList(); return; }
+
+  const table = buildApprItemTable(batch.items);
+  const statusLabel = {approved:'완료', rejected:'반려', draft:'완료'};
+
+  el.innerHTML = `
+    <div class="appr-actions no-print">
+      <button class="btn ghost" id="apprBackBtn">← 목록으로</button>
+      <button class="btn brass" id="apprPrintBtn">🖨 인쇄/PDF</button>
+      <span class="appr-status ${batch.status==='rejected'?'rejected':'approved'}">${statusLabel[batch.status]||'완료'}</span>
+      <button class="btn ghost" id="apprDeleteBtn" style="margin-left:auto; border-color:var(--warn); color:var(--warn);">이 기록 취소 (건들을 다시 대기 목록으로)</button>
+    </div>
+
+    <div class="appr-doc-title">${batch.title||'구매 상세목록'}</div>
+    <div class="appr-meta-row" style="justify-content:center;">
+      <span>작성일: ${batch.createdDate||'-'}</span>
+      <span>작성자: ${batch.drafterName||'-'}</span>
+      <span>총 ${batch.items.length}건 · 공급사 ${table.groupCount}곳</span>
+    </div>
+    ${table.html}
+  `;
+
+  document.getElementById('apprBackBtn').addEventListener('click', ()=>{
+    apprMode = 'list'; apprCurrentBatchId = null; renderApprList();
+  });
+  document.getElementById('apprPrintBtn').addEventListener('click', ()=> window.print());
+  document.getElementById('apprDeleteBtn').addEventListener('click', async ()=>{
+    if(!confirm('이 기록을 취소할까요? 포함된 발주 건들은 다시 대기 목록으로 돌아가며, 이미 입력된 선금지급(예정)일 정보는 함께 지워집니다.')) return;
+    await releaseApprBatchItems(batch);
+    approvalBatches = approvalBatches.filter(b=>b.id!==batch.id);
+    await saveApprovalBatches();
+    apprMode = 'list'; apprCurrentBatchId = null;
+    render();
+    toast('기록을 취소했습니다');
+  });
+}
+
+// 배치에 포함된 원본 발주건들의 결재 참조를 해제 (기록 취소 시 다시 결재 대상 풀로 복귀)
+// 이미 선금이 지급된 건이라면 그 정보도 같이 지워야 "PI만 받고 선금 전" 상태로 돌아가 결재 목록에 다시 나타난다.
+async function releaseApprBatchItems(batch){
+  batch.items.forEach(i=>{
+    const arr = i.source==='overseas' ? pos : domesticPos;
+    const idx = arr.findIndex(p=>p.id===i.refId);
+    if(idx>-1){
+      arr[idx].approvalBatchId = '';
+      arr[idx].approvalStatus = '';
+      arr[idx].depositDate = '';
+      arr[idx].depositPlannedDate = '';
+      arr[idx].depositShared = '';
+    }
+  });
+  await savePos();
+  await saveDomesticPos();
+}
+
+/* ---------------- Supplier Panel ---------------- */
+const suppOverlay = document.getElementById('suppOverlay');
+const suppForm = document.getElementById('suppForm');
+let editingSuppId = null;
+
+function openSuppPanel(id){
+  editingSuppId = id || null;
+  suppForm.reset();
+  document.getElementById('suppPanelTitle').textContent = id ? '거래처 수정' : '거래처 추가';
+  document.getElementById('suppDeleteLink').style.display = id ? 'block' : 'none';
+  if(id){
+    const s = suppliers.find(x=>x.id===id);
+    if(s){
+      Object.keys(s).forEach(k=>{
+        const el = suppForm.elements[k];
+        if(el) el.value = s[k] ?? '';
+      });
+    }
+  }
+  suppOverlay.classList.add('active');
+}
+function closeSuppPanel(){
+  suppOverlay.classList.remove('active');
+  editingSuppId = null;
+}
+
+document.getElementById('btnNewSupp').addEventListener('click', ()=> openSuppPanel(null));
+document.getElementById('suppPanelClose').addEventListener('click', closeSuppPanel);
+document.getElementById('suppCancelBtn').addEventListener('click', closeSuppPanel);
+// 오버레이 바깥 클릭으로는 닫히지 않도록 함 (X / 저장 / 취소로만 닫힘)
+suppForm.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  try{
+    const fd = new FormData(suppForm);
+    const data = {};
+    fd.forEach((v,k)=> data[k]=v);
+    if(!data.name || !data.name.trim()){
+      toast('회사명을 입력해주세요');
+      return;
+    }
+    if(editingSuppId){
+      const idx = suppliers.findIndex(s=>s.id===editingSuppId);
+      const oldName = suppliers[idx].name;
+      suppliers[idx] = {...suppliers[idx], ...data};
+      // keep PO records' supplier references in sync if the name changed
+      if(oldName !== data.name){
+        pos.forEach(p=>{ if(p.supplier===oldName) p.supplier = data.name; });
+        await savePos();
+      }
+    }else{
+      data.id = 's_'+Date.now();
+      suppliers.push(data);
+    }
+    await saveSuppliers();
+    closeSuppPanel();
+    render();
+    toast('거래처 정보를 저장했습니다');
+  }catch(err){
+    console.error(err);
+    toast('저장 중 오류가 발생했습니다');
+  }
+});
+document.getElementById('suppDeleteLink').addEventListener('click', async ()=>{
+  if(!editingSuppId) return;
+  if(!confirm('이 거래처를 삭제할까요? (기존 발주 기록은 남아있습니다)')) return;
+  suppliers = suppliers.filter(s=>s.id!==editingSuppId);
+  await saveSuppliers();
+  closeSuppPanel();
+  render();
+  toast('삭제되었습니다');
+});
+
+/* ---------------- Tabs ---------------- */
+function switchToView(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  const tab = document.querySelector(`.tab[data-view="${name}"]`);
+  if(tab) tab.classList.add('active');
+  document.getElementById('view-'+name).classList.add('active');
+}
+document.querySelectorAll('.tab[data-view]').forEach(tab=>{
+  tab.addEventListener('click', ()=> switchToView(tab.dataset.view));
+});
+document.querySelector('.brand').addEventListener('click', ()=> switchToView('dash'));
+
+document.querySelectorAll('.dhl-copy-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const card = btn.closest('.dhl-card');
+    const title = card.querySelector('.dhl-card-head').textContent;
+    const lines = [...card.querySelectorAll('.dhl-row')].map(row=>{
+      const k = row.querySelector('.k').textContent;
+      const v = row.querySelector('.v').textContent;
+      return `${k}: ${v}`;
+    });
+    const text = `${title}\n${lines.join('\n')}`;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(()=> toast('클립보드에 복사했습니다')).catch(()=> toast('복사에 실패했습니다'));
+    }else{
+      toast('이 브라우저에서는 복사 기능을 지원하지 않습니다');
+    }
+  });
+});
+
+loadData();
+</script>
+</body>
+</html>
