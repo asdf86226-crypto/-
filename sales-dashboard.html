@@ -521,10 +521,12 @@ function renderRank(items) {
   const svg = $('#prodChart'), tip = $('#tooltip');
   const top = items.slice(0, 12);
   const W = svg.clientWidth || 520, rowH = 26, H = Math.max(120, top.length*rowH + 40);
-  const m = {top:8,right:16,bottom:8,left:130}, iw = W-m.left-m.right;
+  const m = {top:8,right:16,bottom:8,left:130};
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height',H);
   if (!top.length) { svg.innerHTML=''; return; }
   const max = Math.max(1,...top.map(p=>p.qty));
+  const labelW = String(KRW.format(max)).length * 7 + 12;      // 막대 끝 값 라벨이 잘리지 않도록 우측 공간 확보
+  const iw = Math.max(40, W - m.left - m.right - labelW);
   let s = '';
   top.forEach((p,i)=>{
     const y = m.top + i*rowH, bw = (p.qty/max)*iw;
