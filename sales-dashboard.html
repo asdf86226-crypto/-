@@ -30,7 +30,7 @@
   * { box-sizing:border-box; }
   body { margin:0; font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
          background:var(--page); color:var(--text-1); -webkit-font-smoothing:antialiased; line-height:1.45; }
-  .wrap { max-width:1180px; margin:0 auto; padding:28px 20px 64px; }
+  .wrap { max-width:1720px; margin:0 auto; padding:28px 32px 64px; }
   header.top { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:20px; }
   h1 { font-size:22px; margin:0 0 4px; letter-spacing:-0.01em; }
   .sub { color:var(--text-2); font-size:13px; margin:0; }
@@ -117,7 +117,6 @@
 
   <div class="controls">
     <div class="tabs" role="tablist" id="tabs">
-      <button class="tab" role="tab" data-period="week"    aria-selected="false">주별</button>
       <button class="tab" role="tab" data-period="month"   aria-selected="true">월별</button>
       <button class="tab" role="tab" data-period="quarter" aria-selected="false">분기별</button>
       <button class="tab" role="tab" data-period="year"    aria-selected="false">연별</button>
@@ -482,13 +481,13 @@ function renderKPIs(rows, period) {
 /* ---------- 추이 차트 ---------- */
 function renderTrend(rows) {
   const svg = $('#chart'), tip = $('#tooltip');
-  const W = Math.max(svg.clientWidth || 900, rows.length*34 + 90), H = 360;
+  const W = Math.max(svg.clientWidth || 1000, 320), H = 360;   // 화면 폭에 맞춤 (가로 스크롤 없음)
   const m = {top:20,right:58,bottom:46,left:60}, iw = W-m.left-m.right, ih = H-m.top-m.bottom;
-  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('width',W);
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('width','100%');
   if (!rows.length) { svg.innerHTML = `<text x="${W/2}" y="${H/2}" text-anchor="middle" class="axis-label">데이터 없음</text>`; return; }
   const maxQty = Math.max(1,...rows.map(r=>r.qty)), maxAmt = Math.max(1,...rows.map(r=>r.amount));
   const x = i => m.left + (iw/rows.length)*i;
-  const bw = Math.min(34, iw/rows.length*0.62);
+  const bw = Math.min(iw/rows.length*0.6, 84);   // 슬롯에 비례하되 과도하게 두꺼워지지 않게
   const yQ = v => m.top + ih - (v/maxQty)*ih, yA = v => m.top + ih - (v/maxAmt)*ih;
   let s = '';
   let lastQLbl = null;
