@@ -84,6 +84,25 @@
 
   .grid2 { display:grid; grid-template-columns:1.1fr 0.9fr; gap:22px; }
   @media (max-width:820px){ .grid2{grid-template-columns:1fr;} }
+  /* 추이 그래프(왼) + 기간 상세표(오) 한 줄 배치 */
+  .grid-main { display:grid; grid-template-columns:1.7fr 1fr; gap:22px; align-items:start; }
+  @media (max-width:960px){ .grid-main{grid-template-columns:1fr;} }
+  /* 검색 가능한 필터 콤보박스 */
+  .combo { position:relative; }
+  .combo input { font:inherit; font-size:13px; padding:7px 10px; border-radius:9px; border:1px solid var(--border);
+                 background:var(--surface); color:var(--text-1); box-shadow:var(--shadow); min-width:250px; }
+  .combo input:focus { outline:2px solid color-mix(in srgb,var(--series-1) 55%, transparent); outline-offset:1px; }
+  .combo-list { position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:300px; overflow-y:auto;
+                background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.20); z-index:30; padding:4px; }
+  .combo-list[hidden]{ display:none; }
+  .combo-item { padding:7px 9px; border-radius:7px; font-size:13px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; justify-content:space-between; gap:10px; }
+  .combo-item:hover, .combo-item.active { background:color-mix(in srgb,var(--series-1) 15%, var(--surface)); }
+  .combo-item .code { color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; }
+  .combo-item .qty  { color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; }
+  .combo-empty { padding:8px 9px; color:var(--muted); font-size:12px; }
+  /* 피벗(품목×기간) 표: 첫 열 고정 느낌 */
+  .pivot td:first-child, .pivot th:first-child { text-align:left; font-variant-numeric:normal; position:sticky; left:0; background:var(--surface); }
+  .pivot th { white-space:nowrap; }
 
   .tooltip { position:fixed; pointer-events:none; background:var(--text-1); color:var(--page); font-size:12px;
              padding:6px 9px; border-radius:7px; opacity:0; transition:opacity .08s; white-space:nowrap; z-index:10; box-shadow:0 4px 12px rgba(0,0,0,.25); }
@@ -130,28 +149,25 @@
         </select>
       </label>
       <label style="display:flex;align-items:center;gap:8px"><span id="filterLabel">상품 필터</span>
-        <select id="dimFilter"><option value="__all__">전체</option></select>
+        <span class="combo" id="filterCombo">
+          <input id="filterInput" type="text" placeholder="전체 (클릭 또는 입력해 검색)" autocomplete="off" role="combobox" aria-expanded="false">
+          <div class="combo-list" id="filterList" hidden></div>
+        </span>
       </label>
     </div>
   </div>
 
   <div class="kpis" id="kpis"></div>
 
-  <div class="card">
-    <h2 id="chartTitle">월별 판매량 추이</h2>
-    <p class="hint">막대는 판매량, 선은 매출(공급가액)입니다. 막대에 마우스를 올리면 상세 수치가 보입니다. 위의 필터로 특정 상품·상품분류·거래처만 볼 수 있습니다.</p>
-    <div class="chart"><svg id="chart" width="100%" height="360" role="img" aria-label="기간별 판매 추이"></svg></div>
-    <div class="legend">
-      <span><i class="swatch" style="background:var(--series-1)"></i>판매량 (개)</span>
-      <span><i class="swatch" style="background:var(--series-2)"></i><span id="amtLegend">매출</span> (원)</span>
-    </div>
-  </div>
-
-  <div class="grid2">
-    <div class="card" id="prodCard">
-      <h2 id="rankTitle">상품별 판매 순위</h2>
-      <p class="hint" id="rankHint">전체 기간 기준 상위 12개입니다. 막대에 올리면 매출·비중이 보입니다.</p>
-      <div class="chart"><svg id="prodChart" width="100%" height="360" role="img" aria-label="분석 기준별 판매 순위"></svg></div>
+  <div class="grid-main">
+    <div class="card">
+      <h2 id="chartTitle">월별 판매량 추이</h2>
+      <p class="hint">막대는 판매량, 선은 매출(공급가액)입니다. 막대에 마우스를 올리면 상세 수치가 보입니다. 위의 필터로 특정 상품·상품분류·거래처만 볼 수 있습니다.</p>
+      <div class="chart"><svg id="chart" width="100%" height="360" role="img" aria-label="기간별 판매 추이"></svg></div>
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--series-1)"></i>판매량 (개)</span>
+        <span><i class="swatch" style="background:var(--series-2)"></i><span id="amtLegend">매출</span> (원)</span>
+      </div>
     </div>
     <div class="card">
       <h2 id="tableTitle">월별 상세</h2>
@@ -162,11 +178,32 @@
     </div>
   </div>
 
-  <div class="card">
-    <h2 id="dimTableTitle">상품별 상세</h2>
-    <p class="hint">전체 기간 기준. 비중은 총 판매량 대비 각 항목의 비율입니다.</p>
-    <div class="table-scroll">
-      <table id="prodTable"><thead></thead><tbody></tbody></table>
+  <div class="card" id="itemQuarterCard" hidden>
+    <h2 id="itemQuarterTitle">품목 3개월 단위 판매량</h2>
+    <p class="hint">선택한 품목의 3개월(분기) 단위 판매량입니다.</p>
+    <div class="chart"><svg id="itemQuarterChart" width="100%" height="300" role="img" aria-label="품목 3개월 단위 판매량"></svg></div>
+  </div>
+
+  <div class="card" id="custDrillCard" hidden>
+    <h2 id="custDrillTitle">거래처 품목별 판매</h2>
+    <p class="hint">선택한 거래처가 구매한 품목을 기간(월/분기/연)별로 정리한 표입니다. 값은 판매량(개)입니다.</p>
+    <div class="table-scroll" style="max-height:460px">
+      <table id="custDrillTable" class="pivot"><thead></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card" id="prodCard">
+      <h2 id="rankTitle">상품별 판매 순위</h2>
+      <p class="hint" id="rankHint">전체 기간 기준 상위 12개입니다. 막대에 올리면 매출·비중이 보입니다.</p>
+      <div class="chart"><svg id="prodChart" width="100%" height="360" role="img" aria-label="분석 기준별 판매 순위"></svg></div>
+    </div>
+    <div class="card">
+      <h2 id="dimTableTitle">상품별 상세</h2>
+      <p class="hint">전체 기간 기준. 비중은 총 판매량 대비 각 항목의 비율입니다.</p>
+      <div class="table-scroll">
+        <table id="prodTable"><thead></thead><tbody></tbody></table>
+      </div>
     </div>
   </div>
 
@@ -446,16 +483,41 @@ function setupDims() {
   $('#dimSelect').value = currentDim;
   rebuildFilter();
 }
+let filterMembers = [];   // 현재 분석 기준의 항목들 {name, code, qty}
 function rebuildFilter() {
   const meta = DIMS[currentDim];
-  const items = aggregateDim(currentDim);
+  filterMembers = aggregateDim(currentDim).map(x => ({ name:x.name, code: currentDim==='product' ? (x.codeFull || '') : '', qty:x.qty }));
   $('#filterLabel').textContent = `${meta.label} 필터`;
-  $('#dimFilter').innerHTML = `<option value="__all__">${meta.all}</option>` +
-    items.map(x => {
-      const text = currentDim === 'product' && x.code ? `${x.name} (${x.code})` : x.name;
-      return `<option value="${String(x.name).replace(/"/g,'&quot;')}">${text}</option>`;
-    }).join('');
+  const inp = $('#filterInput');
+  inp.placeholder = `${meta.all} (클릭·입력해 검색)`;
+  inp.value = '';
+  closeFilterList();
   currentFilter = '__all__';
+}
+/* ---------- 검색 콤보박스 ---------- */
+function openFilterList(query) {
+  const q = String(query || '').trim().toLowerCase();
+  const meta = DIMS[currentDim];
+  let list = filterMembers;
+  if (q) list = filterMembers.filter(m => m.name.toLowerCase().includes(q) || (m.code && m.code.toLowerCase().includes(q)));
+  const shown = list.slice(0, 80);
+  let html = `<div class="combo-item" data-val="__all__"><span>${meta.all}</span></div>`;
+  html += shown.map(m => `<div class="combo-item" data-val="${String(m.name).replace(/"/g,'&quot;')}"><span>${m.name}${m.code ? ` <span class="code">${m.code}</span>` : ''}</span><span class="qty">${KRW.format(m.qty)}</span></div>`).join('');
+  if (!shown.length) html += `<div class="combo-empty">검색 결과가 없습니다</div>`;
+  else if (list.length > shown.length) html += `<div class="combo-empty">…외 ${list.length - shown.length}개 (더 입력해 좁혀보세요)</div>`;
+  const el = $('#filterList'); el.innerHTML = html; el.hidden = false;
+  $('#filterInput').setAttribute('aria-expanded', 'true');
+}
+function closeFilterList() {
+  const el = $('#filterList'); if (el) { el.hidden = true; el.innerHTML = ''; }
+  const inp = $('#filterInput'); if (inp) inp.setAttribute('aria-expanded', 'false');
+}
+function selectFilter(val) {
+  currentFilter = val;
+  const inp = $('#filterInput');
+  inp.value = val === '__all__' ? '' : val;
+  closeFilterList();
+  render();
 }
 
 /* ---------- KPI ---------- */
@@ -575,6 +637,91 @@ function renderDimTable(items, dimLabel) {
   }).join('');
 }
 
+/* ---------- 전체 기간의 구간 목록 ---------- */
+function periodsInSpan(period) {
+  if (!RAW.length) return [];
+  const times = RAW.map(r => r.date.getTime());
+  const min = new Date(Math.min(...times)), max = new Date(Math.max(...times));
+  const map = new Map();
+  const cur = new Date(min.getFullYear(), min.getMonth(), min.getDate());
+  const end = new Date(max.getFullYear(), max.getMonth(), max.getDate());
+  while (cur <= end) { const { key, label, sort } = periodKey(cur, period); if (!map.has(key)) map.set(key, { key, label, sort }); cur.setDate(cur.getDate()+1); }
+  return [...map.values()].sort((a,b) => a.sort - b.sort);
+}
+
+/* ---------- 세로 막대 미니 차트 (판매량) ---------- */
+function renderVBars(sel, buckets) {
+  const svg = $(sel), tip = $('#tooltip');
+  const W = Math.max(svg.clientWidth || 900, 320), H = 300;
+  const m = {top:22,right:16,bottom:40,left:62}, iw = W-m.left-m.right, ih = H-m.top-m.bottom;
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('width','100%');
+  if (!buckets.length) { svg.innerHTML = `<text x="${W/2}" y="${H/2}" text-anchor="middle" class="axis-label">데이터 없음</text>`; return; }
+  const max = Math.max(1,...buckets.map(b=>b.qty));
+  const x = i => m.left + (iw/buckets.length)*i;
+  const bw = Math.min(iw/buckets.length*0.55, 76);
+  const y = v => m.top + ih - (v/max)*ih;
+  let s = '', last = null;
+  for (let t=0;t<=4;t++){ const gv=max*t/4, gy=y(gv);
+    s+=`<line x1="${m.left}" y1="${gy}" x2="${m.left+iw}" y2="${gy}" stroke="var(--grid)" stroke-width="1"/>`;
+    const lbl=KRW.format(Math.round(gv)); if(lbl!==last){ s+=`<text class="axis-label" x="${m.left-8}" y="${gy+4}" text-anchor="end">${lbl}</text>`; last=lbl; } }
+  buckets.forEach((bk,i)=>{ const cx=x(i)+(iw/buckets.length-bw)/2, h=ih-(y(bk.qty)-m.top);
+    s+=`<rect class="vbar" x="${cx.toFixed(1)}" y="${y(bk.qty).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,h).toFixed(1)}" rx="4" fill="var(--series-1)" data-i="${i}"/>`;
+    s+=`<text class="axis-label" x="${(x(i)+iw/buckets.length/2).toFixed(1)}" y="${H-m.bottom+18}" text-anchor="middle">${bk.label}</text>`;
+    if (bk.qty>0) s+=`<text class="axis-label" x="${(x(i)+iw/buckets.length/2).toFixed(1)}" y="${(y(bk.qty)-6).toFixed(1)}" text-anchor="middle" fill="var(--text-2)">${KRW.format(bk.qty)}</text>`;
+  });
+  svg.innerHTML = s;
+  svg.querySelectorAll('rect.vbar').forEach(rect=>{
+    rect.addEventListener('mousemove',e=>{ const bk=buckets[+rect.dataset.i];
+      tip.innerHTML=`<div>${bk.label}</div><div>판매량 <b>${KRW.format(bk.qty)}</b> 개</div>`;
+      tip.style.opacity=1; tip.style.left=Math.min(e.clientX+14,innerWidth-tip.offsetWidth-12)+'px'; tip.style.top=(e.clientY-10)+'px'; rect.setAttribute('fill','var(--series-3)'); });
+    rect.addEventListener('mouseleave',()=>{ tip.style.opacity=0; rect.setAttribute('fill','var(--series-1)'); });
+  });
+}
+
+/* ---------- 품목 3개월(분기) 단위 판매량 (상품 필터 시) ---------- */
+function renderItemQuarter() {
+  const card = $('#itemQuarterCard');
+  if (!(currentDim === 'product' && currentFilter !== '__all__')) { card.hidden = true; return; }
+  card.hidden = false;
+  $('#itemQuarterTitle').textContent = `${currentFilter} · 3개월(분기) 단위 판매량`;
+  const periods = periodsInSpan('quarter');
+  const idx = new Map(periods.map((p,i)=>[p.key,i]));
+  const qty = periods.map(()=>0);
+  for (const r of RAW) { if (r.product !== currentFilter) continue; const i = idx.get(periodKey(r.date,'quarter').key); if (i!=null) qty[i]+=r.qty; }
+  renderVBars('#itemQuarterChart', periods.map((p,i)=>({label:p.label, qty:qty[i]})));
+}
+
+/* ---------- 거래처 품목별 기간 판매 (거래처 필터 시) ---------- */
+function renderCustomerDrill() {
+  const card = $('#custDrillCard');
+  if (!(currentDim === 'customer' && currentFilter !== '__all__')) { card.hidden = true; return; }
+  card.hidden = false;
+  const pname = {month:'월별',quarter:'분기별',year:'연별'}[currentPeriod];
+  $('#custDrillTitle').textContent = `${currentFilter} · 품목별 ${pname} 판매`;
+  const rowsRaw = RAW.filter(r => r.customer === currentFilter);
+  const pmap = new Map();
+  for (const r of rowsRaw) { const { key, label, sort } = periodKey(r.date, currentPeriod); if (!pmap.has(key)) pmap.set(key, { key, label, sort }); }
+  const periods = [...pmap.values()].sort((a,b)=>a.sort-b.sort);
+  const pidx = new Map(periods.map((p,i)=>[p.key,i]));
+  const prods = new Map();
+  for (const r of rowsRaw) {
+    if (!prods.has(r.product)) prods.set(r.product, { name:r.product, codes:new Set(), cells:periods.map(()=>0), total:0 });
+    const g = prods.get(r.product); if (r.code) g.codes.add(r.code);
+    g.cells[pidx.get(periodKey(r.date,currentPeriod).key)] += r.qty; g.total += r.qty;
+  }
+  const list = [...prods.values()].sort((a,b)=>b.total-a.total);
+  const thead = `<tr><th>품목 (코드)</th>${periods.map(p=>`<th>${p.label}</th>`).join('')}<th>합계</th></tr>`;
+  const tbody = list.map(g=>{
+    const code = [...g.codes].slice(0,2).join(', ');
+    return `<tr><td>${g.name}${code?` <span style="color:var(--muted);font-size:11px">${code}</span>`:''}</td>${g.cells.map(c=>`<td>${c?KRW.format(c):'-'}</td>`).join('')}<td><b>${KRW.format(g.total)}</b></td></tr>`;
+  }).join('');
+  const totals = periods.map((p,i)=>list.reduce((s,g)=>s+g.cells[i],0));
+  const grand = totals.reduce((s,v)=>s+v,0);
+  const foot = `<tr style="font-weight:700;background:color-mix(in srgb,var(--surface) 88%,var(--text-1))"><td>합계</td>${totals.map(t=>`<td>${KRW.format(t)}</td>`).join('')}<td>${KRW.format(grand)}</td></tr>`;
+  $('#custDrillTable').querySelector('thead').innerHTML = thead;
+  $('#custDrillTable').querySelector('tbody').innerHTML = tbody + foot;
+}
+
 /* ---------- 오케스트레이션 ---------- */
 function render(mapping, fname) {
   const rows = aggregate(currentPeriod);
@@ -592,6 +739,8 @@ function render(mapping, fname) {
   renderRank(dimItems);
   renderTable(rows, currentPeriod);
   renderDimTable(dimItems, meta.label);
+  renderItemQuarter();
+  renderCustomerDrill();
   if (amountKey) $('#amtLegend').textContent = `매출(${amountKey})`;
   if (RAW.length) {
     const ds = RAW.map(r=>r.date).sort((a,b)=>a-b);
@@ -709,7 +858,14 @@ function makeSampleData() {
 $('#tabs').addEventListener('click', e=>{ const t=e.target.closest('.tab'); if(!t) return;
   currentPeriod=t.dataset.period; [...$('#tabs').children].forEach(x=>x.setAttribute('aria-selected',x===t)); render(); });
 $('#dimSelect').addEventListener('change', e=>{ currentDim=e.target.value; rebuildFilter(); render(); });
-$('#dimFilter').addEventListener('change', e=>{ currentFilter=e.target.value; render(); });
+$('#filterInput').addEventListener('input', e=>openFilterList(e.target.value));
+$('#filterInput').addEventListener('focus', e=>openFilterList(e.target.value));
+$('#filterInput').addEventListener('keydown', e=>{
+  if (e.key==='Escape') { closeFilterList(); e.target.blur(); }
+  else if (e.key==='Enter') { const first=$('#filterList').querySelector('.combo-item'); if(first) selectFilter(first.dataset.val); e.target.blur(); }
+});
+$('#filterList').addEventListener('mousedown', e=>{ const it=e.target.closest('.combo-item'); if(it){ e.preventDefault(); selectFilter(it.dataset.val); } });
+document.addEventListener('click', e=>{ if(!e.target.closest('#filterCombo')) closeFilterList(); });
 $('#uploadBtn').addEventListener('click', ()=>$('#fileInput').click());
 $('#exportBtn').addEventListener('click', exportExcel);
 $('#copyBtn').addEventListener('click', copyTable);
