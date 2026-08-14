@@ -241,6 +241,13 @@
   .steps a{color:var(--accent)}
   .sql{position:relative; background:var(--surface-2); border:1px solid var(--border); border-radius:9px; padding:11px 12px; font-family:ui-monospace,Menlo,monospace; font-size:11px; line-height:1.6; white-space:pre; overflow-x:auto; margin:0 0 16px; color:var(--ink)}
   .sql button{position:absolute; top:8px; right:8px; border:1px solid var(--border); background:var(--surface); color:var(--muted); font-size:11px; padding:3px 8px; border-radius:6px; cursor:pointer}
+  .stage{display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:var(--ink); margin:2px 0 9px}
+  .stage .n{width:20px; height:20px; border-radius:50%; background:var(--accent); color:var(--accent-ink); font-size:11px; font-weight:800; display:grid; place-items:center; flex:none}
+  .openq{display:inline-flex; align-items:center; gap:6px; margin:-8px 0 16px; font-size:12px; font-weight:600; color:var(--accent); background:var(--accent-soft); border:1px solid color-mix(in srgb,var(--accent) 30%,transparent); border-radius:8px; padding:7px 11px; text-decoration:none}
+  .openq:hover{filter:brightness(1.04)}
+  .openq.off{opacity:.5; pointer-events:none}
+  .hint{font-size:11.5px; margin-top:5px; color:var(--muted); min-height:15px; line-height:1.5}
+  .hint.ok{color:var(--s-done)} .hint.warn{color:var(--s-late)}
   .modal label{margin-top:2px}
   .modal .row-btns{display:flex; gap:8px; margin-top:16px}
   .modal .row-btns .btn{width:auto; flex:1}
@@ -270,9 +277,9 @@
   </div>
   <div class="stats" id="stats"></div>
   <div class="banner" id="localBanner">
-    <span>⚠️ 지금은 <b>이 브라우저에만</b> 저장됩니다. 다른 팀원과 공유하려면 클라우드(Supabase) 연결이 필요합니다.</span>
+    <span>⚠️ 지금은 <b>이 브라우저에만</b> 저장됩니다. 팀원과 공유하려면 구글 폼·시트를 연결하세요.</span>
     <span class="grow"></span>
-    <button id="bannerSetup">공유 연결 설정</button>
+    <button id="bannerSetup">구글 폼·시트 연결</button>
   </div>
 </header>
 
@@ -281,36 +288,40 @@
   <div class="modal">
     <div class="mh">
       <div>
-        <h2>팀 공유 연결 (Supabase)</h2>
-        <p>무료 클라우드 데이터베이스에 연결하면 팀원 모두가 같은 링크에서 서로의 구매요청을 실시간으로 보게 됩니다.</p>
+        <h2>구글 폼 + 시트 연결</h2>
+        <p>팀원은 <b>구글 폼</b>으로 제출하고, 이 대시보드는 응답이 모인 <b>구글 시트</b>를 자동으로 읽어와 보여줍니다. 키·코드 없이 <b>링크만</b> 붙여넣으면 됩니다.</p>
       </div>
       <button class="x" id="modalClose">×</button>
     </div>
     <div class="mb">
+      <div class="stage"><span class="n">1</span>구글 폼 만들기</div>
       <ol class="steps">
-        <li><a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a> 무료 가입 후 새 프로젝트(New project) 생성</li>
-        <li>왼쪽 <b>SQL Editor</b>에서 아래 SQL을 붙여넣고 실행(Run) — 테이블 1개가 만들어집니다</li>
-        <li><b>Project Settings → API</b>에서 <b>Project URL</b>과 <b>anon public</b> 키를 복사</li>
-        <li>아래 두 칸에 붙여넣고 <b>연결 테스트 → 저장</b></li>
+        <li><a href="https://forms.new" target="_blank" rel="noopener">forms.new</a> 에서 새 폼 생성</li>
+        <li>질문 추가: <b>요청팀</b>(객관식: 개발·자재·생산·품질), <b>품목코드</b>, <b>품명</b>, <b>수량</b>, <b>입고요청일</b>(날짜), <b>기타사항</b>, 요청자</li>
       </ol>
-      <div class="sql" id="sqlBox"><button id="copySql">복사</button>create table if not exists purchase_requests (
-  id uuid primary key default gen_random_uuid(),
-  team text not null,
-  code text, item_name text, qty text,
-  due_date date, note text, requester text,
-  status text default '접수',
-  created_at timestamptz default now()
-);
-alter table purchase_requests enable row level security;
-create policy "team access" on purchase_requests
-  for all using (true) with check (true);</div>
+      <div class="stage"><span class="n">2</span>응답 → 시트 연결 후 '웹에 게시'</div>
+      <ol class="steps">
+        <li>폼 상단 <b>응답</b> 탭 → <b>스프레드시트에 연결</b>(초록 아이콘)</li>
+        <li>열린 시트에서 <b>파일 → 공유 → 웹에 게시</b></li>
+        <li>형식을 <b>쉼표로 구분된 값(.csv)</b> 로 → <b>게시</b> → 나온 링크 복사</li>
+      </ol>
+      <div class="stage"><span class="n">3</span>폼 링크 복사</div>
+      <ol class="steps">
+        <li>폼 우측 상단 <b>보내기</b> → 링크(🔗) 아이콘 → URL 복사</li>
+      </ol>
       <div class="field">
-        <label>Project URL</label>
-        <input id="cfgUrl" placeholder="https://xxxxxxxx.supabase.co" autocomplete="off" spellcheck="false">
+        <label>① 게시된 CSV 링크 <span class="req">*</span></label>
+        <input id="cfgCsv" placeholder="https://docs.google.com/.../pub?output=csv" autocomplete="off" spellcheck="false">
+        <div class="hint" id="csvHint"></div>
       </div>
       <div class="field">
-        <label>anon public 키</label>
-        <input id="cfgKey" placeholder="eyJhbGciOi..." autocomplete="off" spellcheck="false">
+        <label>② 구글 폼 링크 <span class="req">*</span></label>
+        <input id="cfgForm" placeholder="https://docs.google.com/forms/.../viewform" autocomplete="off" spellcheck="false">
+        <div class="hint" id="formHint"></div>
+      </div>
+      <div class="field">
+        <label>③ 시트 편집 링크 <span style="color:var(--faint);font-weight:400">(선택 — 상태 변경·수정용)</span></label>
+        <input id="cfgSheet" placeholder="https://docs.google.com/spreadsheets/d/.../edit" autocomplete="off" spellcheck="false">
       </div>
       <div class="test-out" id="testOut"></div>
       <div class="row-btns">
@@ -327,7 +338,23 @@ create policy "team access" on purchase_requests
 <main>
   <!-- 좌측: 입력 -->
   <aside class="aside">
-    <section class="card">
+    <!-- 구글 시트 연결 시: 폼 제출 안내 -->
+    <section class="card" id="submitCard" style="display:none">
+      <div class="hd"><h2>구매요청 접수</h2></div>
+      <div style="padding:16px">
+        <p style="margin:0 0 14px; font-size:13px; color:var(--muted); line-height:1.6">
+          팀원은 아래 버튼으로 구글 폼을 열어 제출합니다. 제출한 내용은 자동으로 이 대시보드에 반영됩니다(약 20초 이내).
+        </p>
+        <a class="btn" id="openFormBtn" href="#" target="_blank" rel="noopener" style="text-decoration:none">📝 구글 폼으로 제출하기</a>
+        <a class="btn ghost" id="openSheetBtn" href="#" target="_blank" rel="noopener" style="margin-top:8px; text-decoration:none; display:none">📊 구글 시트에서 편집·상태변경</a>
+        <p style="margin:14px 0 0; font-size:11.5px; color:var(--faint); line-height:1.6">
+          상태(접수·진행·완료) 변경이나 내용 수정은 연결된 구글 시트에서 직접 하시면 됩니다.
+        </p>
+      </div>
+    </section>
+
+    <!-- 로컬 모드: 직접 입력 / 엑셀 붙여넣기 -->
+    <section class="card" id="writeCard">
       <div class="seg">
         <button class="on" data-mode="manual">직접 입력</button>
         <button data-mode="excel">엑셀 붙여넣기</button>
@@ -448,8 +475,7 @@ create policy "team access" on purchase_requests
 (function(){
   "use strict";
   const KEY="purchase_requests_v1";
-  const CFGKEY="purchase_dashboard_supabase";
-  const TABLE="purchase_requests";
+  const CFGKEY="purchase_dashboard_share";
   const TEAMS=["개발","자재","생산","품질"];
   const TEAMVAR={ "개발":"--t-dev","자재":"--t-mat","생산":"--t-prod","품질":"--t-qa" };
   const STATUS=["접수","진행","완료"];
@@ -461,11 +487,45 @@ create policy "team access" on purchase_requests
   const $=s=>document.querySelector(s);
   function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
-  /* ---------- 클라우드 연결 설정 저장 ---------- */
+  /* ---------- 연결 설정 저장 (구글 폼·시트 링크) ---------- */
   function loadCfg(){ try{ return JSON.parse(localStorage.getItem(CFGKEY)); }catch(e){ return null; } }
   function saveCfg(c){ cfg=c; if(c) localStorage.setItem(CFGKEY, JSON.stringify(c)); else localStorage.removeItem(CFGKEY); }
+  function isSheet(){ return !!(cfg && cfg.csvUrl); }
 
-  /* ---------- 저장소 추상화 (로컬 ↔ 클라우드 동일 인터페이스) ---------- */
+  /* ---------- CSV 파서 (따옴표·쉼표·줄바꿈 처리) ---------- */
+  function parseCSV(text){
+    const rows=[]; let row=[], cur="", q=false;
+    text=String(text).replace(/\r\n?/g,"\n");
+    for(let i=0;i<text.length;i++){
+      const c=text[i];
+      if(q){ if(c==='"'){ if(text[i+1]==='"'){ cur+='"'; i++; } else q=false; } else cur+=c; }
+      else if(c==='"') q=true;
+      else if(c===','){ row.push(cur); cur=""; }
+      else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=""; }
+      else cur+=c;
+    }
+    if(cur!==""||row.length){ row.push(cur); rows.push(row); }
+    return rows;
+  }
+  // 헤더(폼 질문 제목) → 필드 자동 매핑
+  function mapHeaders(hs){
+    const idx={};
+    hs.forEach((h,i)=>{
+      const s=String(h).replace(/\s/g,"");
+      if(idx.createdAt==null && /타임스탬프|timestamp|제출|접수일|작성일/i.test(s)) idx.createdAt=i;
+      else if(idx.code==null && /품목코드|품번|자재코드|코드/.test(s)) idx.code=i;
+      else if(idx.itemName==null && /품명|품목명|자재명|품목/.test(s)) idx.itemName=i;
+      else if(idx.qty==null && /수량|개수|qty/i.test(s)) idx.qty=i;
+      else if(idx.dueDate==null && /입고|요청일|납기|희망일|필요일/.test(s)) idx.dueDate=i;
+      else if(idx.note==null && /기타|비고|참고|메모|특이/.test(s)) idx.note=i;
+      else if(idx.requester==null && /요청자|담당자|담당|작성자|이름|성명/.test(s)) idx.requester=i;
+      else if(idx.team==null && /요청팀|팀|부서|소속/.test(s)) idx.team=i;
+      else if(idx.status==null && /상태|진행|처리/.test(s)) idx.status=i;
+    });
+    return idx;
+  }
+
+  /* ---------- 저장소 추상화 (로컬 ↔ 구글 시트 동일 인터페이스) ---------- */
   const LocalStore = {
     mode:"local",
     _all(){ try{ return JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){ return []; } },
@@ -477,27 +537,52 @@ create policy "team access" on purchase_requests
     async clear(){ this._persist([]); }
   };
 
-  function cloudHeaders(){ return { apikey:cfg.key, Authorization:"Bearer "+cfg.key, "Content-Type":"application/json" }; }
-  function cloudUrl(q){ return cfg.url.replace(/\/+$/,"")+"/rest/v1/"+TABLE+(q||""); }
-  function appToRow(it){ return { team:it.team, code:it.code||"", item_name:it.itemName||"", qty:(it.qty||"0"), due_date:it.dueDate||null, note:it.note||"", requester:it.requester||"", status:it.status||"접수" }; }
-  function rowToApp(r){ return { id:r.id, team:r.team, code:r.code||"", itemName:r.item_name||"", qty:(r.qty!=null?r.qty:"0"), dueDate:r.due_date||"", note:r.note||"", requester:r.requester||"", status:r.status||"접수", createdAt:(r.created_at||"").slice(0,10) }; }
-  const CloudStore = {
-    mode:"cloud",
-    async list(){ const res=await fetch(cloudUrl("?select=*&order=created_at.desc"),{headers:cloudHeaders()}); if(!res.ok) throw new Error("불러오기 "+res.status); return (await res.json()).map(rowToApp); },
-    async add(items){ const res=await fetch(cloudUrl(),{method:"POST",headers:{...cloudHeaders(),Prefer:"return=minimal"},body:JSON.stringify(items.map(appToRow))}); if(!res.ok) throw new Error("추가 "+res.status); },
-    async update(id,patch){ const res=await fetch(cloudUrl("?id=eq."+encodeURIComponent(id)),{method:"PATCH",headers:{...cloudHeaders(),Prefer:"return=minimal"},body:JSON.stringify(patch)}); if(!res.ok) throw new Error("변경 "+res.status); },
-    async remove(id){ const res=await fetch(cloudUrl("?id=eq."+encodeURIComponent(id)),{method:"DELETE",headers:cloudHeaders()}); if(!res.ok) throw new Error("삭제 "+res.status); },
-    async clear(){ const res=await fetch(cloudUrl("?id=not.is.null"),{method:"DELETE",headers:cloudHeaders()}); if(!res.ok) throw new Error("삭제 "+res.status); }
+  // 구글 시트: '웹에 게시(CSV)' 링크를 읽기 전용으로 불러옴
+  function csvFetchUrl(u){ return u + (u.indexOf("?")>=0?"&":"?") + "_ts=" + Date.now(); }
+  async function fetchSheetRows(csvUrl){
+    let res;
+    try{ res=await fetch(csvFetchUrl(csvUrl)); }
+    catch(e){ throw new Error("불러오기 실패 — '웹에 게시(CSV)' 링크인지, 인터넷 연결을 확인하세요"); }
+    if(!res.ok) throw new Error("링크 오류 (HTTP "+res.status+")");
+    const text=await res.text();
+    if(/^\s*<(!doctype|html)/i.test(text)) throw new Error("CSV가 아닌 웹페이지가 반환됨 — '웹에 게시 → CSV' 링크를 사용하세요");
+    return parseCSV(text).filter(r=>r.some(c=>String(c).trim()!==""));
+  }
+  const SheetStore = {
+    mode:"sheet",
+    async list(){
+      const rows=await fetchSheetRows(cfg.csvUrl);
+      if(rows.length<2) return [];
+      const idx=mapHeaders(rows[0]);
+      const g=(r,k)=> idx[k]!=null ? String(r[idx[k]]||"").trim() : "";
+      return rows.slice(1).map((r,n)=>({
+        id:"r"+n,
+        team: g(r,"team") || "미지정",
+        code: g(r,"code"), itemName: g(r,"itemName"),
+        qty: g(r,"qty") || "0",
+        dueDate: parseDate(g(r,"dueDate")),
+        note: g(r,"note"), requester: g(r,"requester"),
+        status: g(r,"status") || "접수",
+        createdAt: (parseDate(g(r,"createdAt"))||"").slice(0,10) || todayISO()
+      })).filter(x=>x.code||x.itemName);
+    },
+    async add(){ throw new Error("공유 모드에서는 구글 폼으로 제출하세요"); },
+    async update(){ throw new Error("상태 변경은 구글 시트에서 하세요"); },
+    async remove(){ throw new Error("삭제는 구글 시트에서 하세요"); },
+    async clear(){ throw new Error("삭제는 구글 시트에서 하세요"); }
   };
-  function applyCfg(){ store = (cfg && cfg.url && cfg.key) ? CloudStore : LocalStore; }
+  function applyCfg(){ store = isSheet() ? SheetStore : LocalStore; updateModeUI(); }
 
-  async function testConn(url,key){
-    if(!url||!key) throw new Error("URL과 키를 모두 입력하세요");
-    const res=await fetch(url.replace(/\/+$/,"")+"/rest/v1/"+TABLE+"?select=id&limit=1",{headers:{apikey:key,Authorization:"Bearer "+key}});
-    if(res.status===401||res.status===403) throw new Error("anon 키가 올바르지 않습니다");
-    if(res.status===404) throw new Error("테이블이 없습니다 — SQL을 먼저 실행하세요");
-    if(!res.ok) throw new Error("연결 실패 (HTTP "+res.status+")");
-    return true;
+  async function testSheet(csvUrl){
+    if(!csvUrl) throw new Error("게시된 CSV 링크를 입력하세요");
+    if(!/^https?:\/\//i.test(csvUrl)) throw new Error("올바른 링크(http…)가 아닙니다");
+    const rows=await fetchSheetRows(csvUrl);
+    if(rows.length<1) throw new Error("빈 시트입니다");
+    const idx=mapHeaders(rows[0]);
+    if(idx.code==null && idx.itemName==null) throw new Error("품목코드/품명 열을 찾지 못함 — 폼 질문 제목을 확인하세요");
+    const names={code:"품목코드",itemName:"품명",qty:"수량",dueDate:"입고요청일",team:"요청팀",note:"기타사항",requester:"요청자",status:"상태",createdAt:"접수일"};
+    const found=Object.keys(idx).map(k=>names[k]).filter(Boolean);
+    return { count: Math.max(rows.length-1,0), found };
   }
 
   /* ---------- 유틸 ---------- */
@@ -603,10 +688,10 @@ create policy "team access" on purchase_requests
         <td class="duedate"><span style="white-space:nowrap">${fmtDate(d.dueDate)}</span>${badge}</td>
         <td>${statusChip(d)}</td>
         <td><span class="memo" title="${esc(d.note)}">${esc(d.note)||"–"}</span></td>
-        <td><div class="rowbtns">
+        <td>${isSheet()?"":`<div class="rowbtns">
           <button data-act="cycle" data-id="${d.id}" title="상태 변경">↻</button>
           <button class="del" data-act="del" data-id="${d.id}" title="삭제">✕</button>
-        </div></td>
+        </div>`}</td>
       </tr>`;
     }).join("");
 
@@ -636,16 +721,28 @@ create policy "team access" on purchase_requests
   function setConn(state, msg){
     const b=$("#connBtn"), l=$("#connLabel");
     b.classList.remove("local","cloud","err"); b.title = msg || "공유 연결 설정";
-    if(state==="cloud"){ b.classList.add("cloud"); l.textContent="클라우드 공유"; $("#localBanner").style.display="none"; $("#refreshBtn").style.display=""; }
+    if(state==="sheet"){ b.classList.add("cloud"); l.textContent="구글 시트 연결"; $("#localBanner").style.display="none"; $("#refreshBtn").style.display=""; }
     else if(state==="err"){ b.classList.add("err"); l.textContent="연결 오류"; $("#refreshBtn").style.display=""; }
     else { b.classList.add("local"); l.textContent="로컬 저장"; $("#localBanner").style.display=""; $("#refreshBtn").style.display="none"; }
   }
+  function updateModeUI(){
+    const sheet=isSheet();
+    $("#writeCard").style.display  = sheet?"none":"";
+    $("#submitCard").style.display = sheet?"":"none";
+    $("#clearBtn").style.display   = sheet?"none":"";
+    if(sheet){
+      const f=$("#openFormBtn");
+      if(cfg.formUrl){ f.href=cfg.formUrl; f.style.display=""; } else { f.removeAttribute("href"); f.style.opacity=".5"; }
+      const s=$("#openSheetBtn");
+      if(cfg.sheetUrl){ s.href=cfg.sheetUrl; s.style.display=""; } else s.style.display="none";
+    }
+  }
   async function refresh(){
     try{ data = await store.list(); setConn(store.mode); }
-    catch(e){ setConn("err", e.message); if(store.mode==="cloud") toast("동기화 실패: "+e.message); }
+    catch(e){ setConn("err", e.message); if(store.mode==="sheet") toast("동기화 실패: "+e.message); }
     renderAll();
   }
-  function startPoll(){ stopPoll(); if(store.mode==="cloud") pollTimer=setInterval(()=>{ if(!document.hidden) refresh(); }, 7000); }
+  function startPoll(){ stopPoll(); if(store.mode==="sheet") pollTimer=setInterval(()=>{ if(!document.hidden) refresh(); }, 20000); }
   function stopPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
 
   /* ---------- 항목 추가 ---------- */
@@ -748,9 +845,13 @@ PKG-10021\t완충 에어캡 롤\t10\t2026-09-01\t폭 500mm`;
 
   /* ---------- 이벤트: 공유 연결 모달 ---------- */
   function openModal(){
-    $("#cfgUrl").value=cfg?cfg.url:""; $("#cfgKey").value=cfg?cfg.key:"";
+    $("#cfgCsv").value  = cfg?.csvUrl  || "";
+    $("#cfgForm").value = cfg?.formUrl || "";
+    $("#cfgSheet").value= cfg?.sheetUrl|| "";
+    $("#csvHint").textContent=""; $("#csvHint").className="hint";
+    $("#formHint").textContent=""; $("#formHint").className="hint";
     const o=$("#testOut"); o.textContent=""; o.className="test-out";
-    $("#disconnectRow").style.display=cfg?"flex":"none";
+    $("#disconnectRow").style.display=isSheet()?"flex":"none";
     $("#modalBg").classList.add("show");
   }
   function closeModal(){ $("#modalBg").classList.remove("show"); }
@@ -759,28 +860,43 @@ PKG-10021\t완충 에어캡 롤\t10\t2026-09-01\t폭 500mm`;
   $("#modalClose").onclick=closeModal;
   $("#modalBg").addEventListener("click",e=>{ if(e.target===$("#modalBg")) closeModal(); });
   $("#refreshBtn").onclick=()=>refresh();
-  $("#copySql").onclick=()=>{
-    const t=$("#sqlBox").textContent.replace(/^\s*복사\s*/,"").trim();
-    (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast("SQL이 복사되었습니다")).catch(()=>toast("복사 실패 — 직접 선택해 복사하세요"));
-  };
+
+  // 입력 즉시 링크 형식 힌트
+  $("#cfgCsv").addEventListener("input",e=>{
+    const v=e.target.value.trim(), h=$("#csvHint");
+    if(!v){ h.textContent=""; h.className="hint"; }
+    else if(/output=csv/i.test(v)){ h.textContent="✓ 게시된 CSV 링크 형식이 맞습니다."; h.className="hint ok"; }
+    else if(/\/spreadsheets\/d\/e\//.test(v)){ h.textContent="✓ 게시 링크로 보입니다."; h.className="hint ok"; }
+    else if(/\/spreadsheets\//.test(v)){ h.textContent="⚠ 편집 링크 같습니다. '파일 → 웹에 게시 → CSV' 링크가 필요해요."; h.className="hint warn"; }
+    else { h.textContent="⚠ 게시된 CSV 링크가 아닌 것 같습니다."; h.className="hint warn"; }
+  });
+  $("#cfgForm").addEventListener("input",e=>{
+    const v=e.target.value.trim(), h=$("#formHint");
+    if(!v){ h.textContent=""; h.className="hint"; }
+    else if(/forms\.gle|\/forms\//.test(v)){ h.textContent="✓ 구글 폼 링크 형식이 맞습니다."; h.className="hint ok"; }
+    else { h.textContent="⚠ 구글 폼 링크가 아닌 것 같습니다."; h.className="hint warn"; }
+  });
+
   $("#testBtn").onclick=async ()=>{
     const o=$("#testOut"); o.className="test-out"; o.textContent="확인 중…";
-    try{ await testConn($("#cfgUrl").value.trim(), $("#cfgKey").value.trim());
-      o.className="test-out ok"; o.textContent="✓ 연결 성공 — 테이블이 확인되었습니다.";
+    try{ const r=await testSheet($("#cfgCsv").value.trim());
+      o.className="test-out ok";
+      o.textContent=`✓ 연결 성공 — 데이터 ${r.count}건 인식 (열: ${r.found.join(", ")})`;
     }catch(e){ o.className="test-out bad"; o.textContent="✕ "+e.message; }
   };
   $("#saveCfgBtn").onclick=async ()=>{
-    const url=$("#cfgUrl").value.trim(), key=$("#cfgKey").value.trim();
+    const csvUrl=$("#cfgCsv").value.trim(), formUrl=$("#cfgForm").value.trim(), sheetUrl=$("#cfgSheet").value.trim();
     const o=$("#testOut"); o.className="test-out"; o.textContent="연결 중…";
-    try{ await testConn(url,key); }catch(e){ o.className="test-out bad"; o.textContent="✕ "+e.message; return; }
-    saveCfg({url,key}); applyCfg(); closeModal(); toast("클라우드에 연결되었습니다");
+    try{ await testSheet(csvUrl); }catch(e){ o.className="test-out bad"; o.textContent="✕ "+e.message; return; }
+    if(!formUrl && !confirm("구글 폼 링크가 비어 있습니다. 제출 버튼이 동작하지 않아요. 그래도 저장할까요?")){ o.textContent=""; return; }
+    saveCfg({csvUrl, formUrl, sheetUrl}); applyCfg(); closeModal(); toast("구글 시트에 연결되었습니다");
     await refresh(); startPoll();
   };
   $("#disconnectBtn").onclick=async ()=>{
     saveCfg(null); applyCfg(); stopPoll(); closeModal(); toast("로컬 모드로 전환했습니다");
     await refresh();
   };
-  document.addEventListener("visibilitychange",()=>{ if(!document.hidden && store && store.mode==="cloud") refresh(); });
+  document.addEventListener("visibilitychange",()=>{ if(!document.hidden && store && store.mode==="sheet") refresh(); });
 
   /* ---------- 초기값 ---------- */
   const dd=document.querySelector('input[name="dueDate"]'); if(dd) dd.value=todayISO();
