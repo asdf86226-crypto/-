@@ -100,6 +100,11 @@
   .combo-item .code { color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; }
   .combo-item .qty  { color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; }
   .combo-empty { padding:8px 9px; color:var(--muted); font-size:12px; }
+  /* 기간(날짜) 선택 */
+  .daterange { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:-4px 0 18px; font-size:13px; color:var(--text-2); }
+  .daterange .dr-label { font-weight:600; }
+  .dinput { font:inherit; font-size:13px; padding:6px 9px; border-radius:9px; border:1px solid var(--border); background:var(--surface); color:var(--text-1); box-shadow:var(--shadow); color-scheme:light dark; }
+  .btn.sm { padding:6px 11px; font-size:12px; box-shadow:none; }
   /* 피벗(품목×기간) 표: 첫 열 고정 느낌 */
   .pivot td:first-child, .pivot th:first-child { text-align:left; font-variant-numeric:normal; position:sticky; left:0; background:var(--surface); }
   .pivot th { white-space:nowrap; }
@@ -155,6 +160,17 @@
         </span>
       </label>
     </div>
+  </div>
+
+  <div class="daterange" id="daterange">
+    <span class="dr-label">기간</span>
+    <input type="date" id="dateFrom" class="dinput" aria-label="시작일">
+    <span>~</span>
+    <input type="date" id="dateTo" class="dinput" aria-label="종료일">
+    <button class="btn ghost sm" data-preset="all">전체</button>
+    <button class="btn ghost sm" data-preset="3m">최근 3개월</button>
+    <button class="btn ghost sm" data-preset="6m">최근 6개월</button>
+    <button class="btn ghost sm" data-preset="ytd">올해</button>
   </div>
 
   <div class="kpis" id="kpis"></div>
@@ -428,25 +444,37 @@ function periodKey(date, period) {
   return { key:`${year}-W${String(week).padStart(2,'0')}`, label:`${String(year).slice(2)}년 ${week}주`, sort:year*100+week };
 }
 
+/* ---------- 날짜(기간) 선택 ---------- */
+let dateFrom = null, dateTo = null;   // 선택된 기간 (기본: 전체)
+const parseYMD = (s) => { if (!s) return null; const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const fmtYMD = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+function dataBounds() { if (!RAW.length) return null; const t = RAW.map(r=>r.date.getTime()); return { min:new Date(Math.min(...t)), max:new Date(Math.max(...t)) }; }
+function setDateRange(from, to) {   // from/to: Date(일 단위) 또는 null → 전체 경계
+  const b = dataBounds(); if (!b) return;
+  const f = from || b.min, t = to || b.max;
+  dateFrom = new Date(f.getFullYear(), f.getMonth(), f.getDate());
+  dateTo   = new Date(t.getFullYear(), t.getMonth(), t.getDate(), 23, 59, 59, 999);
+  if ($('#dateFrom')) { $('#dateFrom').value = fmtYMD(dateFrom); $('#dateTo').value = fmtYMD(dateTo); }
+}
+const viewRows = () => (dateFrom && dateTo) ? RAW.filter(r => r.date >= dateFrom && r.date <= dateTo) : RAW;
+const spanBounds = () => (dateFrom && dateTo) ? { lo:dateFrom, hi:dateTo } : (dataBounds() ? { lo:dataBounds().min, hi:dataBounds().max } : null);
+
 /* ---------- 집계 ---------- */
 function filteredRaw() {
-  return currentFilter === '__all__' ? RAW : RAW.filter(r => dimValue(r, currentDim) === currentFilter);
+  const base = viewRows();
+  return currentFilter === '__all__' ? base : base.filter(r => dimValue(r, currentDim) === currentFilter);
 }
 function aggregate(period) {
-  if (!RAW.length) return [];
-  // 전체 데이터 기간(첫 판매일~마지막 판매일)의 모든 구간을 미리 만든다.
-  // 하루씩 훑어 구간 키를 채우므로 판매가 없는 주/월/분기/연도 빠짐없이 0으로 나온다.
-  const times = RAW.map(r => r.date.getTime());
-  const min = new Date(Math.min(...times)), max = new Date(Math.max(...times));
+  const b = spanBounds(); if (!b) return [];
+  // 선택 기간의 모든 구간을 미리 만들어 판매 없는 구간도 0으로 채운다.
   const map = new Map();
-  const cur = new Date(min.getFullYear(), min.getMonth(), min.getDate());
-  const end = new Date(max.getFullYear(), max.getMonth(), max.getDate());
+  const cur = new Date(b.lo.getFullYear(), b.lo.getMonth(), b.lo.getDate());
+  const end = new Date(b.hi.getFullYear(), b.hi.getMonth(), b.hi.getDate());
   while (cur <= end) {
     const { key, label, sort } = periodKey(cur, period);
     if (!map.has(key)) map.set(key, { key, label, sort, qty:0, amount:0 });
     cur.setDate(cur.getDate() + 1);
   }
-  // 필터된 데이터를 해당 구간에 합산 (없는 구간은 0 유지)
   for (const r of filteredRaw()) {
     const { key } = periodKey(r.date, period);
     const g = map.get(key);
@@ -458,7 +486,7 @@ function aggregate(period) {
 function aggregateDim(dim) {
   const map = new Map();
   let total = 0;
-  for (const r of RAW) {
+  for (const r of viewRows()) {
     const k = dimValue(r, dim);
     if (!map.has(k)) map.set(k, { name:k, qty:0, amount:0, codes:new Set() });
     const g = map.get(k); g.qty += r.qty; g.amount += amtOf(r); total += r.qty;
@@ -481,12 +509,36 @@ function setupDims() {
   // 거래처 데이터가 없으면 거래처 옵션 비활성화
   document.querySelector('#dimSelect option[value="customer"]').disabled = !hasCustomerData();
   $('#dimSelect').value = currentDim;
+  const b = dataBounds();
+  if (b) { const lo=fmtYMD(b.min), hi=fmtYMD(b.max);
+    ['#dateFrom','#dateTo'].forEach(id=>{ $(id).min=lo; $(id).max=hi; }); }
+  setDateRange(null, null);                   // 전체 기간으로 초기화
   rebuildFilter();
 }
-let filterMembers = [];   // 현재 분석 기준의 항목들 {name, code, qty}
+function applyDateInputs() {
+  let f = parseYMD($('#dateFrom').value), t = parseYMD($('#dateTo').value);
+  if (f && t && f > t) { const x=f; f=t; t=x; }
+  setDateRange(f, t); render();
+}
+function applyPreset(p) {
+  const b = dataBounds(); if (!b) return;
+  if (p === 'all') setDateRange(null, null);
+  else if (p === 'ytd') setDateRange(new Date(b.max.getFullYear(),0,1), b.max);
+  else { const months = p==='3m' ? 3 : 6; const f = new Date(b.max); f.setMonth(f.getMonth()-months); f.setDate(f.getDate()+1);
+         setDateRange(f < b.min ? b.min : f, b.max); }
+  render();
+}
+let filterMembers = [];   // 현재 분석 기준의 항목들 {name, code, qty} — 전체 기간 기준(목록 안정성)
 function rebuildFilter() {
   const meta = DIMS[currentDim];
-  filterMembers = aggregateDim(currentDim).map(x => ({ name:x.name, code: currentDim==='product' ? (x.codeFull || '') : '', qty:x.qty }));
+  const seen = new Map();
+  for (const r of RAW) {
+    const k = dimValue(r, currentDim);
+    if (!seen.has(k)) seen.set(k, { name:k, codes:new Set(), qty:0 });
+    const g = seen.get(k); if (currentDim === 'product' && r.code) g.codes.add(r.code); g.qty += r.qty;
+  }
+  filterMembers = [...seen.values()].sort((a,b) => b.qty - a.qty)
+    .map(x => ({ name:x.name, code: currentDim === 'product' ? [...x.codes].join(', ') : '', qty:x.qty }));
   $('#filterLabel').textContent = `${meta.label} 필터`;
   const inp = $('#filterInput');
   inp.placeholder = `${meta.all} (클릭·입력해 검색)`;
@@ -639,12 +691,10 @@ function renderDimTable(items, dimLabel) {
 
 /* ---------- 전체 기간의 구간 목록 ---------- */
 function periodsInSpan(period) {
-  if (!RAW.length) return [];
-  const times = RAW.map(r => r.date.getTime());
-  const min = new Date(Math.min(...times)), max = new Date(Math.max(...times));
+  const b = spanBounds(); if (!b) return [];
   const map = new Map();
-  const cur = new Date(min.getFullYear(), min.getMonth(), min.getDate());
-  const end = new Date(max.getFullYear(), max.getMonth(), max.getDate());
+  const cur = new Date(b.lo.getFullYear(), b.lo.getMonth(), b.lo.getDate());
+  const end = new Date(b.hi.getFullYear(), b.hi.getMonth(), b.hi.getDate());
   while (cur <= end) { const { key, label, sort } = periodKey(cur, period); if (!map.has(key)) map.set(key, { key, label, sort }); cur.setDate(cur.getDate()+1); }
   return [...map.values()].sort((a,b) => a.sort - b.sort);
 }
@@ -687,7 +737,7 @@ function renderItemQuarter() {
   const periods = periodsInSpan('quarter');
   const idx = new Map(periods.map((p,i)=>[p.key,i]));
   const qty = periods.map(()=>0);
-  for (const r of RAW) { if (r.product !== currentFilter) continue; const i = idx.get(periodKey(r.date,'quarter').key); if (i!=null) qty[i]+=r.qty; }
+  for (const r of viewRows()) { if (r.product !== currentFilter) continue; const i = idx.get(periodKey(r.date,'quarter').key); if (i!=null) qty[i]+=r.qty; }
   renderVBars('#itemQuarterChart', periods.map((p,i)=>({label:p.label, qty:qty[i]})));
 }
 
@@ -698,7 +748,7 @@ function renderCustomerDrill() {
   card.hidden = false;
   const pname = {month:'월별',quarter:'분기별',year:'연별'}[currentPeriod];
   $('#custDrillTitle').textContent = `${currentFilter} · 품목별 ${pname} 판매`;
-  const rowsRaw = RAW.filter(r => r.customer === currentFilter);
+  const rowsRaw = viewRows().filter(r => r.customer === currentFilter);
   const pmap = new Map();
   for (const r of rowsRaw) { const { key, label, sort } = periodKey(r.date, currentPeriod); if (!pmap.has(key)) pmap.set(key, { key, label, sort }); }
   const periods = [...pmap.values()].sort((a,b)=>a.sort-b.sort);
@@ -743,12 +793,14 @@ function render(mapping, fname) {
   renderCustomerDrill();
   if (amountKey) $('#amtLegend').textContent = `매출(${amountKey})`;
   if (RAW.length) {
-    const ds = RAW.map(r=>r.date).sort((a,b)=>a-b);
     const f = d => `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
     const src = fname ? `${fname} · ` : '';
     const nProd = aggregateDim('product').length;
     const custInfo = hasCustomerData() ? ` · 거래처 ${aggregateDim('customer').length}곳` : '';
-    $('#meta').innerHTML = `${src}기간 ${f(ds[0])} ~ ${f(ds[ds.length-1])} · ${KRW.format(RAW.length)}건 · 상품 ${nProd}종${custInfo}` +
+    const b = dataBounds();
+    const isFull = dateFrom && dateTo && dateFrom.getTime() <= b.min.getTime() && dateTo.getTime() >= b.max.getTime();
+    const rangeTxt = (dateFrom && dateTo) ? `${f(dateFrom)} ~ ${f(dateTo)}${isFull ? ' (전체)' : ''}` : '';
+    $('#meta').innerHTML = `${src}기간 ${rangeTxt} · ${KRW.format(viewRows().length)}건 · 상품 ${nProd}종${custInfo}` +
                            (mapping ? `<br>${mapping}` : (window.__lastMapping || ''));
     if (mapping) window.__lastMapping = mapping;
   }
@@ -858,6 +910,9 @@ function makeSampleData() {
 $('#tabs').addEventListener('click', e=>{ const t=e.target.closest('.tab'); if(!t) return;
   currentPeriod=t.dataset.period; [...$('#tabs').children].forEach(x=>x.setAttribute('aria-selected',x===t)); render(); });
 $('#dimSelect').addEventListener('change', e=>{ currentDim=e.target.value; rebuildFilter(); render(); });
+$('#dateFrom').addEventListener('change', applyDateInputs);
+$('#dateTo').addEventListener('change', applyDateInputs);
+$('#daterange').addEventListener('click', e=>{ const btn=e.target.closest('[data-preset]'); if(btn) applyPreset(btn.dataset.preset); });
 $('#filterInput').addEventListener('input', e=>openFilterList(e.target.value));
 $('#filterInput').addEventListener('focus', e=>openFilterList(e.target.value));
 $('#filterInput').addEventListener('keydown', e=>{
