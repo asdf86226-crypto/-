@@ -313,19 +313,19 @@ const COLS = ['id','createdAt','team','code','itemName','qty','dueDate','request
 function sh_(){ const ss=SpreadsheetApp.getActiveSpreadsheet(); let s=ss.getSheetByName(SHEET);
   if(!s){ s=ss.insertSheet(SHEET); } if(s.getLastRow()===0){ s.appendRow(COLS); } return s; }
 function read_(){ const s=sh_(); const v=s.getDataRange().getValues(); const h=v[0];
-  return v.slice(1).map(r=>{ const o={}; h.forEach((k,i)=>{ let c=r[i];
+  return v.slice(1).map(r=&gt;{ const o={}; h.forEach((k,i)=&gt;{ let c=r[i];
     if(c instanceof Date) c=Utilities.formatDate(c,Session.getScriptTimeZone(),'yyyy-MM-dd'); o[k]=c; }); return o; })
-    .filter(o=>o.id); }
-function doGet(e){ const out={ok:true,rows:read_()}; const cb=e&&e.parameter&&e.parameter.callback;
+    .filter(o=&gt;o.id); }
+function doGet(e){ const out={ok:true,rows:read_()}; const cb=e&amp;&amp;e.parameter&amp;&amp;e.parameter.callback;
   if(cb) return ContentService.createTextOutput(cb+'('+JSON.stringify(out)+')').setMimeType(ContentService.MimeType.JAVASCRIPT);
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON); }
 function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_();
   const v=s.getDataRange().getValues(), h=v[0], idc=h.indexOf('id');
-  if(b.action==='add'){ (b.items||[]).forEach(it=>{ const id=Utilities.getUuid();
+  if(b.action==='add'){ (b.items||[]).forEach(it=&gt;{ const id=Utilities.getUuid();
     const cd=Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy-MM-dd');
-    s.appendRow(COLS.map(k=> k==='id'?id : k==='createdAt'?cd : (it[k]!=null?it[k]:''))); }); }
-  else if(b.action==='remove'){ for(let i=1;i<v.length;i++){ if(v[i][idc]===b.id){ s.deleteRow(i+1); break; } } }
-  else if(b.action==='clear'){ if(s.getLastRow()>1) s.deleteRows(2,s.getLastRow()-1); }
+    s.appendRow(COLS.map(k=&gt; k==='id'?id : k==='createdAt'?cd : (it[k]!=null?it[k]:''))); }); }
+  else if(b.action==='remove'){ for(let i=1;i&lt;v.length;i++){ if(v[i][idc]===b.id){ s.deleteRow(i+1); break; } } }
+  else if(b.action==='clear'){ if(s.getLastRow()&gt;1) s.deleteRows(2,s.getLastRow()-1); }
   return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON); }</div>
       <div class="stage"><span class="n">2</span>웹앱으로 배포</div>
       <ol class="steps">
