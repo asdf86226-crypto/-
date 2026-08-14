@@ -75,9 +75,9 @@
   table { width:100%; border-collapse:collapse; font-size:13px; }
   th,td { padding:9px 10px; text-align:right; border-bottom:1px solid var(--grid); font-variant-numeric:tabular-nums; }
   th:first-child,td:first-child { text-align:left; font-variant-numeric:normal; }
-  thead th { color:var(--muted); font-weight:600; font-size:12px; border-bottom:1px solid var(--baseline); position:sticky; top:0; background:var(--surface); z-index:2; }
+  thead th { color:var(--muted); font-weight:600; font-size:12px; border-bottom:1px solid var(--baseline); position:sticky; top:0; background:var(--surface); z-index:2; white-space:nowrap; }
   tbody tr:hover { background:color-mix(in srgb,var(--surface) 90%,var(--text-1)); }
-  .table-scroll { max-height:380px; overflow-y:auto; }
+  .table-scroll { max-height:380px; overflow-y:auto; overflow-x:auto; }
   /* 판매량 셀: 막대를 셀 배경 그라디언트로 그려 절대위치·z-index 없이 안전하게 (sticky 헤더와 겹치지 않음) */
   .bar-cell { background-image:linear-gradient(to right, color-mix(in srgb,var(--series-1) 20%, transparent) var(--w,0%), transparent var(--w,0%));
               background-repeat:no-repeat; background-position:left center; background-size:100% 66%; }
@@ -630,7 +630,7 @@ function renderDimTable(items, dimLabel) {
     const w = (p.qty/maxQty*100).toFixed(1);
     const unit = p.qty ? KRW.format(Math.round(p.amount/p.qty)) : '-';
     const codeCell = showCode ? `<td style="text-align:left;font-variant-numeric:normal;color:var(--text-2)">${p.code || '-'}</td>` : '';
-    const catCell = showCode ? `<td style="text-align:left;font-variant-numeric:normal;color:var(--text-2)">${p.category || '-'}</td>` : '';
+    const catCell = showCode ? `<td style="text-align:left;font-variant-numeric:normal;color:var(--text-2);white-space:nowrap">${p.category || '-'}</td>` : '';
     return `<tr>${codeCell}<td style="text-align:left;font-variant-numeric:normal">${p.name}</td>${catCell}
       <td class="bar-cell" style="--w:${w}%">${KRW.format(p.qty)}</td>
       <td>${KRW.format(Math.round(p.amount))}</td><td>${unit}</td><td>${p.share.toFixed(1)}%</td></tr>`;
