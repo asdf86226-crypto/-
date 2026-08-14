@@ -207,6 +207,46 @@
   .linkbtn:hover{border-color:var(--border-strong)}
   .linkbtn.danger:hover{color:var(--s-late); border-color:var(--s-late)}
 
+  /* 연결 상태 버튼 */
+  .conn{
+    display:inline-flex; align-items:center; gap:7px; background:var(--surface); border:1px solid var(--border);
+    color:var(--muted); font-weight:600; font-size:12px; padding:0 12px; height:34px; border-radius:9px;
+  }
+  .conn:hover{border-color:var(--border-strong)}
+  .conn .dot{width:8px; height:8px}
+  .conn.cloud{color:var(--s-done)} .conn.cloud .dot{background:var(--s-done)}
+  .conn.local{color:var(--s-new)} .conn.local .dot{background:var(--s-new)}
+  .conn.err{color:var(--s-late)} .conn.err .dot{background:var(--s-late)}
+
+  /* 로컬 모드 안내 배너 */
+  .banner{
+    display:flex; align-items:center; gap:10px; margin-top:12px; padding:9px 14px;
+    background:color-mix(in srgb,var(--s-new) 12%,var(--surface)); border:1px solid color-mix(in srgb,var(--s-new) 32%,transparent);
+    border-radius:10px; font-size:12.5px; color:var(--ink);
+  }
+  .banner b{color:var(--ink)} .banner .grow{margin-left:auto}
+  .banner button{border:0; background:var(--accent); color:var(--accent-ink); font-weight:700; font-size:12px; padding:6px 12px; border-radius:7px}
+
+  /* 모달 */
+  .modal-bg{position:fixed; inset:0; background:rgba(10,14,22,.5); backdrop-filter:blur(2px); z-index:50; display:none; align-items:center; justify-content:center; padding:20px}
+  .modal-bg.show{display:flex}
+  .modal{background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow); width:100%; max-width:560px; max-height:90vh; overflow:auto}
+  .modal .mh{padding:18px 20px 0; display:flex; align-items:flex-start; gap:10px}
+  .modal .mh h2{font-size:16px} .modal .mh p{margin:4px 0 0; font-size:12.5px; color:var(--muted); line-height:1.6}
+  .modal .mh .x{margin-left:auto; border:0; background:transparent; color:var(--faint); font-size:20px; line-height:1; cursor:pointer}
+  .modal .mb{padding:16px 20px 20px}
+  .steps{counter-reset:s; margin:0 0 16px; padding:0; list-style:none; font-size:12.5px; color:var(--muted); line-height:1.7}
+  .steps li{position:relative; padding-left:26px; margin-bottom:7px; counter-increment:s}
+  .steps li::before{content:counter(s); position:absolute; left:0; top:0; width:18px; height:18px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:11px; font-weight:800; display:grid; place-items:center}
+  .steps a{color:var(--accent)}
+  .sql{position:relative; background:var(--surface-2); border:1px solid var(--border); border-radius:9px; padding:11px 12px; font-family:ui-monospace,Menlo,monospace; font-size:11px; line-height:1.6; white-space:pre; overflow-x:auto; margin:0 0 16px; color:var(--ink)}
+  .sql button{position:absolute; top:8px; right:8px; border:1px solid var(--border); background:var(--surface); color:var(--muted); font-size:11px; padding:3px 8px; border-radius:6px; cursor:pointer}
+  .modal label{margin-top:2px}
+  .modal .row-btns{display:flex; gap:8px; margin-top:16px}
+  .modal .row-btns .btn{width:auto; flex:1}
+  .test-out{font-size:12px; margin-top:10px; min-height:16px}
+  .test-out.ok{color:var(--s-done)} .test-out.bad{color:var(--s-late)}
+
   /* 토스트 */
   #toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px); opacity:0;
     background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:10px; font-size:13px; font-weight:600;
@@ -224,10 +264,65 @@
         <p>개발 · 자재 · 생산 · 품질 팀 구매요청 통합 관리</p>
       </div>
     </div>
+    <button class="conn local" id="connBtn" title="공유 연결 설정"><span class="dot"></span><span id="connLabel">로컬 저장</span></button>
+    <button class="icon-btn" id="refreshBtn" title="새로고침" style="display:none">⟳</button>
     <button class="icon-btn" id="themeBtn" title="테마 전환">◑</button>
   </div>
   <div class="stats" id="stats"></div>
+  <div class="banner" id="localBanner">
+    <span>⚠️ 지금은 <b>이 브라우저에만</b> 저장됩니다. 다른 팀원과 공유하려면 클라우드(Supabase) 연결이 필요합니다.</span>
+    <span class="grow"></span>
+    <button id="bannerSetup">공유 연결 설정</button>
+  </div>
 </header>
+
+<!-- 공유 연결 설정 모달 -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <div class="mh">
+      <div>
+        <h2>팀 공유 연결 (Supabase)</h2>
+        <p>무료 클라우드 데이터베이스에 연결하면 팀원 모두가 같은 링크에서 서로의 구매요청을 실시간으로 보게 됩니다.</p>
+      </div>
+      <button class="x" id="modalClose">×</button>
+    </div>
+    <div class="mb">
+      <ol class="steps">
+        <li><a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a> 무료 가입 후 새 프로젝트(New project) 생성</li>
+        <li>왼쪽 <b>SQL Editor</b>에서 아래 SQL을 붙여넣고 실행(Run) — 테이블 1개가 만들어집니다</li>
+        <li><b>Project Settings → API</b>에서 <b>Project URL</b>과 <b>anon public</b> 키를 복사</li>
+        <li>아래 두 칸에 붙여넣고 <b>연결 테스트 → 저장</b></li>
+      </ol>
+      <div class="sql" id="sqlBox"><button id="copySql">복사</button>create table if not exists purchase_requests (
+  id uuid primary key default gen_random_uuid(),
+  team text not null,
+  code text, item_name text, qty text,
+  due_date date, note text, requester text,
+  status text default '접수',
+  created_at timestamptz default now()
+);
+alter table purchase_requests enable row level security;
+create policy "team access" on purchase_requests
+  for all using (true) with check (true);</div>
+      <div class="field">
+        <label>Project URL</label>
+        <input id="cfgUrl" placeholder="https://xxxxxxxx.supabase.co" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label>anon public 키</label>
+        <input id="cfgKey" placeholder="eyJhbGciOi..." autocomplete="off" spellcheck="false">
+      </div>
+      <div class="test-out" id="testOut"></div>
+      <div class="row-btns">
+        <button class="btn ghost" id="testBtn" type="button">연결 테스트</button>
+        <button class="btn" id="saveCfgBtn" type="button">저장하고 연결</button>
+      </div>
+      <div class="row-btns" id="disconnectRow" style="display:none">
+        <button class="btn ghost" id="disconnectBtn" type="button" style="color:var(--s-late)">연결 해제(로컬 모드로 전환)</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <main>
   <!-- 좌측: 입력 -->
@@ -353,21 +448,57 @@
 (function(){
   "use strict";
   const KEY="purchase_requests_v1";
+  const CFGKEY="purchase_dashboard_supabase";
+  const TABLE="purchase_requests";
   const TEAMS=["개발","자재","생산","품질"];
   const TEAMVAR={ "개발":"--t-dev","자재":"--t-mat","생산":"--t-prod","품질":"--t-qa" };
   const STATUS=["접수","진행","완료"];
   const STATUSVAR={ "접수":"--s-new","진행":"--s-prog","완료":"--s-done" };
 
-  let data = load();
+  let data = [];                 // 화면에 표시되는 캐시(저장소에서 동기화)
   let filterTeam="전체", search="", sortKey="createdAt", sortDir=-1;
-
-  /* ---------- 저장/로드 ---------- */
-  function load(){
-    try{ return JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ return []; }
-  }
-  function save(){ localStorage.setItem(KEY, JSON.stringify(data)); }
-  function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+  let cfg=null, pollTimer=null, store=null;
   const $=s=>document.querySelector(s);
+  function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+  /* ---------- 클라우드 연결 설정 저장 ---------- */
+  function loadCfg(){ try{ return JSON.parse(localStorage.getItem(CFGKEY)); }catch(e){ return null; } }
+  function saveCfg(c){ cfg=c; if(c) localStorage.setItem(CFGKEY, JSON.stringify(c)); else localStorage.removeItem(CFGKEY); }
+
+  /* ---------- 저장소 추상화 (로컬 ↔ 클라우드 동일 인터페이스) ---------- */
+  const LocalStore = {
+    mode:"local",
+    _all(){ try{ return JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){ return []; } },
+    _persist(a){ localStorage.setItem(KEY, JSON.stringify(a)); },
+    async list(){ return this._all(); },
+    async add(items){ const a=this._all(); items.forEach(it=>a.push({...it, id:uid(), createdAt:todayISO()})); this._persist(a); },
+    async update(id,patch){ const a=this._all(); const i=a.findIndex(x=>x.id===id); if(i>=0){ a[i]={...a[i],...patch}; this._persist(a);} },
+    async remove(id){ this._persist(this._all().filter(x=>x.id!==id)); },
+    async clear(){ this._persist([]); }
+  };
+
+  function cloudHeaders(){ return { apikey:cfg.key, Authorization:"Bearer "+cfg.key, "Content-Type":"application/json" }; }
+  function cloudUrl(q){ return cfg.url.replace(/\/+$/,"")+"/rest/v1/"+TABLE+(q||""); }
+  function appToRow(it){ return { team:it.team, code:it.code||"", item_name:it.itemName||"", qty:(it.qty||"0"), due_date:it.dueDate||null, note:it.note||"", requester:it.requester||"", status:it.status||"접수" }; }
+  function rowToApp(r){ return { id:r.id, team:r.team, code:r.code||"", itemName:r.item_name||"", qty:(r.qty!=null?r.qty:"0"), dueDate:r.due_date||"", note:r.note||"", requester:r.requester||"", status:r.status||"접수", createdAt:(r.created_at||"").slice(0,10) }; }
+  const CloudStore = {
+    mode:"cloud",
+    async list(){ const res=await fetch(cloudUrl("?select=*&order=created_at.desc"),{headers:cloudHeaders()}); if(!res.ok) throw new Error("불러오기 "+res.status); return (await res.json()).map(rowToApp); },
+    async add(items){ const res=await fetch(cloudUrl(),{method:"POST",headers:{...cloudHeaders(),Prefer:"return=minimal"},body:JSON.stringify(items.map(appToRow))}); if(!res.ok) throw new Error("추가 "+res.status); },
+    async update(id,patch){ const res=await fetch(cloudUrl("?id=eq."+encodeURIComponent(id)),{method:"PATCH",headers:{...cloudHeaders(),Prefer:"return=minimal"},body:JSON.stringify(patch)}); if(!res.ok) throw new Error("변경 "+res.status); },
+    async remove(id){ const res=await fetch(cloudUrl("?id=eq."+encodeURIComponent(id)),{method:"DELETE",headers:cloudHeaders()}); if(!res.ok) throw new Error("삭제 "+res.status); },
+    async clear(){ const res=await fetch(cloudUrl("?id=not.is.null"),{method:"DELETE",headers:cloudHeaders()}); if(!res.ok) throw new Error("삭제 "+res.status); }
+  };
+  function applyCfg(){ store = (cfg && cfg.url && cfg.key) ? CloudStore : LocalStore; }
+
+  async function testConn(url,key){
+    if(!url||!key) throw new Error("URL과 키를 모두 입력하세요");
+    const res=await fetch(url.replace(/\/+$/,"")+"/rest/v1/"+TABLE+"?select=id&limit=1",{headers:{apikey:key,Authorization:"Bearer "+key}});
+    if(res.status===401||res.status===403) throw new Error("anon 키가 올바르지 않습니다");
+    if(res.status===404) throw new Error("테이블이 없습니다 — SQL을 먼저 실행하세요");
+    if(!res.ok) throw new Error("연결 실패 (HTTP "+res.status+")");
+    return true;
+  }
 
   /* ---------- 유틸 ---------- */
   function todayISO(){ return new Date().toISOString().slice(0,10); }
@@ -479,11 +610,13 @@
       </tr>`;
     }).join("");
 
-    tb.querySelectorAll("button[data-act]").forEach(b=>b.onclick=()=>{
+    tb.querySelectorAll("button[data-act]").forEach(b=>b.onclick=async ()=>{
       const d=data.find(x=>x.id===b.dataset.id); if(!d) return;
-      if(b.dataset.act==="del"){ data=data.filter(x=>x.id!==d.id); toast("삭제되었습니다"); }
-      else { const i=STATUS.indexOf(d.status); d.status=STATUS[(i+1)%STATUS.length]; }
-      save(); renderAll();
+      try{
+        if(b.dataset.act==="del"){ await store.remove(d.id); toast("삭제되었습니다"); }
+        else { const i=STATUS.indexOf(d.status); await store.update(d.id,{status:STATUS[(i+1)%STATUS.length]}); }
+      }catch(e){ toast("처리 실패: "+e.message); return; }
+      await refresh();
     });
     $("#footInfo").textContent = data.length ? `${rows.length}건 표시 · 총 ${data.length}건` : "";
     document.querySelectorAll("thead th").forEach(th=>{
@@ -499,37 +632,50 @@
 
   function renderAll(){ renderStats(); renderTabs(); renderTable(); }
 
+  /* ---------- 저장소 ↔ 화면 동기화 ---------- */
+  function setConn(state, msg){
+    const b=$("#connBtn"), l=$("#connLabel");
+    b.classList.remove("local","cloud","err"); b.title = msg || "공유 연결 설정";
+    if(state==="cloud"){ b.classList.add("cloud"); l.textContent="클라우드 공유"; $("#localBanner").style.display="none"; $("#refreshBtn").style.display=""; }
+    else if(state==="err"){ b.classList.add("err"); l.textContent="연결 오류"; $("#refreshBtn").style.display=""; }
+    else { b.classList.add("local"); l.textContent="로컬 저장"; $("#localBanner").style.display=""; $("#refreshBtn").style.display="none"; }
+  }
+  async function refresh(){
+    try{ data = await store.list(); setConn(store.mode); }
+    catch(e){ setConn("err", e.message); if(store.mode==="cloud") toast("동기화 실패: "+e.message); }
+    renderAll();
+  }
+  function startPoll(){ stopPoll(); if(store.mode==="cloud") pollTimer=setInterval(()=>{ if(!document.hidden) refresh(); }, 7000); }
+  function stopPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
+
   /* ---------- 항목 추가 ---------- */
-  function addItems(items, team){
-    let n=0;
-    items.forEach(it=>{
-      if(!it.code && !it.itemName) return;
-      data.push({
-        id:uid(), team,
-        code:it.code||"", itemName:it.itemName||"",
-        qty:it.qty!==""&&it.qty!=null? it.qty : "0",
-        dueDate:it.dueDate||"", note:it.note||"", requester:it.requester||"",
-        status:"접수", createdAt:todayISO()
-      });
-      n++;
-    });
-    save(); renderAll(); return n;
+  async function addItems(items, team){
+    const norm=items.filter(it=>it.code||it.itemName).map(it=>({
+      team, code:(it.code||"").trim(), itemName:(it.itemName||"").trim(),
+      qty:(it.qty!==""&&it.qty!=null)?String(it.qty).trim():"0",
+      dueDate:it.dueDate||"", note:(it.note||"").trim(), requester:(it.requester||"").trim(), status:"접수"
+    }));
+    if(!norm.length) return 0;
+    try{ await store.add(norm); }catch(e){ toast("추가 실패: "+e.message); return 0; }
+    await refresh(); return norm.length;
   }
 
   /* ---------- 이벤트: 직접 입력 ---------- */
-  $("#manualForm").addEventListener("submit",e=>{
+  $("#manualForm").addEventListener("submit",async e=>{
     e.preventDefault();
     const f=e.target, fd=new FormData(f);
     const team=fd.get("team");
     if(!team){ toast("요청팀을 선택하세요"); return; }
-    addItems([{
-      code:fd.get("code").trim(), itemName:fd.get("itemName").trim(),
+    const teamId=f.querySelector('input[name=team]:checked')?.id;
+    const n=await addItems([{
+      code:fd.get("code"), itemName:fd.get("itemName"),
       qty:fd.get("qty"), dueDate:fd.get("dueDate"),
-      note:fd.get("note").trim(), requester:fd.get("requester").trim()
+      note:fd.get("note"), requester:fd.get("requester")
     }], team);
-    toast("구매요청이 추가되었습니다");
-    const keepTeam=f.querySelector('input[name=team]:checked');
-    f.reset(); if(keepTeam) keepTeam.checked=true;
+    if(n){ toast("구매요청이 추가되었습니다");
+      f.reset(); if(teamId) f.querySelector("#"+teamId).checked=true;
+      const dd=f.querySelector('input[name="dueDate"]'); if(dd) dd.value=todayISO();
+    }
   });
 
   /* ---------- 이벤트: 입력 방식 전환 ---------- */
@@ -549,13 +695,12 @@
       : "붙여넣으면 인식된 행 수가 여기에 표시됩니다.";
   }
   $("#pasteArea").addEventListener("input",updatePreview);
-  $("#excelForm").addEventListener("submit",e=>{
+  $("#excelForm").addEventListener("submit",async e=>{
     e.preventDefault();
     const rows=parseTable($("#pasteArea").value);
     if(!rows.length){ toast("인식된 데이터가 없습니다"); return; }
-    const n=addItems(rows, $("#excelTeam").value);
-    $("#pasteArea").value=""; updatePreview();
-    toast(`${n}건이 추가되었습니다`);
+    const n=await addItems(rows, $("#excelTeam").value);
+    if(n){ $("#pasteArea").value=""; updatePreview(); toast(`${n}건이 추가되었습니다`); }
   });
   $("#sampleBtn").onclick=()=>{
     $("#pasteArea").value=
@@ -586,9 +731,12 @@ PKG-10021\t완충 에어캡 롤\t10\t2026-09-01\t폭 500mm`;
     URL.revokeObjectURL(a.href);
     toast("CSV로 내보냈습니다");
   };
-  $("#clearBtn").onclick=()=>{
+  $("#clearBtn").onclick=async ()=>{
     if(!data.length) return;
-    if(confirm(`전체 ${data.length}건을 삭제할까요? 되돌릴 수 없습니다.`)){ data=[]; save(); renderAll(); toast("전체 삭제되었습니다"); }
+    if(confirm(`전체 ${data.length}건을 삭제할까요? 되돌릴 수 없습니다.`)){
+      try{ await store.clear(); }catch(e){ toast("삭제 실패: "+e.message); return; }
+      await refresh(); toast("전체 삭제되었습니다");
+    }
   };
 
   /* ---------- 테마 ---------- */
@@ -598,9 +746,46 @@ PKG-10021\t완충 에어캡 롤\t10\t2026-09-01\t폭 500mm`;
     document.documentElement.setAttribute("data-theme", isDark?"light":"dark");
   };
 
+  /* ---------- 이벤트: 공유 연결 모달 ---------- */
+  function openModal(){
+    $("#cfgUrl").value=cfg?cfg.url:""; $("#cfgKey").value=cfg?cfg.key:"";
+    const o=$("#testOut"); o.textContent=""; o.className="test-out";
+    $("#disconnectRow").style.display=cfg?"flex":"none";
+    $("#modalBg").classList.add("show");
+  }
+  function closeModal(){ $("#modalBg").classList.remove("show"); }
+  $("#connBtn").onclick=openModal;
+  $("#bannerSetup").onclick=openModal;
+  $("#modalClose").onclick=closeModal;
+  $("#modalBg").addEventListener("click",e=>{ if(e.target===$("#modalBg")) closeModal(); });
+  $("#refreshBtn").onclick=()=>refresh();
+  $("#copySql").onclick=()=>{
+    const t=$("#sqlBox").textContent.replace(/^\s*복사\s*/,"").trim();
+    (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast("SQL이 복사되었습니다")).catch(()=>toast("복사 실패 — 직접 선택해 복사하세요"));
+  };
+  $("#testBtn").onclick=async ()=>{
+    const o=$("#testOut"); o.className="test-out"; o.textContent="확인 중…";
+    try{ await testConn($("#cfgUrl").value.trim(), $("#cfgKey").value.trim());
+      o.className="test-out ok"; o.textContent="✓ 연결 성공 — 테이블이 확인되었습니다.";
+    }catch(e){ o.className="test-out bad"; o.textContent="✕ "+e.message; }
+  };
+  $("#saveCfgBtn").onclick=async ()=>{
+    const url=$("#cfgUrl").value.trim(), key=$("#cfgKey").value.trim();
+    const o=$("#testOut"); o.className="test-out"; o.textContent="연결 중…";
+    try{ await testConn(url,key); }catch(e){ o.className="test-out bad"; o.textContent="✕ "+e.message; return; }
+    saveCfg({url,key}); applyCfg(); closeModal(); toast("클라우드에 연결되었습니다");
+    await refresh(); startPoll();
+  };
+  $("#disconnectBtn").onclick=async ()=>{
+    saveCfg(null); applyCfg(); stopPoll(); closeModal(); toast("로컬 모드로 전환했습니다");
+    await refresh();
+  };
+  document.addEventListener("visibilitychange",()=>{ if(!document.hidden && store && store.mode==="cloud") refresh(); });
+
   /* ---------- 초기값 ---------- */
   const dd=document.querySelector('input[name="dueDate"]'); if(dd) dd.value=todayISO();
-  renderAll();
+  cfg=loadCfg(); applyCfg();
+  refresh(); startPoll();
 })();
 </script>
 </body>
