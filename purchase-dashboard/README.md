@@ -16,7 +16,7 @@ python -m http.server -d purchase-dashboard 8080
 | | 로컬 모드(기본) | 구글 시트 공유 모드 |
 |---|---|---|
 | 저장 | 내 브라우저(localStorage) | 구글 시트(팀 전체 공유) |
-| 입력 | 대시보드에서 직접 입력 | **대시보드에서 직접 입력**(동일) |
+| 입력 | 직접 입력 / 엑셀·CSV 업로드 | **동일**(대시보드에서 직접) |
 | 보기 | 나만 | 팀원 모두 실시간 |
 | 설정 | 없음 | 대표자 1명이 1회만 |
 
@@ -26,9 +26,12 @@ python -m http.server -d purchase-dashboard 8080
 ## 주요 기능
 
 - **직접 입력**: 요청팀, 품목코드, 품명, 수량, 입고요청일, 기타사항(+요청자)
-- **엑셀 붙여넣기**: 엑셀 표를 복사해 붙여넣으면 여러 건 일괄 등록
+- **엑셀 파일 업로드**: `.xlsx` 또는 CSV 파일을 선택/드래그하면 자동으로 읽어 일괄 등록
+  - 열 순서: `품목코드 · 품명 · 수량 · 입고요청일 · 기타사항` (맨 윗줄 헤더 자동 인식)
+  - 엑셀 날짜 셀은 자동으로 `YYYY-MM-DD` 로 변환. 외부 라이브러리 없이 브라우저에서 직접 해석
+  - '양식(CSV) 내려받기'로 표준 양식 제공
 - **실시간 공유**: 구글 시트 연결 시 약 10초 주기로 자동 동기화(팀원 입력이 내 화면에 나타남)
-- **상태 관리**: 접수 → 진행 → 완료 순환, 입고요청일 기한 초과/임박 자동 표시
+- **입고요청일 관리**: 기한 초과/임박(D-3) 자동 표시
 - **팀별 필터 · 검색 · 정렬**, **요약 집계**, **CSV 내보내기**, **라이트/다크 테마**
 
 ## 팀 공유 설정 (구글 시트 + Apps Script) — 대표자 1명, 1회만
@@ -57,7 +60,7 @@ python -m http.server -d purchase-dashboard 8080
 
 - 읽기: JSONP(`<script>`)로 웹앱 `doGet` 호출 → 목록 수신
 - 쓰기: `fetch(..., mode:'no-cors')` 로 `doPost` 에 add/update/remove/clear 전송 후 재조회
-- 데이터는 시트의 `requests` 탭에 `id, createdAt, team, code, itemName, qty, dueDate, status, requester, note` 열로 저장
+- 데이터는 시트의 `requests` 탭에 `id, createdAt, team, code, itemName, qty, dueDate, requester, note` 열로 저장
 
 ## 데이터 저장 위치
 

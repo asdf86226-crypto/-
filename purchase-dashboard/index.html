@@ -150,6 +150,15 @@
   textarea.paste{min-height:120px; font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:12px; white-space:pre; overflow:auto}
   .preview-note{font-size:12px; margin:10px 0 0; color:var(--muted)}
   .preview-note b{color:var(--accent)}
+  .preview-note.bad{color:var(--s-late)}
+  .dropzone{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    padding:22px 14px; border:1.5px dashed var(--border-strong); border-radius:11px; cursor:pointer;
+    text-align:center; background:var(--surface-2); transition:.15s}
+  .dropzone:hover,.dropzone.drag{border-color:var(--accent); background:var(--accent-soft)}
+  .dropzone .dz-ic{font-size:26px; line-height:1}
+  .dropzone .dz-main{font-size:13px; font-weight:700; color:var(--ink)}
+  .dropzone .dz-sub{font-size:11.5px; color:var(--faint)}
+  .dropzone.ok{border-style:solid; border-color:var(--s-done); background:color-mix(in srgb,var(--s-done) 10%,var(--surface))}
 
   /* ---------- 메인: 필터 + 테이블 ---------- */
   .toolbar{display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--border); flex-wrap:wrap}
@@ -185,7 +194,6 @@
   .chip{display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border-radius:20px; font-size:11.5px; font-weight:700; white-space:nowrap}
   .chip .dot{width:7px;height:7px}
   .team-chip{background:color-mix(in srgb,var(--tc) 14%,transparent); color:var(--tc)}
-  .status{border:1px solid transparent}
 
   .duedate{font-variant-numeric:tabular-nums}
   .duedate .badge{display:block; font-size:10.5px; font-weight:700; margin-top:2px}
@@ -301,7 +309,7 @@
         <li>편집기의 기존 코드를 모두 지우고, 아래 코드를 붙여넣은 뒤 <b>저장(💾)</b></li>
       </ol>
       <div class="sql" id="codeBox"><button id="copyCode">복사</button>const SHEET = 'requests';
-const COLS = ['id','createdAt','team','code','itemName','qty','dueDate','status','requester','note'];
+const COLS = ['id','createdAt','team','code','itemName','qty','dueDate','requester','note'];
 function sh_(){ const ss=SpreadsheetApp.getActiveSpreadsheet(); let s=ss.getSheetByName(SHEET);
   if(!s){ s=ss.insertSheet(SHEET); } if(s.getLastRow()===0){ s.appendRow(COLS); } return s; }
 function read_(){ const s=sh_(); const v=s.getDataRange().getValues(); const h=v[0];
@@ -316,8 +324,6 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
   if(b.action==='add'){ (b.items||[]).forEach(it=>{ const id=Utilities.getUuid();
     const cd=Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy-MM-dd');
     s.appendRow(COLS.map(k=> k==='id'?id : k==='createdAt'?cd : (it[k]!=null?it[k]:''))); }); }
-  else if(b.action==='update'){ for(let i=1;i<v.length;i++){ if(v[i][idc]===b.id){
-    Object.keys(b.patch||{}).forEach(k=>{ const c=h.indexOf(k); if(c>=0) s.getRange(i+1,c+1).setValue(b.patch[k]); }); break; } } }
   else if(b.action==='remove'){ for(let i=1;i<v.length;i++){ if(v[i][idc]===b.id){ s.deleteRow(i+1); break; } } }
   else if(b.action==='clear'){ if(s.getLastRow()>1) s.deleteRows(2,s.getLastRow()-1); }
   return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON); }</div>
@@ -355,7 +361,7 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
     <section class="card" id="writeCard">
       <div class="seg">
         <button class="on" data-mode="manual">직접 입력</button>
-        <button data-mode="excel">엑셀 붙여넣기</button>
+        <button data-mode="excel">엑셀 파일</button>
       </div>
 
       <!-- 직접 입력 -->
@@ -400,12 +406,12 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
         <button class="btn" type="submit">＋ 구매요청 추가</button>
       </form>
 
-      <!-- 엑셀 붙여넣기 -->
+      <!-- 엑셀 파일 업로드 -->
       <form id="excelForm" style="display:none">
         <p class="paste-help">
-          엑셀에서 표 영역을 복사(<code>Ctrl+C</code>)한 뒤 아래에 붙여넣기(<code>Ctrl+V</code>)하세요.
+          엑셀(<code>.xlsx</code>) 또는 CSV 파일을 올리면 자동으로 읽어 등록합니다.
           열 순서: <b>품목코드 · 품명 · 수량 · 입고요청일 · 기타사항</b><br>
-          맨 윗줄에 헤더가 있어도 자동 인식하며, 요청팀은 아래에서 지정합니다.
+          맨 윗줄 헤더는 자동 인식하며, 요청팀은 아래에서 지정합니다.
         </p>
         <div class="field">
           <label>요청팀 <span class="req">*</span></label>
@@ -416,13 +422,15 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
             <option value="품질">품질</option>
           </select>
         </div>
-        <div class="field">
-          <label>붙여넣기 영역</label>
-          <textarea class="paste" id="pasteArea" placeholder="MAT-00123&#9;볼트 M4&#9;500&#9;2026-08-25&#9;아연도금&#10;MAT-00988&#9;너트 M4&#9;500&#9;2026-08-25&#9;"></textarea>
-        </div>
-        <p class="preview-note" id="pastePreview">붙여넣으면 인식된 행 수가 여기에 표시됩니다.</p>
-        <button class="btn" type="submit" style="margin-top:12px">인식된 항목 일괄 추가</button>
-        <button class="btn ghost" type="button" id="sampleBtn" style="margin-top:8px">샘플 데이터 채우기</button>
+        <label class="dropzone" id="dropzone" for="fileInput">
+          <input type="file" id="fileInput" accept=".xlsx,.csv,.tsv,.txt" hidden>
+          <div class="dz-ic">📄</div>
+          <div class="dz-main">엑셀·CSV 파일 선택</div>
+          <div class="dz-sub">또는 여기로 파일을 끌어다 놓기</div>
+        </label>
+        <p class="preview-note" id="filePreview">아직 선택된 파일이 없습니다.</p>
+        <button class="btn" type="submit" id="importBtn" style="margin-top:12px" disabled>인식된 항목 일괄 추가</button>
+        <a class="btn ghost" id="templateBtn" style="margin-top:8px; text-decoration:none" download="구매요청_양식.csv">양식(CSV) 내려받기</a>
       </form>
     </section>
   </aside>
@@ -446,7 +454,6 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
             <th data-sort="itemName">품명 <span class="arw">▾</span></th>
             <th data-sort="qty">수량 <span class="arw">▾</span></th>
             <th data-sort="dueDate">입고요청일 <span class="arw">▾</span></th>
-            <th data-sort="status">상태 <span class="arw">▾</span></th>
             <th>기타사항</th>
             <th></th>
           </tr>
@@ -476,8 +483,6 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
   const CFGKEY="purchase_dashboard_share";
   const TEAMS=["개발","자재","생산","품질"];
   const TEAMVAR={ "개발":"--t-dev","자재":"--t-mat","생산":"--t-prod","품질":"--t-qa" };
-  const STATUS=["접수","진행","완료"];
-  const STATUSVAR={ "접수":"--s-new","진행":"--s-prog","완료":"--s-done" };
 
   let data = [];                 // 화면에 표시되는 캐시(저장소에서 동기화)
   let filterTeam="전체", search="", sortKey="createdAt", sortDir=-1;
@@ -523,7 +528,7 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
     }catch(e){ throw new Error("저장 실패 — 인터넷 연결/URL을 확인하세요"); }
   }
   function cleanItem_(it){ return { team:it.team||"", code:it.code||"", itemName:it.itemName||"",
-    qty:it.qty||"0", dueDate:it.dueDate||"", status:it.status||"접수", requester:it.requester||"", note:it.note||"" }; }
+    qty:it.qty||"0", dueDate:it.dueDate||"", requester:it.requester||"", note:it.note||"" }; }
   function normDate_(v){ if(!v) return ""; const m=String(v).match(/(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+"-"+m[2]+"-"+m[3]; return parseDate(String(v)); }
   const SheetStore = {
     mode:"sheet",
@@ -537,7 +542,6 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
         itemName:r.itemName!=null?String(r.itemName):"",
         qty:(r.qty!=null&&r.qty!=="")?String(r.qty):"0",
         dueDate:normDate_(r.dueDate),
-        status:(r.status&&String(r.status))||"접수",
         requester:r.requester!=null?String(r.requester):"",
         note:r.note!=null?String(r.note):"",
         createdAt:normDate_(r.createdAt)||todayISO()
@@ -579,36 +583,123 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
     return s;
   }
 
-  /* ---------- 엑셀/CSV 붙여넣기 파싱 ---------- */
-  function parseTable(text){
-    const lines=text.replace(/\r/g,"").split("\n").filter(l=>l.trim()!=="");
-    if(!lines.length) return [];
-    const delim = lines[0].includes("\t") ? "\t" : (lines[0].split(",").length>lines[0].split("\t").length ? "," : "\t");
-    let rows=lines.map(l=>l.split(delim).map(c=>c.trim()));
-    // 헤더 행 감지: 첫 행에 '수량'/'품명'/'코드' 등 텍스트가 있고 숫자 수량이 아니면 스킵
+  /* ---------- 표(2차원 배열) → 구매요청 항목 ---------- */
+  function rowsToItems(rows){
+    rows=(rows||[]).map(r=>r.map(c=>String(c==null?"":c).trim())).filter(r=>r.some(c=>c!==""));
+    if(!rows.length) return [];
     const h=rows[0].join("").replace(/\s/g,"");
-    const looksHeader=/품목|코드|품명|수량|입고|요청일|기타/.test(h);
-    if(looksHeader) rows=rows.slice(1);
+    if(/품목|코드|품명|수량|입고|요청일|기타|비고/.test(h)) rows=rows.slice(1);   // 헤더 행 제거
     return rows.map(r=>({
-      code:r[0]||"",
-      itemName:r[1]||"",
-      qty:r[2]||"",
-      dueDate:parseDate(r[3]||""),
-      note:r[4]||""
+      code:r[0]||"", itemName:r[1]||"", qty:r[2]||"",
+      dueDate:parseDate(r[3]||""), note:r[4]||""
     })).filter(r=>r.code||r.itemName);
+  }
+
+  /* ---------- 파일 읽기: CSV/TSV 또는 .xlsx ---------- */
+  async function readFileToRows(file){
+    const name=(file.name||"").toLowerCase();
+    if(name.endsWith(".xlsx")) return readXlsx(await file.arrayBuffer());
+    if(name.endsWith(".xls")) throw new Error("옛 .xls 형식은 지원하지 않아요. .xlsx 또는 CSV로 저장해 올려주세요");
+    return splitDelimited(await file.text());
+  }
+  function splitDelimited(text){
+    text=String(text).replace(/^﻿/,"").replace(/\r\n?/g,"\n");
+    if(text.indexOf("\t")>=0) return text.split("\n").map(l=>l.split("\t"));   // TSV
+    const rows=[]; let row=[], cur="", q=false;                                // CSV(따옴표 처리)
+    for(let i=0;i<text.length;i++){ const c=text[i];
+      if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+      else if(c==='"') q=true;
+      else if(c===','){ row.push(cur); cur=""; }
+      else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=""; }
+      else cur+=c;
+    }
+    if(cur!==""||row.length){ row.push(cur); rows.push(row); }
+    return rows;
+  }
+
+  // .xlsx = zip(xml). 외부 라이브러리 없이 브라우저 압축해제(DecompressionStream)로 파싱
+  async function inflateRaw(bytes){
+    if(typeof DecompressionStream==="undefined") throw new Error("이 브라우저는 xlsx 자동 해제를 지원하지 않아요. CSV로 저장해 올려주세요");
+    const st=new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    return new Uint8Array(await new Response(st).arrayBuffer());
+  }
+  async function unzip(u8){
+    const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength);
+    let eocd=-1;
+    for(let i=u8.length-22;i>=0;i--){ if(dv.getUint32(i,true)===0x06054b50){ eocd=i; break; } }
+    if(eocd<0) throw new Error("올바른 엑셀(.xlsx) 파일이 아닙니다");
+    const count=dv.getUint16(eocd+10,true); let off=dv.getUint32(eocd+16,true);
+    const out={}; const td=new TextDecoder();
+    for(let e=0;e<count && dv.getUint32(off,true)===0x02014b50; e++){
+      const method=dv.getUint16(off+10,true), compSize=dv.getUint32(off+20,true);
+      const fnLen=dv.getUint16(off+28,true), exLen=dv.getUint16(off+30,true), cmLen=dv.getUint16(off+32,true);
+      const localOff=dv.getUint32(off+42,true);
+      const nm=td.decode(u8.subarray(off+46,off+46+fnLen));
+      const lFn=dv.getUint16(localOff+26,true), lEx=dv.getUint16(localOff+28,true);
+      const ds=localOff+30+lFn+lEx, comp=u8.subarray(ds,ds+compSize);
+      if(/sharedStrings|styles|worksheets\/sheet|workbook\.xml$/.test(nm)){
+        out[nm] = method===0 ? comp.slice() : await inflateRaw(comp);
+      }
+      off+=46+fnLen+exLen+cmLen;
+    }
+    return out;
+  }
+  function colIdx(ref){ const m=(ref||"").match(/^([A-Z]+)/); if(!m) return 0; let n=0; for(const ch of m[1]) n=n*26+(ch.charCodeAt(0)-64); return n-1; }
+  function serialToDate(s){ const d=new Date(Date.UTC(1899,11,30)+Math.round(s)*86400000);
+    if(isNaN(d)) return String(s);
+    return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0"); }
+  async function readXlsx(buf){
+    const files=await unzip(new Uint8Array(buf));
+    const td=new TextDecoder();
+    const parse=nm=> files[nm]? new DOMParser().parseFromString(td.decode(files[nm]),"application/xml") : null;
+    const tags=(el,t)=> el? el.getElementsByTagName(t) : [];
+    const first=(el,t)=> { const l=tags(el,t); return l.length?l[0]:null; };
+    const textOf=el=>{ if(!el) return ""; let s=""; const ts=el.getElementsByTagName("t"); for(let i=0;i<ts.length;i++) s+=ts[i].textContent; return s; };
+    // 공유 문자열
+    const shared=[]; const ss=parse("xl/sharedStrings.xml");
+    if(ss){ const sis=ss.getElementsByTagName("si"); for(let i=0;i<sis.length;i++) shared.push(textOf(sis[i])); }
+    // 날짜 서식 스타일 판별 (반드시 cellXfs 안의 xf 만; cellStyleXfs 제외)
+    const dateStyle=[]; const stDoc=parse("xl/styles.xml");
+    if(stDoc){
+      const fmt={}; const nfs=stDoc.getElementsByTagName("numFmt");
+      for(let i=0;i<nfs.length;i++) fmt[nfs[i].getAttribute("numFmtId")]=nfs[i].getAttribute("formatCode")||"";
+      const isDate=id=>{ const k=+id; if((k>=14&&k<=22)||(k>=45&&k<=47)) return true;
+        const code=fmt[id]; return code? /[dmy]/i.test(code.replace(/\[[^\]]*\]/g,"").replace(/"[^"]*"/g,"")) : false; };
+      const cx=first(stDoc,"cellXfs"); const xfs=tags(cx,"xf");
+      for(let i=0;i<xfs.length;i++) dateStyle[i]=isDate(xfs[i].getAttribute("numFmtId")||"0");
+    }
+    // 첫 워크시트
+    const sheetNm=Object.keys(files).filter(n=>/^xl\/worksheets\/sheet\d+\.xml$/.test(n)).sort()[0];
+    if(!sheetNm) throw new Error("워크시트를 찾을 수 없습니다");
+    const ws=parse(sheetNm); const rows=[]; const rowEls=ws.getElementsByTagName("row");
+    for(let ri=0; ri<rowEls.length; ri++){
+      const cs=rowEls[ri].getElementsByTagName("c"); const cells=[];
+      for(let ci=0; ci<cs.length; ci++){
+        const c=cs[ci], col=colIdx(c.getAttribute("r")), t=c.getAttribute("t"), s=c.getAttribute("s");
+        const vEl=first(c,"v"); let val="";
+        if(t==="s"){ val=shared[+((vEl&&vEl.textContent)||-1)]||""; }
+        else if(t==="inlineStr"){ val=textOf(first(c,"is")); }
+        else if(t==="str"){ val=vEl?vEl.textContent:""; }
+        else { const raw=vEl?vEl.textContent:""; val=(raw!==""&&s!=null&&dateStyle[+s])?serialToDate(+raw):raw; }
+        cells[col]=val;
+      }
+      for(let i=0;i<cells.length;i++) if(cells[i]==null) cells[i]="";
+      rows.push(cells);
+    }
+    return rows;
   }
 
   /* ---------- 렌더: 스탯 ---------- */
   function renderStats(){
     const total=data.length;
-    const open=data.filter(d=>d.status!=="완료").length;
-    const late=data.filter(d=>d.status!=="완료" && daysUntil(d.dueDate)!=null && daysUntil(d.dueDate)<0).length;
-    const done=data.filter(d=>d.status==="완료").length;
+    const late=data.filter(d=>{ const u=daysUntil(d.dueDate); return u!=null && u<0; }).length;
+    const soon=data.filter(d=>{ const u=daysUntil(d.dueDate); return u!=null && u>=0 && u<=3; }).length;
+    const qtySum=data.reduce((s,d)=>s+(parseFloat(String(d.qty).replace(/[^\d.\-]/g,""))||0),0);
     const cards=[
       {k:"총 요청",v:total,dot:"var(--accent)"},
-      {k:"진행 중",v:open,dot:"var(--s-prog)",sub:"미완료"},
+      {k:"임박",v:soon,dot:"var(--s-new)",sub:"3일 이내"},
       {k:"지연",v:late,dot:"var(--s-late)",sub:"기한초과"},
-      {k:"완료",v:done,dot:"var(--s-done)"},
+      {k:"총 수량",v:qtySum.toLocaleString(),dot:"var(--s-prog)"},
     ];
     $("#stats").innerHTML=cards.map(c=>`
       <div class="stat">
@@ -647,8 +738,8 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
 
     tb.innerHTML=rows.map(d=>{
       const du=daysUntil(d.dueDate);
-      const isLate=d.status!=="완료" && du!=null && du<0;
-      const isSoon=d.status!=="완료" && du!=null && du>=0 && du<=2;
+      const isLate=du!=null && du<0;
+      const isSoon=du!=null && du>=0 && du<=3;
       let badge="";
       if(isLate) badge=`<span class="badge late">${-du}일 초과</span>`;
       else if(isSoon) badge=`<span class="badge soon">${du===0?"오늘":"D-"+du}</span>`;
@@ -659,21 +750,18 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
         <td class="name">${esc(d.itemName)}${d.requester?`<span class="memo">요청: ${esc(d.requester)}</span>`:""}</td>
         <td class="qty num">${esc(d.qty)}</td>
         <td class="duedate"><span style="white-space:nowrap">${fmtDate(d.dueDate)}</span>${badge}</td>
-        <td>${statusChip(d)}</td>
         <td><span class="memo" title="${esc(d.note)}">${esc(d.note)||"–"}</span></td>
         <td><div class="rowbtns">
-          <button data-act="cycle" data-id="${d.id}" title="상태 변경">↻</button>
           <button class="del" data-act="del" data-id="${d.id}" title="삭제">✕</button>
         </div></td>
       </tr>`;
     }).join("");
 
-    tb.querySelectorAll("button[data-act]").forEach(b=>b.onclick=async ()=>{
+    tb.querySelectorAll("button[data-act='del']").forEach(b=>b.onclick=async ()=>{
       const d=data.find(x=>x.id===b.dataset.id); if(!d) return;
-      try{
-        if(b.dataset.act==="del"){ await store.remove(d.id); toast("삭제되었습니다"); }
-        else { const i=STATUS.indexOf(d.status); await store.update(d.id,{status:STATUS[(i+1)%STATUS.length]}); }
-      }catch(e){ toast("처리 실패: "+e.message); return; }
+      if(!confirm(`'${d.itemName||d.code}' 요청을 삭제할까요?`)) return;
+      try{ await store.remove(d.id); toast("삭제되었습니다"); }
+      catch(e){ toast("삭제 실패: "+e.message); return; }
       await refresh();
     });
     $("#footInfo").textContent = data.length ? `${rows.length}건 표시 · 총 ${data.length}건` : "";
@@ -681,11 +769,6 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
       th.classList.toggle("sorted", th.dataset.sort===sortKey);
       const a=th.querySelector(".arw"); if(a) a.textContent = th.dataset.sort===sortKey ? (sortDir===1?"▲":"▼") : "▾";
     });
-  }
-  function statusChip(d){
-    const v=STATUSVAR[d.status]||"--s-new";
-    return `<span class="chip status" style="color:var(${v});background:color-mix(in srgb,var(${v}) 14%,transparent);border-color:color-mix(in srgb,var(${v}) 30%,transparent)">
-      <span class="dot" style="background:var(${v})"></span>${esc(d.status)}</span>`;
   }
 
   function renderAll(){ renderStats(); renderTabs(); renderTable(); }
@@ -749,30 +832,45 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
     $("#excelForm").style.display=excel?"":"none";
   });
 
-  /* ---------- 이벤트: 엑셀 붙여넣기 ---------- */
-  function updatePreview(){
-    const rows=parseTable($("#pasteArea").value);
-    $("#pastePreview").innerHTML = rows.length
-      ? `인식된 항목: <b>${rows.length}건</b> — 첫 항목: ${esc(rows[0].code||"?")} / ${esc(rows[0].itemName||"?")}`
-      : "붙여넣으면 인식된 행 수가 여기에 표시됩니다.";
+  /* ---------- 이벤트: 엑셀·CSV 파일 업로드 ---------- */
+  let pendingItems=[];
+  function resetFile(){
+    pendingItems=[]; $("#importBtn").disabled=true;
+    $("#dropzone").classList.remove("ok");
+    $("#filePreview").className="preview-note"; $("#filePreview").textContent="아직 선택된 파일이 없습니다.";
+    $("#fileInput").value="";
   }
-  $("#pasteArea").addEventListener("input",updatePreview);
+  async function handleFile(file){
+    if(!file) return;
+    $("#filePreview").className="preview-note"; $("#filePreview").textContent=`'${file.name}' 읽는 중…`;
+    try{
+      const rows=await readFileToRows(file);
+      const items=rowsToItems(rows);
+      if(!items.length) throw new Error("인식된 데이터가 없습니다 (품목코드·품명 열 확인)");
+      pendingItems=items;
+      $("#dropzone").classList.add("ok");
+      $("#importBtn").disabled=false;
+      $("#filePreview").className="preview-note";
+      $("#filePreview").innerHTML=`✓ '${esc(file.name)}' — <b>${items.length}건</b> 인식 · 첫 항목: ${esc(items[0].code||"?")} / ${esc(items[0].itemName||"?")}`;
+    }catch(err){
+      pendingItems=[]; $("#importBtn").disabled=true; $("#dropzone").classList.remove("ok");
+      $("#filePreview").className="preview-note bad"; $("#filePreview").textContent="✕ "+err.message;
+    }
+  }
+  $("#fileInput").addEventListener("change",e=>handleFile(e.target.files[0]));
+  const dz=$("#dropzone");
+  ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{ e.preventDefault(); dz.classList.add("drag"); }));
+  ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{ e.preventDefault(); dz.classList.remove("drag"); }));
+  dz.addEventListener("drop",e=>{ const f=e.dataTransfer&&e.dataTransfer.files[0]; if(f) handleFile(f); });
   $("#excelForm").addEventListener("submit",async e=>{
     e.preventDefault();
-    const rows=parseTable($("#pasteArea").value);
-    if(!rows.length){ toast("인식된 데이터가 없습니다"); return; }
-    const n=await addItems(rows, $("#excelTeam").value);
-    if(n){ $("#pasteArea").value=""; updatePreview(); toast(`${n}건이 추가되었습니다`); }
+    if(!pendingItems.length){ toast("먼저 파일을 선택하세요"); return; }
+    const n=await addItems(pendingItems, $("#excelTeam").value);
+    if(n){ toast(`${n}건이 추가되었습니다`); resetFile(); }
   });
-  $("#sampleBtn").onclick=()=>{
-    $("#pasteArea").value=
-`품목코드\t품명\t수량\t입고요청일\t기타사항
-MAT-00123\t스테인리스 볼트 M4\t500\t2026-08-25\t아연도금
-MAT-00988\t육각너트 M4\t500\t2026-08-25\t
-ELE-04412\t마이크로컨트롤러 STM32\t30\t2026-08-20\t긴급, 개발보드용
-PKG-10021\t완충 에어캡 롤\t10\t2026-09-01\t폭 500mm`;
-    updatePreview();
-  };
+  // 양식(CSV) 내려받기 링크
+  $("#templateBtn").href="data:text/csv;charset=utf-8,"+encodeURIComponent("﻿"+
+    "품목코드,품명,수량,입고요청일,기타사항\nMAT-00123,스테인리스 볼트 M4,500,2026-08-25,아연도금\n");
 
   /* ---------- 이벤트: 정렬/검색/내보내기/삭제 ---------- */
   document.querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=()=>{
@@ -784,8 +882,8 @@ PKG-10021\t완충 에어캡 롤\t10\t2026-09-01\t폭 500mm`;
 
   $("#exportBtn").onclick=()=>{
     if(!data.length){ toast("내보낼 데이터가 없습니다"); return; }
-    const head=["접수일","요청팀","품목코드","품명","수량","입고요청일","상태","요청자","기타사항"];
-    const rows=getRows().map(d=>[d.createdAt,d.team,d.code,d.itemName,d.qty,d.dueDate,d.status,d.requester||"",d.note||""]);
+    const head=["접수일","요청팀","품목코드","품명","수량","입고요청일","요청자","기타사항"];
+    const rows=getRows().map(d=>[d.createdAt,d.team,d.code,d.itemName,d.qty,d.dueDate,d.requester||"",d.note||""]);
     const csv=[head,...rows].map(r=>r.map(c=>{ c=String(c==null?"":c); return /[",\n]/.test(c)?`"${c.replace(/"/g,'""')}"`:c; }).join(",")).join("\n");
     const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
     const a=document.createElement("a");
