@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>구매요청 대시보드</title>
+<style>
+  /* ---------- 토큰: 라이트(기본) ---------- */
+  :root{
+    --bg:#F7F8FA; --surface:#FFFFFF; --surface-2:#F1F3F6;
+    --border:#E3E7ED; --border-strong:#CDD4DE;
+    --ink:#1A2230; --muted:#5B6675; --faint:#8A94A3;
+    --accent:#3B5BDB; --accent-ink:#fff; --accent-soft:#EDF0FE;
+    --ring:rgba(59,91,219,.35);
+    /* 팀 */
+    --t-dev:#4C6EF5; --t-mat:#F08C00; --t-prod:#12B886; --t-qa:#AE3EC9;
+    /* 상태 */
+    --s-new:#F59F00; --s-prog:#4C6EF5; --s-done:#2F9E44; --s-late:#E03131;
+    --shadow:0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.06);
+    --radius:12px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#12151C; --surface:#1A1F29; --surface-2:#222836;
+      --border:#2A3140; --border-strong:#3A4356;
+      --ink:#E8ECF2; --muted:#9AA5B5; --faint:#6B7688;
+      --accent:#6C8BFF; --accent-ink:#0d1017; --accent-soft:#242C43;
+      --ring:rgba(108,139,255,.4);
+      --t-dev:#6C8BFF; --t-mat:#FFB454; --t-prod:#38D9A9; --t-qa:#DA77F2;
+      --s-new:#FFC94D; --s-prog:#6C8BFF; --s-done:#51CF66; --s-late:#FF6B6B;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12151C; --surface:#1A1F29; --surface-2:#222836;
+    --border:#2A3140; --border-strong:#3A4356;
+    --ink:#E8ECF2; --muted:#9AA5B5; --faint:#6B7688;
+    --accent:#6C8BFF; --accent-ink:#0d1017; --accent-soft:#242C43;
+    --ring:rgba(108,139,255,.4);
+    --t-dev:#6C8BFF; --t-mat:#FFB454; --t-prod:#38D9A9; --t-qa:#DA77F2;
+    --s-new:#FFC94D; --s-prog:#6C8BFF; --s-done:#51CF66; --s-late:#FF6B6B;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"Pretendard","Pretendard Variable",-apple-system,BlinkMacSystemFont,
+      "Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
+    font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{margin:0; font-weight:700; letter-spacing:-.01em}
+  .num{font-variant-numeric:tabular-nums}
+  button{font-family:inherit; cursor:pointer}
+  ::selection{background:var(--accent-soft)}
+
+  /* ---------- 헤더 ---------- */
+  header.top{
+    position:sticky; top:0; z-index:20;
+    background:color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter:saturate(1.4) blur(8px);
+    border-bottom:1px solid var(--border);
+    padding:14px 22px;
+  }
+  .top-row{display:flex; align-items:center; gap:16px; flex-wrap:wrap}
+  .brand{display:flex; align-items:center; gap:11px; margin-right:auto}
+  .logo{
+    width:34px; height:34px; border-radius:9px; flex:none;
+    background:linear-gradient(135deg,var(--accent),#7048E8);
+    display:grid; place-items:center; color:#fff; font-weight:800; font-size:16px;
+    box-shadow:var(--shadow);
+  }
+  .brand h1{font-size:16px}
+  .brand p{margin:1px 0 0; font-size:11.5px; color:var(--muted)}
+  .icon-btn{
+    background:var(--surface); border:1px solid var(--border); color:var(--muted);
+    width:34px; height:34px; border-radius:9px; display:grid; place-items:center; font-size:15px;
+  }
+  .icon-btn:hover{border-color:var(--border-strong); color:var(--ink)}
+
+  /* ---------- 스탯 바 ---------- */
+  .stats{display:flex; gap:10px; margin-top:12px; overflow-x:auto; padding-bottom:2px}
+  .stat{
+    flex:1 1 0; min-width:132px; background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius); padding:11px 14px; position:relative; overflow:hidden;
+  }
+  .stat .k{font-size:11.5px; color:var(--muted); display:flex; align-items:center; gap:6px}
+  .stat .v{font-size:23px; font-weight:800; margin-top:3px; letter-spacing:-.02em}
+  .stat .v small{font-size:12px; font-weight:600; color:var(--faint); margin-left:3px}
+  .dot{width:8px; height:8px; border-radius:50%; flex:none}
+
+  /* ---------- 본문 레이아웃 ---------- */
+  main{display:grid; grid-template-columns:344px 1fr; gap:18px; padding:18px 22px 40px; align-items:start}
+  @media (max-width:920px){ main{grid-template-columns:1fr} }
+
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow)}
+  .card > .hd{padding:13px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:9px}
+  .card > .hd h2{font-size:13.5px}
+  .card > .hd .sub{font-size:11.5px; color:var(--muted); margin-left:auto}
+  .aside{position:sticky; top:150px; display:flex; flex-direction:column; gap:18px}
+  @media (max-width:920px){ .aside{position:static} }
+
+  /* 탭 (입력 방식) */
+  .seg{display:flex; gap:4px; padding:4px; background:var(--surface-2); border-radius:10px; margin:14px 16px 0}
+  .seg button{
+    flex:1; border:0; background:transparent; color:var(--muted); font-weight:600; font-size:12.5px;
+    padding:7px 0; border-radius:7px;
+  }
+  .seg button.on{background:var(--surface); color:var(--ink); box-shadow:var(--shadow)}
+
+  /* 폼 */
+  form{padding:14px 16px 16px}
+  .field{margin-bottom:11px}
+  .field.hidden{display:none}
+  label{display:block; font-size:11.5px; font-weight:600; color:var(--muted); margin-bottom:5px}
+  label .req{color:var(--s-late); margin-left:2px}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  input,select,textarea{
+    width:100%; padding:9px 11px; font-size:13.5px; font-family:inherit; color:var(--ink);
+    background:var(--surface); border:1px solid var(--border-strong); border-radius:9px; outline:none;
+  }
+  textarea{resize:vertical; min-height:60px; line-height:1.5}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent); box-shadow:0 0 0 3px var(--ring)}
+  input::placeholder,textarea::placeholder{color:var(--faint)}
+
+  /* 팀 선택 pills */
+  .team-pick{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  .team-pick input{position:absolute; opacity:0; pointer-events:none}
+  .team-pick label{
+    display:flex; align-items:center; gap:8px; margin:0; padding:9px 11px; cursor:pointer;
+    border:1.5px solid var(--border-strong); border-radius:9px; font-size:13px; font-weight:600; color:var(--ink);
+    transition:.12s;
+  }
+  .team-pick label:hover{border-color:var(--border-strong)}
+  .team-pick input:checked + label{border-color:var(--tc); background:color-mix(in srgb,var(--tc) 12%,var(--surface))}
+  .team-pick input:focus-visible + label{box-shadow:0 0 0 3px var(--ring)}
+
+  .btn{
+    width:100%; border:0; border-radius:9px; padding:11px; font-size:13.5px; font-weight:700;
+    background:var(--accent); color:var(--accent-ink); display:flex; align-items:center; justify-content:center; gap:7px;
+  }
+  .btn:hover{filter:brightness(1.05)}
+  .btn.ghost{background:var(--surface-2); color:var(--ink)}
+  .btn.ghost:hover{background:var(--border)}
+
+  /* 엑셀 붙여넣기 */
+  .paste-help{font-size:12px; color:var(--muted); margin:0 0 10px; line-height:1.6}
+  .paste-help code{background:var(--surface-2); padding:1px 6px; border-radius:5px; font-size:11.5px}
+  textarea.paste{min-height:120px; font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:12px; white-space:pre; overflow:auto}
+  .preview-note{font-size:12px; margin:10px 0 0; color:var(--muted)}
+  .preview-note b{color:var(--accent)}
+
+  /* ---------- 메인: 필터 + 테이블 ---------- */
+  .toolbar{display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--border); flex-wrap:wrap}
+  .tabs{display:flex; gap:5px; flex-wrap:wrap}
+  .tab{
+    border:1px solid var(--border); background:var(--surface); color:var(--muted); font-weight:600; font-size:12.5px;
+    padding:6px 12px; border-radius:20px; display:inline-flex; align-items:center; gap:7px;
+  }
+  .tab .cnt{font-size:11px; background:var(--surface-2); padding:0 6px; border-radius:10px; color:var(--muted); min-width:18px; text-align:center}
+  .tab.on{color:#fff; border-color:transparent; background:var(--accent)}
+  .tab.on .cnt{background:rgba(255,255,255,.25); color:#fff}
+  .tab[data-team] .swatch{width:9px;height:9px;border-radius:50%;background:var(--tc)}
+  .search{margin-left:auto; position:relative}
+  .search input{padding-left:32px; width:210px}
+  .search svg{position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--faint)}
+
+  .table-wrap{overflow-x:auto}
+  table{width:100%; border-collapse:collapse; font-size:13px; min-width:860px}
+  thead th{
+    text-align:left; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em;
+    padding:10px 14px; border-bottom:1px solid var(--border); white-space:nowrap; position:sticky; top:0; background:var(--surface); cursor:pointer; user-select:none;
+  }
+  thead th .arw{opacity:.4; font-size:10px}
+  thead th.sorted .arw{opacity:1; color:var(--accent)}
+  tbody td{padding:11px 14px; border-bottom:1px solid var(--border); vertical-align:middle}
+  tbody tr:hover{background:var(--surface-2)}
+  tbody tr.late{box-shadow:inset 3px 0 0 var(--s-late)}
+  td.code{font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:var(--muted)}
+  td.name{font-weight:600}
+  td .memo{color:var(--muted); font-size:12px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block}
+  td.qty{text-align:right; font-weight:700}
+
+  .chip{display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border-radius:20px; font-size:11.5px; font-weight:700; white-space:nowrap}
+  .chip .dot{width:7px;height:7px}
+  .team-chip{background:color-mix(in srgb,var(--tc) 14%,transparent); color:var(--tc)}
+  .status{border:1px solid transparent}
+
+  .duedate{font-variant-numeric:tabular-nums}
+  .duedate .badge{display:block; font-size:10.5px; font-weight:700; margin-top:2px}
+  .duedate .badge.late{color:var(--s-late)}
+  .duedate .badge.soon{color:var(--s-new)}
+
+  .rowbtns{display:flex; gap:5px; justify-content:flex-end}
+  .rowbtns button{border:1px solid var(--border); background:var(--surface); border-radius:7px; padding:4px 8px; font-size:11.5px; color:var(--muted)}
+  .rowbtns button:hover{border-color:var(--border-strong); color:var(--ink)}
+  .rowbtns button.del:hover{color:var(--s-late); border-color:var(--s-late)}
+
+  .empty{padding:56px 20px; text-align:center; color:var(--faint)}
+  .empty .ic{font-size:34px; margin-bottom:10px}
+  .empty p{margin:4px 0}
+
+  .foot{display:flex; align-items:center; gap:10px; padding:12px 16px; border-top:1px solid var(--border); flex-wrap:wrap}
+  .foot .info{font-size:12px; color:var(--muted); margin-right:auto}
+  .linkbtn{border:1px solid var(--border); background:var(--surface); color:var(--ink); font-weight:600; font-size:12.5px; padding:7px 12px; border-radius:8px; display:inline-flex; gap:6px; align-items:center}
+  .linkbtn:hover{border-color:var(--border-strong)}
+  .linkbtn.danger:hover{color:var(--s-late); border-color:var(--s-late)}
+
+  /* 토스트 */
+  #toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px); opacity:0;
+    background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:10px; font-size:13px; font-weight:600;
+    box-shadow:var(--shadow); z-index:60; pointer-events:none; transition:.25s}
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-row">
+    <div class="brand">
+      <div class="logo">P</div>
+      <div>
+        <h1>구매요청 대시보드</h1>
+        <p>개발 · 자재 · 생산 · 품질 팀 구매요청 통합 관리</p>
+      </div>
+    </div>
+    <button class="icon-btn" id="themeBtn" title="테마 전환">◑</button>
+  </div>
+  <div class="stats" id="stats"></div>
+</header>
+
+<main>
+  <!-- 좌측: 입력 -->
+  <aside class="aside">
+    <section class="card">
+      <div class="seg">
+        <button class="on" data-mode="manual">직접 입력</button>
+        <button data-mode="excel">엑셀 붙여넣기</button>
+      </div>
+
+      <!-- 직접 입력 -->
+      <form id="manualForm">
+        <div class="field">
+          <label>요청팀 <span class="req">*</span></label>
+          <div class="team-pick" id="teamPick">
+            <input type="radio" name="team" id="t-dev" value="개발" required><label for="t-dev" style="--tc:var(--t-dev)"><span class="dot" style="background:var(--t-dev)"></span>개발</label>
+            <input type="radio" name="team" id="t-mat" value="자재"><label for="t-mat" style="--tc:var(--t-mat)"><span class="dot" style="background:var(--t-mat)"></span>자재</label>
+            <input type="radio" name="team" id="t-prod" value="생산"><label for="t-prod" style="--tc:var(--t-prod)"><span class="dot" style="background:var(--t-prod)"></span>생산</label>
+            <input type="radio" name="team" id="t-qa" value="품질"><label for="t-qa" style="--tc:var(--t-qa)"><span class="dot" style="background:var(--t-qa)"></span>품질</label>
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>품목코드 <span class="req">*</span></label>
+            <input name="code" placeholder="예: MAT-00123" required autocomplete="off">
+          </div>
+          <div class="field">
+            <label>수량 <span class="req">*</span></label>
+            <input name="qty" type="number" min="0" step="any" placeholder="0" required>
+          </div>
+        </div>
+        <div class="field">
+          <label>품명 <span class="req">*</span></label>
+          <input name="itemName" placeholder="예: 스테인리스 볼트 M4" required autocomplete="off">
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>입고요청일 <span class="req">*</span></label>
+            <input name="dueDate" type="date" required>
+          </div>
+          <div class="field">
+            <label>요청자</label>
+            <input name="requester" placeholder="이름 (선택)" autocomplete="off">
+          </div>
+        </div>
+        <div class="field">
+          <label>기타사항</label>
+          <textarea name="note" placeholder="규격, 납품처, 참고사항 등"></textarea>
+        </div>
+        <button class="btn" type="submit">＋ 구매요청 추가</button>
+      </form>
+
+      <!-- 엑셀 붙여넣기 -->
+      <form id="excelForm" style="display:none">
+        <p class="paste-help">
+          엑셀에서 표 영역을 복사(<code>Ctrl+C</code>)한 뒤 아래에 붙여넣기(<code>Ctrl+V</code>)하세요.
+          열 순서: <b>품목코드 · 품명 · 수량 · 입고요청일 · 기타사항</b><br>
+          맨 윗줄에 헤더가 있어도 자동 인식하며, 요청팀은 아래에서 지정합니다.
+        </p>
+        <div class="field">
+          <label>요청팀 <span class="req">*</span></label>
+          <select id="excelTeam">
+            <option value="개발">개발</option>
+            <option value="자재">자재</option>
+            <option value="생산">생산</option>
+            <option value="품질">품질</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>붙여넣기 영역</label>
+          <textarea class="paste" id="pasteArea" placeholder="MAT-00123&#9;볼트 M4&#9;500&#9;2026-08-25&#9;아연도금&#10;MAT-00988&#9;너트 M4&#9;500&#9;2026-08-25&#9;"></textarea>
+        </div>
+        <p class="preview-note" id="pastePreview">붙여넣으면 인식된 행 수가 여기에 표시됩니다.</p>
+        <button class="btn" type="submit" style="margin-top:12px">인식된 항목 일괄 추가</button>
+        <button class="btn ghost" type="button" id="sampleBtn" style="margin-top:8px">샘플 데이터 채우기</button>
+      </form>
+    </section>
+  </aside>
+
+  <!-- 우측: 목록 -->
+  <section class="card">
+    <div class="toolbar">
+      <div class="tabs" id="teamTabs"></div>
+      <div class="search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="searchBox" placeholder="품목코드·품명 검색">
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="table">
+        <thead>
+          <tr>
+            <th data-sort="createdAt">접수일 <span class="arw">▾</span></th>
+            <th data-sort="team">요청팀 <span class="arw">▾</span></th>
+            <th data-sort="code">품목코드 <span class="arw">▾</span></th>
+            <th data-sort="itemName">품명 <span class="arw">▾</span></th>
+            <th data-sort="qty">수량 <span class="arw">▾</span></th>
+            <th data-sort="dueDate">입고요청일 <span class="arw">▾</span></th>
+            <th data-sort="status">상태 <span class="arw">▾</span></th>
+            <th>기타사항</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="emptyState" style="display:none">
+      <div class="ic">📋</div>
+      <p><b>아직 등록된 구매요청이 없습니다</b></p>
+      <p>왼쪽에서 직접 입력하거나 엑셀 표를 붙여넣어 시작하세요.</p>
+    </div>
+    <div class="foot">
+      <span class="info" id="footInfo"></span>
+      <button class="linkbtn" id="exportBtn">⬇ CSV 내보내기</button>
+      <button class="linkbtn danger" id="clearBtn">전체 삭제</button>
+    </div>
+  </section>
+</main>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  const KEY="purchase_requests_v1";
+  const TEAMS=["개발","자재","생산","품질"];
+  const TEAMVAR={ "개발":"--t-dev","자재":"--t-mat","생산":"--t-prod","품질":"--t-qa" };
+  const STATUS=["접수","진행","완료"];
+  const STATUSVAR={ "접수":"--s-new","진행":"--s-prog","완료":"--s-done" };
+
+  let data = load();
+  let filterTeam="전체", search="", sortKey="createdAt", sortDir=-1;
+
+  /* ---------- 저장/로드 ---------- */
+  function load(){
+    try{ return JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ return []; }
+  }
+  function save(){ localStorage.setItem(KEY, JSON.stringify(data)); }
+  function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+  const $=s=>document.querySelector(s);
+
+  /* ---------- 유틸 ---------- */
+  function todayISO(){ return new Date().toISOString().slice(0,10); }
+  function fmtDate(iso){ if(!iso) return "–"; const d=new Date(iso+"T00:00"); if(isNaN(d)) return iso;
+    return `${d.getMonth()+1}/${d.getDate()}`; }
+  function daysUntil(iso){ if(!iso) return null; const d=new Date(iso+"T00:00"); if(isNaN(d)) return null;
+    const t=new Date(todayISO()+"T00:00"); return Math.round((d-t)/86400000); }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+  function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),2200); }
+
+  /* ---------- 날짜 파싱(엑셀 다양한 포맷) ---------- */
+  function parseDate(raw){
+    if(!raw) return "";
+    const s=String(raw).trim();
+    let m=s.match(/^(\d{4})[.\-\/년\s]+(\d{1,2})[.\-\/월\s]+(\d{1,2})/);
+    if(m) return `${m[1]}-${String(m[2]).padStart(2,"0")}-${String(m[3]).padStart(2,"0")}`;
+    m=s.match(/^(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{2,4})$/); // m/d/y
+    if(m){ let y=m[3].length===2?"20"+m[3]:m[3]; return `${y}-${String(m[1]).padStart(2,"0")}-${String(m[2]).padStart(2,"0")}`; }
+    const d=new Date(s); if(!isNaN(d)) return d.toISOString().slice(0,10);
+    return s;
+  }
+
+  /* ---------- 엑셀/CSV 붙여넣기 파싱 ---------- */
+  function parseTable(text){
+    const lines=text.replace(/\r/g,"").split("\n").filter(l=>l.trim()!=="");
+    if(!lines.length) return [];
+    const delim = lines[0].includes("\t") ? "\t" : (lines[0].split(",").length>lines[0].split("\t").length ? "," : "\t");
+    let rows=lines.map(l=>l.split(delim).map(c=>c.trim()));
+    // 헤더 행 감지: 첫 행에 '수량'/'품명'/'코드' 등 텍스트가 있고 숫자 수량이 아니면 스킵
+    const h=rows[0].join("").replace(/\s/g,"");
+    const looksHeader=/품목|코드|품명|수량|입고|요청일|기타/.test(h);
+    if(looksHeader) rows=rows.slice(1);
+    return rows.map(r=>({
+      code:r[0]||"",
+      itemName:r[1]||"",
+      qty:r[2]||"",
+      dueDate:parseDate(r[3]||""),
+      note:r[4]||""
+    })).filter(r=>r.code||r.itemName);
+  }
+
+  /* ---------- 렌더: 스탯 ---------- */
+  function renderStats(){
+    const total=data.length;
+    const open=data.filter(d=>d.status!=="완료").length;
+    const late=data.filter(d=>d.status!=="완료" && daysUntil(d.dueDate)!=null && daysUntil(d.dueDate)<0).length;
+    const done=data.filter(d=>d.status==="완료").length;
+    const cards=[
+      {k:"총 요청",v:total,dot:"var(--accent)"},
+      {k:"진행 중",v:open,dot:"var(--s-prog)",sub:"미완료"},
+      {k:"지연",v:late,dot:"var(--s-late)",sub:"기한초과"},
+      {k:"완료",v:done,dot:"var(--s-done)"},
+    ];
+    $("#stats").innerHTML=cards.map(c=>`
+      <div class="stat">
+        <div class="k"><span class="dot" style="background:${c.dot}"></span>${c.k}</div>
+        <div class="v num">${c.v}${c.sub?`<small>${c.sub}</small>`:""}</div>
+      </div>`).join("");
+  }
+
+  /* ---------- 렌더: 팀 필터 탭 ---------- */
+  function renderTabs(){
+    const counts={}; TEAMS.forEach(t=>counts[t]=0); data.forEach(d=>{ if(counts[d.team]!=null) counts[d.team]++; });
+    const all=`<button class="tab ${filterTeam==="전체"?"on":""}" data-team="전체">전체 <span class="cnt num">${data.length}</span></button>`;
+    const rest=TEAMS.map(t=>`<button class="tab ${filterTeam===t?"on":""}" data-team="${t}" style="--tc:var(${TEAMVAR[t]})">
+        <span class="swatch"></span>${t} <span class="cnt num">${counts[t]}</span></button>`).join("");
+    $("#teamTabs").innerHTML=all+rest;
+    $("#teamTabs").querySelectorAll(".tab").forEach(b=>b.onclick=()=>{ filterTeam=b.dataset.team; renderTabs(); renderTable(); });
+  }
+
+  /* ---------- 렌더: 테이블 ---------- */
+  function getRows(){
+    let rows=data.filter(d=>filterTeam==="전체"||d.team===filterTeam);
+    if(search){ const q=search.toLowerCase();
+      rows=rows.filter(d=>(d.code+" "+d.itemName+" "+(d.note||"")).toLowerCase().includes(q)); }
+    rows.sort((a,b)=>{
+      let x=a[sortKey], y=b[sortKey];
+      if(sortKey==="qty"){ x=+x||0; y=+y||0; }
+      if(x<y) return -1*sortDir; if(x>y) return 1*sortDir; return 0;
+    });
+    return rows;
+  }
+  function renderTable(){
+    const rows=getRows();
+    const tb=$("#tbody");
+    $("#emptyState").style.display = data.length ? "none":"block";
+    document.querySelector("#table").style.display = data.length ? "":"none";
+
+    tb.innerHTML=rows.map(d=>{
+      const du=daysUntil(d.dueDate);
+      const isLate=d.status!=="완료" && du!=null && du<0;
+      const isSoon=d.status!=="완료" && du!=null && du>=0 && du<=2;
+      let badge="";
+      if(isLate) badge=`<span class="badge late">${-du}일 초과</span>`;
+      else if(isSoon) badge=`<span class="badge soon">${du===0?"오늘":"D-"+du}</span>`;
+      return `<tr class="${isLate?"late":""}">
+        <td class="num" style="color:var(--muted);white-space:nowrap">${fmtDate(d.createdAt)}</td>
+        <td><span class="chip team-chip" style="--tc:var(${TEAMVAR[d.team]||'--accent'})"><span class="dot" style="background:var(${TEAMVAR[d.team]||'--accent'})"></span>${esc(d.team)}</span></td>
+        <td class="code">${esc(d.code)}</td>
+        <td class="name">${esc(d.itemName)}${d.requester?`<span class="memo">요청: ${esc(d.requester)}</span>`:""}</td>
+        <td class="qty num">${esc(d.qty)}</td>
+        <td class="duedate"><span style="white-space:nowrap">${fmtDate(d.dueDate)}</span>${badge}</td>
+        <td>${statusChip(d)}</td>
+        <td><span class="memo" title="${esc(d.note)}">${esc(d.note)||"–"}</span></td>
+        <td><div class="rowbtns">
+          <button data-act="cycle" data-id="${d.id}" title="상태 변경">↻</button>
+          <button class="del" data-act="del" data-id="${d.id}" title="삭제">✕</button>
+        </div></td>
+      </tr>`;
+    }).join("");
+
+    tb.querySelectorAll("button[data-act]").forEach(b=>b.onclick=()=>{
+      const d=data.find(x=>x.id===b.dataset.id); if(!d) return;
+      if(b.dataset.act==="del"){ data=data.filter(x=>x.id!==d.id); toast("삭제되었습니다"); }
+      else { const i=STATUS.indexOf(d.status); d.status=STATUS[(i+1)%STATUS.length]; }
+      save(); renderAll();
+    });
+    $("#footInfo").textContent = data.length ? `${rows.length}건 표시 · 총 ${data.length}건` : "";
+    document.querySelectorAll("thead th").forEach(th=>{
+      th.classList.toggle("sorted", th.dataset.sort===sortKey);
+      const a=th.querySelector(".arw"); if(a) a.textContent = th.dataset.sort===sortKey ? (sortDir===1?"▲":"▼") : "▾";
+    });
+  }
+  function statusChip(d){
+    const v=STATUSVAR[d.status]||"--s-new";
+    return `<span class="chip status" style="color:var(${v});background:color-mix(in srgb,var(${v}) 14%,transparent);border-color:color-mix(in srgb,var(${v}) 30%,transparent)">
+      <span class="dot" style="background:var(${v})"></span>${esc(d.status)}</span>`;
+  }
+
+  function renderAll(){ renderStats(); renderTabs(); renderTable(); }
+
+  /* ---------- 항목 추가 ---------- */
+  function addItems(items, team){
+    let n=0;
+    items.forEach(it=>{
+      if(!it.code && !it.itemName) return;
+      data.push({
+        id:uid(), team,
+        code:it.code||"", itemName:it.itemName||"",
+        qty:it.qty!==""&&it.qty!=null? it.qty : "0",
+        dueDate:it.dueDate||"", note:it.note||"", requester:it.requester||"",
+        status:"접수", createdAt:todayISO()
+      });
+      n++;
+    });
+    save(); renderAll(); return n;
+  }
+
+  /* ---------- 이벤트: 직접 입력 ---------- */
+  $("#manualForm").addEventListener("submit",e=>{
+    e.preventDefault();
+    const f=e.target, fd=new FormData(f);
+    const team=fd.get("team");
+    if(!team){ toast("요청팀을 선택하세요"); return; }
+    addItems([{
+      code:fd.get("code").trim(), itemName:fd.get("itemName").trim(),
+      qty:fd.get("qty"), dueDate:fd.get("dueDate"),
+      note:fd.get("note").trim(), requester:fd.get("requester").trim()
+    }], team);
+    toast("구매요청이 추가되었습니다");
+    const keepTeam=f.querySelector('input[name=team]:checked');
+    f.reset(); if(keepTeam) keepTeam.checked=true;
+  });
+
+  /* ---------- 이벤트: 입력 방식 전환 ---------- */
+  document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{
+    document.querySelectorAll(".seg button").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on");
+    const excel=b.dataset.mode==="excel";
+    $("#manualForm").style.display=excel?"none":"";
+    $("#excelForm").style.display=excel?"":"none";
+  });
+
+  /* ---------- 이벤트: 엑셀 붙여넣기 ---------- */
+  function updatePreview(){
+    const rows=parseTable($("#pasteArea").value);
+    $("#pastePreview").innerHTML = rows.length
+      ? `인식된 항목: <b>${rows.length}건</b> — 첫 항목: ${esc(rows[0].code||"?")} / ${esc(rows[0].itemName||"?")}`
+      : "붙여넣으면 인식된 행 수가 여기에 표시됩니다.";
+  }
+  $("#pasteArea").addEventListener("input",updatePreview);
+  $("#excelForm").addEventListener("submit",e=>{
+    e.preventDefault();
+    const rows=parseTable($("#pasteArea").value);
+    if(!rows.length){ toast("인식된 데이터가 없습니다"); return; }
+    const n=addItems(rows, $("#excelTeam").value);
+    $("#pasteArea").value=""; updatePreview();
+    toast(`${n}건이 추가되었습니다`);
+  });
+  $("#sampleBtn").onclick=()=>{
+    $("#pasteArea").value=
+`품목코드\t품명\t수량\t입고요청일\t기타사항
+MAT-00123\t스테인리스 볼트 M4\t500\t2026-08-25\t아연도금
+MAT-00988\t육각너트 M4\t500\t2026-08-25\t
+ELE-04412\t마이크로컨트롤러 STM32\t30\t2026-08-20\t긴급, 개발보드용
+PKG-10021\t완충 에어캡 롤\t10\t2026-09-01\t폭 500mm`;
+    updatePreview();
+  };
+
+  /* ---------- 이벤트: 정렬/검색/내보내기/삭제 ---------- */
+  document.querySelectorAll("thead th[data-sort]").forEach(th=>th.onclick=()=>{
+    const k=th.dataset.sort;
+    if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=1; }
+    renderTable();
+  });
+  $("#searchBox").addEventListener("input",e=>{ search=e.target.value.trim(); renderTable(); });
+
+  $("#exportBtn").onclick=()=>{
+    if(!data.length){ toast("내보낼 데이터가 없습니다"); return; }
+    const head=["접수일","요청팀","품목코드","품명","수량","입고요청일","상태","요청자","기타사항"];
+    const rows=getRows().map(d=>[d.createdAt,d.team,d.code,d.itemName,d.qty,d.dueDate,d.status,d.requester||"",d.note||""]);
+    const csv=[head,...rows].map(r=>r.map(c=>{ c=String(c==null?"":c); return /[",\n]/.test(c)?`"${c.replace(/"/g,'""')}"`:c; }).join(",")).join("\n");
+    const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob); a.download=`구매요청_${todayISO()}.csv`; a.click();
+    URL.revokeObjectURL(a.href);
+    toast("CSV로 내보냈습니다");
+  };
+  $("#clearBtn").onclick=()=>{
+    if(!data.length) return;
+    if(confirm(`전체 ${data.length}건을 삭제할까요? 되돌릴 수 없습니다.`)){ data=[]; save(); renderAll(); toast("전체 삭제되었습니다"); }
+  };
+
+  /* ---------- 테마 ---------- */
+  $("#themeBtn").onclick=()=>{
+    const cur=document.documentElement.getAttribute("data-theme");
+    const isDark = cur ? cur==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.setAttribute("data-theme", isDark?"light":"dark");
+  };
+
+  /* ---------- 초기값 ---------- */
+  const dd=document.querySelector('input[name="dueDate"]'); if(dd) dd.value=todayISO();
+  renderAll();
+})();
+</script>
+</body>
+</html>
