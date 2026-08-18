@@ -287,6 +287,9 @@
   .mc-deposit-label{color:var(--ink); font-weight:600; flex:1;}
   .mc-deposit-date{color:var(--ink-soft); font-size:11px; white-space:nowrap;}
   .mc-deposit-amt{font-family:var(--sans); font-weight:700; color:var(--console-accent); min-width:100px; text-align:right;}
+  .mc-balance-list{background:#eef4ee;}
+  .mc-balance-list .mc-deposit-heading{color:#2f7d5c;}
+  .mc-balance-list .mc-deposit-amt{color:#2f7d5c;}
   @media (max-width:640px){
     .mc-row-top{flex-wrap:wrap;}
     .mc-total{text-align:left;}
@@ -796,7 +799,7 @@
   <!-- ===================== MONTHLY COST FORECAST ===================== -->
   <div class="view" id="view-monthcost">
     <div class="view-header"><span class="vlabel">월별 예상 비용</span></div>
-    <div class="cal-hint">각 발주의 납기요청일 기준으로 월별 예상 지출 합계를 보여줍니다. 해외는 CI금액(없으면 PI금액)을 환율로 환산, 국내는 실제입고금액(없으면 발주금액) 기준입니다. 선금이 이미 지급된 건은 남은 잔금만 합계에 반영됩니다(지급된 선금은 아래 "선금 지급내역"에서 확인). 종결(ERP입력완료)된 건은 자동으로 제외됩니다.</div>
+    <div class="cal-hint">각 발주의 납기요청일 기준으로 월별 예상 지출 합계를 보여줍니다. 해외는 CI금액(없으면 PI금액)을 환율로 환산, 국내는 실제입고금액(없으면 발주금액) 기준입니다. 이미 지급된 선금·잔금은 합계에서 빠지고 남은 금액만 반영됩니다(지급된 선금은 "선금 지급내역", 지급된 잔금은 "잔금 지급내역"에서 확인). 종결(ERP입력완료)된 건은 자동으로 제외됩니다.</div>
     <div class="mc-grand-row">
       <span class="mc-grand-label">진행중인 전체 예상 비용 합계</span>
       <span class="mc-grand-total" id="monthCostGrandTotal">₩0</span>
@@ -2122,26 +2125,34 @@ function getActiveMonthCostList(){
   const overseas = pos.filter(p=>computeStageIndex(p)!==9 && p.dueDate).map(p=>{
     const fullAmountKrw = finalPoAmountKrw(p);
     const depositPaid = !!p.depositDate; // 체크만 해둔 "입고 후 지급"은 아직 실제 지급이 아니므로 제외
+    const balancePaid = !!p.balanceDate; // 실제 잔금지급일이 있어야 지급된 것으로 봄
     const depositAmountKrw = toKrwCur(computeAmounts(p).deposit, p.currency||'USD');
+    const balanceAmountKrw = toKrwCur(computeAmounts(p).balance, p.currency||'USD');
+    // 이미 지급된 선금/잔금은 나간 돈이므로 이 달 비용 합계에서 빼고, 남은 금액만 반영
+    const paidOutKrw = (depositPaid?depositAmountKrw:0) + (balancePaid?balanceAmountKrw:0);
     return {
       id:p.id, source:'overseas', itemName:p.itemName, itemCode:p.itemCode, supplier:p.supplier, dueDate:p.dueDate,
       fullAmountKrw,
-      // 선금이 이미 지급됐다면 그 금액은 이미 나간 돈이므로, 이 달 비용 합계에서는 남은 금액(잔금)만 반영
-      amountKrw: depositPaid ? Math.max(0, fullAmountKrw - depositAmountKrw) : fullAmountKrw,
+      amountKrw: Math.max(0, fullAmountKrw - paidOutKrw),
       piNo: p.piNo,
       depositPaid, depositDate: p.depositDate, depositAmountKrw,
+      balancePaid, balanceDate: p.balanceDate, balanceAmountKrw,
     };
   });
   const domestic = domesticPos.filter(p=>computeDomStageIndex(p)!==5 && p.dueDate).map(p=>{
     const fullAmountKrw = finalDomAmountKrw(p);
     const depositPaid = !!p.depositDate;
+    const balancePaid = !!p.balanceDate;
     const depositAmountKrw = computeDomAmounts(p).deposit;
+    const balanceAmountKrw = computeDomAmounts(p).balance;
+    const paidOutKrw = (depositPaid?depositAmountKrw:0) + (balancePaid?balanceAmountKrw:0);
     return {
       id:p.id, source:'domestic', itemName:p.itemName, itemCode:p.itemCode, supplier:p.supplier, dueDate:p.dueDate,
       fullAmountKrw,
-      amountKrw: depositPaid ? Math.max(0, fullAmountKrw - depositAmountKrw) : fullAmountKrw,
+      amountKrw: Math.max(0, fullAmountKrw - paidOutKrw),
       piNo: '',
       depositPaid, depositDate: p.depositDate, depositAmountKrw,
+      balancePaid, balanceDate: p.balanceDate, balanceAmountKrw,
     };
   });
   return [...overseas, ...domestic];
@@ -2162,6 +2173,25 @@ function buildDepositPaidSummary(items){
     }
   });
   return [...Object.values(piMap), ...standalone].sort((a,b)=>(a.depositDate||'').localeCompare(b.depositDate||''));
+}
+// 잔금이 지급된 건들을 PI번호 기준으로 종합(같은 PI면 하나로 묶어서 합산) — 국내는 PI 개념이 없어 건별로 표시
+function buildBalancePaidSummary(items){
+  const piMap = {}; // piNo -> {label, balanceDate, amountKrw}
+  const standalone = [];
+  items.forEach(it=>{
+    if(!it.balancePaid) return;
+    if(it.source==='overseas' && (it.piNo||'').trim()){
+      const key = it.piNo.trim();
+      if(!piMap[key]) piMap[key] = {label:'PI '+key, balanceDate:it.balanceDate, amountKrw:0};
+      piMap[key].amountKrw += it.balanceAmountKrw;
+      if(it.balanceDate && (!piMap[key].balanceDate || it.balanceDate < piMap[key].balanceDate)) piMap[key].balanceDate = it.balanceDate;
+    }else{
+      standalone.push({label: it.itemName||'(품명 미입력)', balanceDate: it.balanceDate, amountKrw: it.balanceAmountKrw});
+    }
+  });
+  return [...Object.values(piMap), ...standalone]
+    .filter(e=> Math.round(e.amountKrw) > 0) // 잔금액이 0인 건(선금 100% 등)은 잔금 내역에 표시하지 않음
+    .sort((a,b)=>(a.balanceDate||'').localeCompare(b.balanceDate||''));
 }
 const monthCostOverlay = document.getElementById('monthCostOverlay');
 let monthCostGroupsCache = {};
@@ -2203,6 +2233,18 @@ function renderMonthCost(){
             </div>
           `).join('')}
         </div>` : '';
+      const balanceEntries = buildBalancePaidSummary(g.items);
+      const balanceHtml = balanceEntries.length ? `
+        <div class="mc-deposit-list mc-balance-list">
+          <div class="mc-deposit-heading">잔금 지급내역</div>
+          ${balanceEntries.map(d=>`
+            <div class="mc-deposit-row">
+              <span class="mc-deposit-label">${d.label}</span>
+              <span class="mc-deposit-date">${d.balanceDate||'-'} 지급</span>
+              <span class="mc-deposit-amt">${fmtKrw(d.amountKrw)}</span>
+            </div>
+          `).join('')}
+        </div>` : '';
       return `<div class="mc-row" data-month="${m}">
         <div class="mc-row-top">
           <div class="mc-month ${isPast?'past':''}">${y}년 ${parseInt(mm,10)}월${isPast?'<span class="mc-overdue">지남</span>':''}</div>
@@ -2214,6 +2256,7 @@ function renderMonthCost(){
           <div class="mc-total">${fmtKrw(g.krw)}</div>
         </div>
         ${depositHtml}
+        ${balanceHtml}
       </div>`;
     }).join('');
     listEl.querySelectorAll('.mc-row').forEach(row=>{
@@ -2236,7 +2279,7 @@ function openMonthCostDetail(month){
         <span class="name">${it.itemName || '(품명 미입력)'}${it.itemCode ? `<span style="font-weight:700; font-size:13.5px; color:#b7bec7; margin-left:6px;">/ ${it.itemCode}</span>` : ''}</span>
         <span class="sub">${it.supplier||'-'} · 납기 ${it.dueDate||'-'} · ${it.source==='overseas'?'해외':'국내'}</span>
       </div>
-      <span class="ddays upcoming">${fmtKrw(it.amountKrw)}</span>
+      <span class="ddays ${it.amountKrw===0 && (it.depositPaid||it.balancePaid) ? 'today':'upcoming'}">${it.amountKrw===0 && (it.depositPaid||it.balancePaid) ? '지급완료' : fmtKrw(it.amountKrw)}</span>
     </div>
   `).join('');
   listEl.querySelectorAll('.day-item').forEach(el=>{
