@@ -306,23 +306,55 @@
       </ol>
       <div class="sql" id="codeBox"><button id="copyCode">복사</button>const SHEET = 'requests';
 const COLS = ['id','createdAt','team','code','itemName','qty','dueDate','requester','note'];
+const P = PropertiesService.getScriptProperties();
 function sh_(){ const ss=SpreadsheetApp.getActiveSpreadsheet(); let s=ss.getSheetByName(SHEET);
   if(!s){ s=ss.insertSheet(SHEET); } if(s.getLastRow()===0){ s.appendRow(COLS); } return s; }
 function read_(){ const s=sh_(); const v=s.getDataRange().getValues(); const h=v[0];
   return v.slice(1).map(r=&gt;{ const o={}; h.forEach((k,i)=&gt;{ let c=r[i];
     if(c instanceof Date) c=Utilities.formatDate(c,Session.getScriptTimeZone(),'yyyy-MM-dd'); o[k]=c; }); return o; })
     .filter(o=&gt;o.id); }
-function doGet(e){ const out={ok:true,rows:read_()}; const cb=e&amp;&amp;e.parameter&amp;&amp;e.parameter.callback;
-  if(cb) return ContentService.createTextOutput(cb+'('+JSON.stringify(out)+')').setMimeType(ContentService.MimeType.JAVASCRIPT);
-  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON); }
+function json_(o){ return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
+function html_(m){ return HtmlService.createHtmlOutput('&lt;meta charset="utf-8"&gt;&lt;p style="font:16px sans-serif;padding:24px;line-height:1.6"&gt;'+m+'&lt;/p&gt;'); }
+function doGet(e){ const p=e.parameter||{};
+  if(p.code) return kakaoCb_(p.code);
+  if(p.kakao_setup) return kakaoStart_(p.key);
+  const out={ok:true,rows:read_()};
+  if(p.callback) return ContentService.createTextOutput(p.callback+'('+JSON.stringify(out)+')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+  return json_(out); }
 function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_();
   const v=s.getDataRange().getValues(), h=v[0], idc=h.indexOf('id');
   if(b.action==='add'){ (b.items||[]).forEach(it=&gt;{ const id=Utilities.getUuid();
     const cd=Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy-MM-dd');
-    s.appendRow(COLS.map(k=&gt; k==='id'?id : k==='createdAt'?cd : (it[k]!=null?it[k]:''))); }); }
+    s.appendRow(COLS.map(k=&gt; k==='id'?id : k==='createdAt'?cd : (it[k]!=null?it[k]:''))); });
+    try{ notify_(b.items||[]); }catch(err){} }
   else if(b.action==='remove'){ for(let i=1;i&lt;v.length;i++){ if(v[i][idc]===b.id){ s.deleteRow(i+1); break; } } }
   else if(b.action==='clear'){ if(s.getLastRow()&gt;1) s.deleteRows(2,s.getLastRow()-1); }
-  return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON); }</div>
+  return json_({ok:true}); }
+// ===== 카카오톡 '나에게 보내기' 접수 알림 =====
+function kakaoStart_(key){ if(key) P.setProperty('KAKAO_KEY',key);
+  const u='https://kauth.kakao.com/oauth/authorize?response_type=code&amp;scope=talk_message'
+    +'&amp;client_id='+encodeURIComponent(P.getProperty('KAKAO_KEY')||'')
+    +'&amp;redirect_uri='+encodeURIComponent(ScriptApp.getService().getUrl());
+  return HtmlService.createHtmlOutput('&lt;meta charset="utf-8"&gt;&lt;div style="font:16px sans-serif;padding:24px;line-height:1.7"&gt;카카오톡 알림을 연결합니다.&lt;br&gt;&lt;a href="'+u+'" target="_top" style="display:inline-block;margin-top:14px;background:#FEE500;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:700;color:#000"&gt;카카오 로그인하고 동의하기&lt;/a&gt;&lt;/div&gt;'); }
+function kakaoCb_(code){ const key=P.getProperty('KAKAO_KEY');
+  const r=UrlFetchApp.fetch('https://kauth.kakao.com/oauth/token',{method:'post',muteHttpExceptions:true,
+    payload:{grant_type:'authorization_code',client_id:key,redirect_uri:ScriptApp.getService().getUrl(),code:code}});
+  const t=JSON.parse(r.getContentText());
+  if(t.refresh_token){ P.setProperty('KAKAO_RT',t.refresh_token);
+    return html_('✅ 카카오톡 알림이 연결되었습니다. 이제 접수되면 카톡이 옵니다. 이 창은 닫으셔도 됩니다.'); }
+  return html_('연결 실패: '+r.getContentText()); }
+function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty('KAKAO_RT');
+  if(!key||!rt||!items.length) return;
+  const r=UrlFetchApp.fetch('https://kauth.kakao.com/oauth/token',{method:'post',muteHttpExceptions:true,
+    payload:{grant_type:'refresh_token',client_id:key,refresh_token:rt}});
+  const t=JSON.parse(r.getContentText()); if(t.refresh_token) P.setProperty('KAKAO_RT',t.refresh_token);
+  if(!t.access_token) return;
+  let text='🛒 구매요청 '+items.length+'건 접수\n'+items.map(it=&gt;
+    '· ['+(it.team||'')+'] '+(it.itemName||it.code||'')+' '+(it.qty||'')+'개 / 입고 '+(it.dueDate||'-')).join('\n');
+  if(text.length&gt;190) text=text.substring(0,188)+'…';
+  const tmpl={object_type:'text',text:text,link:{web_url:'https://kakao.com'}};
+  UrlFetchApp.fetch('https://kapi.kakao.com/v2/api/talk/memo/default/send',{method:'post',muteHttpExceptions:true,
+    headers:{Authorization:'Bearer '+t.access_token},payload:{template_object:JSON.stringify(tmpl)}}); }</div>
       <div class="stage"><span class="n">2</span>웹앱으로 배포</div>
       <ol class="steps">
         <li>우측 상단 <b>배포 → 새 배포</b> → 유형 <b>웹 앱</b></li>
@@ -345,6 +377,29 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
       </div>
       <div class="row-btns" id="disconnectRow" style="display:none">
         <button class="btn ghost" id="disconnectBtn" type="button" style="color:var(--s-late)">연결 해제(로컬 모드로 전환)</button>
+      </div>
+
+      <!-- 카카오톡 접수 알림 (연결 후 표시) -->
+      <div id="kakaoSetup" style="display:none; margin-top:20px; border-top:1px solid var(--border); padding-top:16px">
+        <div class="stage"><span class="n">🔔</span>카카오톡 접수 알림 (선택)</div>
+        <p class="paste-help">접수가 등록되면 <b>대표자 본인 카카오톡</b>으로 알림이 옵니다. 아래 설정도 대표자만 1회.</p>
+        <ol class="steps">
+          <li><a href="https://developers.kakao.com/console/app" target="_blank" rel="noopener">developers.kakao.com</a> → <b>애플리케이션 추가하기</b>로 앱 생성</li>
+          <li>왼쪽 <b>앱 키</b>에서 <b>REST API 키</b> 복사</li>
+          <li>왼쪽 <b>카카오 로그인</b> → <b>활성화 설정</b> ON, <b>Redirect URI</b>에 아래 주소 등록:
+            <div class="sql" id="redirectBox" style="margin-top:8px"><button id="copyRedirect">복사</button><span id="redirectUrl">먼저 위에서 시트를 연결하세요</span></div>
+          </li>
+          <li><b>카카오 로그인 → 동의항목</b>에서 <b>카카오톡 메시지 전송</b>을 '이용 중 동의'로 설정</li>
+          <li>아래에 REST API 키를 넣고 <b>카카오톡 연결</b> → 열린 창에서 로그인·동의하면 완료</li>
+        </ol>
+        <div class="field">
+          <label>REST API 키</label>
+          <input id="kakaoKey" placeholder="예: 3a1b2c4d..." autocomplete="off" spellcheck="false">
+        </div>
+        <div class="row-btns">
+          <button class="btn" id="kakaoConnectBtn" type="button" style="background:#FEE500;color:#000">🔔 카카오톡 연결</button>
+        </div>
+        <p class="paste-help" style="margin-top:10px">※ 코드를 새로 붙여넣었으면 <b>배포 → 배포 관리 → 편집 → 새 버전</b>으로 다시 배포하고, 실행 권한 재승인(외부 서비스 연결) 후 이용하세요.</p>
       </div>
     </div>
   </div>
@@ -896,12 +951,18 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
   };
 
   /* ---------- 이벤트: 공유 연결 모달 ---------- */
+  function showKakao(){
+    const on=isConnected();
+    $("#kakaoSetup").style.display = on?"block":"none";
+    if(on) $("#redirectUrl").textContent = cfg.exec;
+  }
   function openModal(){
     $("#cfgExec").value = cfg?.exec || "";
     $("#execHint").textContent=""; $("#execHint").className="hint";
     const o=$("#testOut"); o.textContent=""; o.className="test-out";
     $("#disconnectRow").style.display = isConnected()?"flex":"none";
     $("#shareRow").style.display = isConnected()?"flex":"none";
+    showKakao();
     $("#modalBg").classList.add("show");
   }
   function closeModal(){ $("#modalBg").classList.remove("show"); }
@@ -936,9 +997,22 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
     const o=$("#testOut"); o.className="test-out"; o.textContent="연결 중…";
     try{ await testExec(exec); }catch(e){ o.className="test-out bad"; o.textContent="✕ "+e.message; return; }
     saveCfg({exec}); applyCfg(); toast("구글 시트에 연결되었습니다");
-    $("#disconnectRow").style.display="flex"; $("#shareRow").style.display="flex";
+    $("#disconnectRow").style.display="flex"; $("#shareRow").style.display="flex"; showKakao();
     await refresh(); startPoll();
     const oo=$("#testOut"); oo.className="test-out ok"; oo.textContent="✓ 연결 완료! 이제 팀원에게 공유 링크를 보내세요.";
+  };
+  $("#copyRedirect").onclick=()=>{
+    if(!cfg||!cfg.exec){ toast("먼저 시트를 연결하세요"); return; }
+    (navigator.clipboard?navigator.clipboard.writeText(cfg.exec):Promise.reject())
+      .then(()=>toast("Redirect URI가 복사되었습니다")).catch(()=>toast("복사 실패 — 직접 선택해 복사하세요"));
+  };
+  $("#kakaoConnectBtn").onclick=()=>{
+    if(!cfg||!cfg.exec){ toast("먼저 시트를 연결하세요"); return; }
+    const key=$("#kakaoKey").value.trim();
+    if(!key){ toast("REST API 키를 입력하세요"); return; }
+    const u=cfg.exec+(cfg.exec.indexOf("?")>=0?"&":"?")+"kakao_setup=1&key="+encodeURIComponent(key);
+    window.open(u,"_blank");
+    toast("열린 창에서 카카오 로그인·동의하면 연결됩니다");
   };
   $("#shareBtn").onclick=()=>{
     if(!cfg||!cfg.exec) return;
