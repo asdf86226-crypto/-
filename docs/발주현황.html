@@ -178,6 +178,7 @@
     .poc-group{break-inside:avoid; border:1px solid #999;}
     .poc-group-head{background:#eee !important; color:#111 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
     .item-badge{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    .pay-tag{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
     #pocResult{display:none !important;}
     .poc-print-only{display:block !important;}
     .no-print{display:none !important;}
@@ -391,6 +392,14 @@
   }
   .item-badge.sample{background:#8b5cf6;}
   .item-badge.urgent{background:#dc2626;}
+  /* 지급 상태 표시 (선금/잔금 열) */
+  .pay-tag{
+    display:inline-block; font-size:9.5px; font-weight:800; padding:1px 5px; border-radius:3px;
+    margin-left:5px; vertical-align:middle; letter-spacing:.02em; white-space:nowrap;
+  }
+  .pay-tag.need{background:#dc2626; color:#fff;}          /* 지급필요 */
+  .pay-tag.later{background:#f59e0b; color:#fff;}         /* 입고 후 지급 예정 */
+  .pay-tag.done{background:#e8f5ec; color:#15803d; border:1px solid #bbe3c8;} /* 지급완료 */
   .appr-dot{
     display:inline-block; width:8px; height:8px; border-radius:50%; background:#16a34a;
     margin-left:6px; vertical-align:middle;
@@ -1628,6 +1637,18 @@ function isDepositDone(po){ return !!po.depositDate || !!po.depositDeferred; }
 function isDepositShared(po){ return po.depositShared==='O'; }
 function isBalanceDone(po){ return !!po.balanceDate || !!po.balanceDeferred; }
 
+// 발주목록 선금/잔금 열에 붙는 지급 상태 태그
+// kind: 'deposit' | 'balance'
+function payTag(po, kind, amount){
+  if(!(parseFloat(amount)>0)) return '';                    // 금액이 없으면 표시 안 함
+  const payDate  = kind==='balance' ? po.balanceDate     : po.depositDate;
+  const deferred = kind==='balance' ? po.balanceDeferred  : po.depositDeferred;
+  if(payDate)  return `<span class="pay-tag done" title="${payDate} 지급 완료">지급완료</span>`;
+  if(deferred) return `<span class="pay-tag later" title="입고 후 지급 예정 — 아직 지급되지 않았습니다">입고후지급</span>`;
+  const planned = kind==='balance' ? po.balancePlannedDate : po.depositPlannedDate;
+  return `<span class="pay-tag need" title="${planned ? '지급예정일 '+planned+' · 아직 지급되지 않았습니다' : '아직 지급되지 않았습니다'}">지급필요</span>`;
+}
+
 // PI 문서 자체와 관련된 항목: 같은 PI번호면 반드시 같아야 함 (자동 동기화 대상)
 const PI_DOC_FIELDS = [
   {key:'supplier',            label:'공급사'},
@@ -1948,8 +1969,8 @@ function renderPoTable(){
       <td style="font-family:var(--sans)">${p.ciQty && parseFloat(p.ciQty)!==parseFloat(p.qty) ? `<span style="color:#dc2626; text-decoration:line-through;">${fmtQty(p.qty)}</span> → <b style="color:#dc2626; font-size:14px;">${fmtQty(p.ciQty)}</b>` : fmtQty(p.qty)}</td>
       <td>${p.supplier||'-'}</td>
       <td class="money">${p.piAmount? (p.ciAmount && parseFloat(p.ciAmount)!==parseFloat(p.piAmount) ? `<span style="color:#dc2626; text-decoration:line-through;">${fmtMoneyCur(p.piAmount, p.currency)}</span> → <b style="color:#dc2626; font-size:14px;">${fmtMoneyCur(p.ciAmount, p.currency)}</b>` : fmtMoneyCur(p.piAmount, p.currency)) : '-'}</td>
-      <td class="money">${p.piAmount? fmtMoneyCur(deposit, p.currency) + krwSubCur(deposit, p.currency) : '-'}</td>
-      <td class="money">${p.piAmount? fmtMoneyCur(balance, p.currency) + krwSubCur(balance, p.currency) : '-'}</td>
+      <td class="money">${p.piAmount? fmtMoneyCur(deposit, p.currency) + krwSubCur(deposit, p.currency) + payTag(p,'deposit',deposit) : '-'}</td>
+      <td class="money">${p.piAmount? fmtMoneyCur(balance, p.currency) + krwSubCur(balance, p.currency) + payTag(p,'balance',balance) : '-'}</td>
       <td>${p.dueDate||'-'}</td>
       <td><span class="badge" style="background:${STAGE_COLORS[stageIdx]}">${stageLabel}${unsharedNote}</span></td>
       <td>${p.warehouseDate||'-'}</td>
@@ -3279,8 +3300,8 @@ function renderDomTable(){
       <td style="font-family:var(--sans)">${p.actualQty && parseFloat(p.actualQty)!==parseFloat(p.qty) ? `<span style="color:#dc2626; text-decoration:line-through;">${fmtQty(p.qty)}</span> → <b style="color:#dc2626; font-size:14px;">${fmtQty(p.actualQty)}</b>` : fmtQty(p.qty)}</td>
       <td>${p.supplier||'-'}</td>
       <td class="money">${p.poAmount? fmtKrw(p.poAmount):'-'}</td>
-      <td class="money">${p.poAmount? fmtKrw(deposit):'-'}</td>
-      <td class="money">${p.poAmount? fmtKrw(balance):'-'}</td>
+      <td class="money">${p.poAmount? fmtKrw(deposit) + payTag(p,'deposit',deposit) :'-'}</td>
+      <td class="money">${p.poAmount? fmtKrw(balance) + payTag(p,'balance',balance) :'-'}</td>
       <td>${p.dueDate||'-'}</td>
       <td><span class="badge" style="background:${DOM_STAGE_COLORS[stageIdx]}">${stageLabelText(p, stageIdx, true)}</span></td>
       <td>${p.warehouseDate||'-'}</td>
