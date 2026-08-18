@@ -800,7 +800,7 @@
   <!-- ===================== MONTHLY COST FORECAST ===================== -->
   <div class="view" id="view-monthcost">
     <div class="view-header"><span class="vlabel">월별 예상 비용</span></div>
-    <div class="cal-hint">각 발주의 납기요청일 기준으로 월별 예상 지출 합계를 보여줍니다. 해외는 CI금액(없으면 PI금액)을 환율로 환산, 국내는 실제입고금액(없으면 발주금액) 기준입니다. <b>선금·잔금 지급일이 입력되지 않은(=아직 지급 전) 금액만 예상비용으로 합산</b>되며, 지급일이 입력된 금액은 합계에서 빠지고 아래 <b>"선금 지급내역"·"잔금 지급내역"</b>에 표시됩니다. 종결(ERP입력완료)된 건은 월별 합계에서 제외되며, 그중 <b>아직 지급되지 않은 금액이 남은 건은 맨 아래 "ERP입력 완료 · 미지급"</b>에 따로 모아 보여줍니다.</div>
+    <div class="cal-hint">각 발주의 납기요청일 기준으로 월별 예상 지출 합계를 보여줍니다. 해외는 CI금액(없으면 PI금액)을 환율로 환산, 국내는 실제입고금액(없으면 발주금액) 기준입니다. <b>선금·잔금 지급일이 입력되지 않은(=아직 지급 전) 금액만 예상비용으로 합산</b>되며, 지급일이 입력된 금액은 합계에서 빠지고 아래 <b>"선금 지급내역"·"잔금 지급내역"</b>에 <b>CI번호 기준</b>으로 묶여 표시됩니다(CI 미발행이면 PI 기준, 국내발주는 건별). 종결(ERP입력완료)된 건은 월별 합계에서 제외되며, 그중 <b>아직 지급되지 않은 금액이 남은 건은 맨 아래 "ERP입력 완료 · 미지급"</b>에 따로 모아 보여줍니다.</div>
     <div class="mc-grand-row">
       <span class="mc-grand-label">진행중인 전체 예상 비용 합계</span>
       <span class="mc-grand-total" id="monthCostGrandTotal">₩0</span>
@@ -811,7 +811,7 @@
     <!-- ERP입력 완료됐지만 아직 지급되지 않은 건 -->
     <div id="mcClosedUnpaidWrap" style="display:none; margin-top:26px;">
       <div class="view-header"><span class="vlabel" style="color:#dc2626;">⚠ ERP입력 완료 · 미지급</span></div>
-      <div class="cal-hint">ERP입력까지 끝났지만 <b>선금 또는 잔금 지급일이 입력되지 않은</b> 건입니다. 위 월별 합계에는 포함되지 않으니 별도로 확인하세요. (실제로 지급했다면 해당 건을 열어 지급일을 입력해 주세요)</div>
+      <div class="cal-hint">ERP입력까지 끝났지만 <b>선금 또는 잔금 지급일이 입력되지 않은</b> 건입니다. <b>CI번호 기준</b>으로 묶어서 보여줍니다(CI 미발행이면 PI 기준, 국내발주는 건별). 위 월별 합계에는 포함되지 않으니 별도로 확인하세요. (실제로 지급했다면 해당 건을 열어 지급일을 입력해 주세요)</div>
       <div class="mc-grand-row" style="border-color:#dc2626;">
         <span class="mc-grand-label">미지급 합계</span>
         <span class="mc-grand-total" id="mcClosedUnpaidTotal" style="color:#dc2626;">₩0</span>
@@ -2215,10 +2215,21 @@ function toMonthCostItem(p, source){
     // 아직 지급하지 않은 금액만 합산 (지급한 선금·잔금은 지급내역에서 확인)
     amountKrw: (depositPaid?0:depositAmountKrw) + (balancePaid?0:balanceAmountKrw),
     piNo: isOverseas ? p.piNo : '',
+    ciNo: isOverseas ? p.ciNo : '',
     depositPaid, depositDate: p.depositDate, depositAmountKrw,
     balancePaid, balanceDate: p.balanceDate, balanceAmountKrw,
     erpDate: p.erpDate,
   };
+}
+// 지급/미지급 집계 기준 키 — CI번호가 있으면 CI(같은 PI 안에서), 없으면 PI, 둘 다 없으면 건별
+// 국내발주는 CI/PI 개념이 없으므로 항상 건별
+function payGroupKeyOf(it){
+  if(it.source!=='overseas') return {key:'item:'+it.id, label: it.itemName||'(품명 미입력)'};
+  const ci = (it.ciNo||'').trim();
+  const pi = (it.piNo||'').trim();
+  if(ci) return {key:'ci:'+pi+'|'+ci, label:'CI '+ci + (pi?` (PI ${pi})`:'')};
+  if(pi) return {key:'pi:'+pi,        label:'PI '+pi + ' · CI 미발행'};
+  return {key:'item:'+it.id, label: it.itemName||'(품명 미입력)'};
 }
 // 종결(ERP입력완료)되지 않았고 납기요청일이 있는 건 — 해외/국내 통합
 function getActiveMonthCostList(){
@@ -2234,26 +2245,25 @@ function getClosedUnpaidList(){
     ...domesticPos.filter(p=>computeDomStageIndex(p)===5).map(p=>toMonthCostItem(p,'domestic')),
   ].filter(it=>it.amountKrw>0);
 }
-// 지급된 건들을 PI번호 기준으로 종합(같은 PI면 하나로 묶어서 합산) — 국내는 PI 개념이 없어 건별로 표시
+// 지급된 건들을 CI번호 기준으로 종합(같은 CI면 하나로 묶어서 합산)
+// CI가 아직 없으면 PI 기준, 국내발주는 CI/PI 개념이 없어 건별로 표시
 // kind: 'deposit'(선금) | 'balance'(잔금)
 function buildPaidSummary(items, kind){
   const paidKey = kind==='balance' ? 'balancePaid' : 'depositPaid';
   const dateKey = kind==='balance' ? 'balanceDate' : 'depositDate';
   const amtKey  = kind==='balance' ? 'balanceAmountKrw' : 'depositAmountKrw';
-  const piMap = {}; // piNo -> {label, payDate, amountKrw}
-  const standalone = [];
+  const map = {}; // groupKey -> {label, payDate, amountKrw, count}
+  const order = [];
   items.forEach(it=>{
     if(!it[paidKey]) return;
-    if(it.source==='overseas' && (it.piNo||'').trim()){
-      const key = it.piNo.trim();
-      if(!piMap[key]) piMap[key] = {label:'PI '+key, payDate:it[dateKey], amountKrw:0};
-      piMap[key].amountKrw += it[amtKey];
-      if(it[dateKey] && (!piMap[key].payDate || it[dateKey] < piMap[key].payDate)) piMap[key].payDate = it[dateKey];
-    }else{
-      standalone.push({label: it.itemName||'(품명 미입력)', payDate: it[dateKey], amountKrw: it[amtKey]});
-    }
+    const {key, label} = payGroupKeyOf(it);
+    if(!map[key]){ map[key] = {label, payDate:it[dateKey], amountKrw:0, count:0}; order.push(key); }
+    map[key].amountKrw += it[amtKey];
+    map[key].count += 1;
+    // 같은 묶음 안에서는 가장 이른 지급일을 대표로 표시
+    if(it[dateKey] && (!map[key].payDate || it[dateKey] < map[key].payDate)) map[key].payDate = it[dateKey];
   });
-  return [...Object.values(piMap), ...standalone].sort((a,b)=>(a.payDate||'').localeCompare(b.payDate||''));
+  return order.map(k=>map[k]).sort((a,b)=>(a.payDate||'').localeCompare(b.payDate||''));
 }
 const monthCostOverlay = document.getElementById('monthCostOverlay');
 let monthCostGroupsCache = {};
@@ -2292,7 +2302,7 @@ function renderMonthCost(){
           <div class="mc-deposit-heading">${heading}</div>
           ${entries.map(d=>`
             <div class="mc-deposit-row">
-              <span class="mc-deposit-label">${d.label}</span>
+              <span class="mc-deposit-label">${d.label}${d.count>1?` <span style="opacity:.7; font-weight:600;">${d.count}건</span>`:''}</span>
               <span class="mc-deposit-date">${d.payDate||'-'} 지급</span>
               <span class="mc-deposit-amt">${fmtKrw(d.amountKrw)}</span>
             </div>
@@ -2328,22 +2338,46 @@ function renderClosedUnpaid(){
   wrap.style.display = 'block';
   const total = items.reduce((s,it)=>s+it.amountKrw, 0);
   document.getElementById('mcClosedUnpaidTotal').textContent = fmtKrw(total);
-  const sorted = [...items].sort((a,b)=>(b.erpDate||b.dueDate||'').localeCompare(a.erpDate||a.dueDate||''));
-  document.getElementById('mcClosedUnpaidList').innerHTML = sorted.map(it=>{
+  // CI 기준으로 묶기 (CI 없으면 PI, 국내는 건별)
+  const map = {}; const order = [];
+  items.forEach(it=>{
+    const {key, label} = payGroupKeyOf(it);
+    if(!map[key]){
+      map[key] = { label, source:it.source, ids:[it.id], suppliers:new Set(), itemNames:[],
+                   erpDate:it.erpDate, depositKrw:0, balanceKrw:0, total:0 };
+      order.push(key);
+    }else{
+      map[key].ids.push(it.id);
+    }
+    const g = map[key];
+    if(it.supplier) g.suppliers.add(it.supplier);
+    g.itemNames.push(it.itemName||'(품명 미입력)');
+    if(!it.depositPaid) g.depositKrw += it.depositAmountKrw;
+    if(!it.balancePaid) g.balanceKrw += it.balanceAmountKrw;
+    g.total += it.amountKrw;
+    // 묶음 대표 ERP일자는 가장 늦은 날짜
+    if(it.erpDate && (!g.erpDate || it.erpDate > g.erpDate)) g.erpDate = it.erpDate;
+  });
+  const groups = order.map(k=>map[k]).sort((a,b)=>(b.erpDate||'').localeCompare(a.erpDate||''));
+  document.getElementById('mcClosedUnpaidList').innerHTML = groups.map(g=>{
     const missing = [
-      (!it.depositPaid && it.depositAmountKrw>0) ? `선금 ${fmtKrw(it.depositAmountKrw)}` : '',
-      (!it.balancePaid && it.balanceAmountKrw>0) ? `잔금 ${fmtKrw(it.balanceAmountKrw)}` : ''
+      g.depositKrw>0 ? `선금 ${fmtKrw(g.depositKrw)}` : '',
+      g.balanceKrw>0 ? `잔금 ${fmtKrw(g.balanceKrw)}` : ''
     ].filter(Boolean).join(' + ');
-    return `<div class="mc-row" data-id="${it.id}" data-source="${it.source}" style="cursor:pointer;">
+    const names = g.itemNames.length>2
+      ? `${g.itemNames.slice(0,2).join(', ')} 외 ${g.itemNames.length-2}건`
+      : g.itemNames.join(', ');
+    return `<div class="mc-row" data-id="${g.ids[0]}" data-source="${g.source}" style="cursor:pointer;">
       <div class="mc-row-top">
-        <div class="mc-month" style="font-size:14px;">${it.itemName||'(품명 미입력)'}${it.itemCode?`<span style="color:#b7bec7; font-weight:700; margin-left:6px;">/ ${it.itemCode}</span>`:''}</div>
-        <div class="mc-count">${it.source==='overseas'?'해외':'국내'}</div>
+        <div class="mc-month" style="font-size:14px;">${g.label}${g.ids.length>1?`<span style="opacity:.7; font-weight:600; margin-left:6px;">${g.ids.length}건</span>`:''}</div>
+        <div class="mc-count">${g.source==='overseas'?'해외':'국내'}</div>
         <div class="mc-breakdown">
-          <span>${it.supplier||'-'}</span>
-          <span>ERP ${it.erpDate||'-'}</span>
+          <span title="${g.itemNames.join(', ').replace(/"/g,'&quot;')}">${names}</span>
+          <span>${[...g.suppliers].join(', ')||'-'}</span>
+          <span>ERP ${g.erpDate||'-'}</span>
           <span style="color:#dc2626; font-weight:700;">미지급: ${missing||'-'}</span>
         </div>
-        <div class="mc-total" style="color:#dc2626;">${fmtKrw(it.amountKrw)}</div>
+        <div class="mc-total" style="color:#dc2626;">${fmtKrw(g.total)}</div>
       </div>
     </div>`;
   }).join('');
