@@ -391,6 +391,12 @@
   }
   .item-badge.sample{background:#8b5cf6;}
   .item-badge.urgent{background:#dc2626;}
+  .item-badge.pay-needed{background:#b45309;}
+  .crow.pay-need-row{background:#fbe9d9; border-radius:6px; padding-left:8px; padding-right:8px; cursor:pointer;}
+  .crow.pay-need-row .t{color:#8a4b12; font-weight:700;}
+  .crow.pay-need-row .c{color:#b45309; font-weight:800;}
+  .crow.pay-need-row.zero{background:transparent; cursor:default;}
+  .crow.pay-need-row.zero .t, .crow.pay-need-row.zero .c{color:var(--console-text-dim); font-weight:600;}
   .appr-dot{
     display:inline-block; width:8px; height:8px; border-radius:50%; background:#16a34a;
     margin-left:6px; vertical-align:middle;
@@ -1186,6 +1192,7 @@ const VIEWER = !!SHARED;
 
 const STAGE_LABELS = ["①요청등록","②PI수령","③선금지급완료","④CI수령","⑤잔금지급완료","⑥선적완료","⑦항구도착","⑧공장입고","⑨품질검수완료","⑩ERP입력완료"];
 let poStageFilter = null; // set by clicking a stage-distribution number on the dashboard
+let poPayFilter = false; // set by clicking "지급 필요" on the dashboard — 지급일 미입력 건만 필터
 let domStageFilter = null; // 국내발주건용
 // one shared, highly distinguishable multi-hue palette (grey start -> warm -> cool -> green finish)
 // used everywhere: table badges, stage bar, calendar dots/events
@@ -1530,6 +1537,22 @@ function isDepositDone(po){ return !!po.depositDate || !!po.depositDeferred; }
 function isDepositShared(po){ return po.depositShared==='O'; }
 function isBalanceDone(po){ return !!po.balanceDate || !!po.balanceDeferred; }
 
+// "지급 필요" 판정 — 실제 지급일자(선금지급일/잔금지급일)가 비어 있으면 아직 지급되지 않은 것으로 본다.
+// (‘입고 후 지급’ 체크만 되어 있어도, 실제 지급일이 없으면 미지급으로 간주)
+// 지급 시점이 지난 단계(선금=PI수령 후, 잔금=CI수령 후)인데 지급일이 없으면 지급 필요로 구분한다.
+// ERP입력완료(종결)된 건이라도 지급일자가 비어 있으면 지급 필요로 잡는다.
+function paymentNeeded(po){
+  const {deposit, balance} = computeAmounts(po);
+  const depositNeeded = deposit > 0 && !!po.piDate && !po.depositDate;
+  const balanceNeeded = balance > 0 && !!po.ciDate && !po.balanceDate;
+  return {depositNeeded, balanceNeeded, any: depositNeeded || balanceNeeded};
+}
+function paymentNeededBadge(pn){
+  if(!pn || !pn.any) return '';
+  const what = (pn.depositNeeded && pn.balanceNeeded) ? '선금·잔금' : (pn.depositNeeded ? '선금' : '잔금');
+  return `<span class="item-badge pay-needed" title="지급일자가 입력되지 않았습니다 — ${what} 지급 필요 (ERP입력완료여도 지급일이 없으면 표시됩니다)">💰지급필요(${what})</span>`;
+}
+
 // PI 문서 자체와 관련된 항목: 같은 PI번호면 반드시 같아야 함 (자동 동기화 대상)
 const PI_DOC_FIELDS = [
   {key:'supplier',            label:'공급사'},
@@ -1675,6 +1698,7 @@ function renderDashboard(){
     seg.innerHTML = `<span class="stage-seg-bar" style="background:${STAGE_COLORS[idx]}"></span><span class="n" style="cursor:pointer;">${count}</span><span class="lbl">${cleanLabel}</span>`;
     seg.querySelector('.n').addEventListener('click', ()=>{
       poStageFilter = idx;
+      poPayFilter = false;
       switchToView('po');
       renderPoTable();
     });
@@ -1722,13 +1746,31 @@ function renderDashboard(){
   const bucketCounts = [0,0,0,0,0,0];
   pos.forEach(p=> bucketCounts[getCheckpointBucket(p)]++);
   const alerts = CHECKPOINT_LABELS.map((label, i)=>({label, count: bucketCounts[i], isAlert: CHECKPOINT_IS_ALERT[i]}));
+  // 지급 필요 — 지급일자(선금/잔금)가 입력되지 않은 건 (ERP입력완료 건도 포함)
+  const payNeedOverseas = pos.filter(p=> paymentNeeded(p).any).length;
+  const payNeedDom = domesticPos.filter(p=> domPaymentNeeded(p).any).length;
+  const payNeedTotal = payNeedOverseas + payNeedDom;
   const alertEl = document.getElementById('alertList');
-  alertEl.innerHTML = alerts.map(a=>`
+  const payRow = `
+    <div class="crow pay-need-row ${payNeedTotal===0?'zero':''}" id="alertPayNeed" title="지급일자(선금/잔금)가 입력되지 않은 건 — ERP입력완료 건도 포함. 클릭하면 해외발주에서 해당 건만 봅니다.">
+      <span class="t">💰 지급 필요 <span style="font-weight:600; font-size:11px;">지급일 미입력 · ERP완료 포함</span></span>
+      <span class="c">${payNeedTotal}건${payNeedDom>0?` <span style="font-weight:600; font-size:11px;">(해외 ${payNeedOverseas}·국내 ${payNeedDom})</span>`:''}</span>
+    </div>`;
+  alertEl.innerHTML = payRow + alerts.map(a=>`
     <div class="crow ${a.isAlert && a.count===0?'zero':''}">
       <span class="t">${a.label}</span>
       <span class="c">${a.count}건</span>
     </div>
   `).join('');
+  const payRowEl = document.getElementById('alertPayNeed');
+  if(payRowEl && payNeedTotal>0){
+    payRowEl.addEventListener('click', ()=>{
+      poStageFilter = null;
+      poPayFilter = true;
+      switchToView('po');
+      renderPoTable();
+    });
+  }
 }
 
 document.getElementById('fxKrw').addEventListener('input', ()=>{
@@ -1783,6 +1825,9 @@ function getFilteredPos(){
   if(poStageFilter !== null){
     filtered = filtered.filter(p=> computeStageIndex(p) === poStageFilter);
   }
+  if(poPayFilter){
+    filtered = filtered.filter(p=> paymentNeeded(p).any);
+  }
   if(dateStart){
     filtered = filtered.filter(p=> p.reqDate && p.reqDate >= dateStart);
   }
@@ -1816,7 +1861,11 @@ function renderPoTable(){
   `).join('');
 
   const banner = document.getElementById('poFilterBanner');
-  if(poStageFilter !== null){
+  if(poPayFilter){
+    banner.style.display = 'flex';
+    banner.innerHTML = `<span>💰 지급 필요(지급일 미입력) 건만 보는 중 (${filtered.length}건)</span><button id="poFilterClearBtn">전체보기</button>`;
+    document.getElementById('poFilterClearBtn').addEventListener('click', resetPoFilter);
+  }else if(poStageFilter !== null){
     banner.style.display = 'flex';
     banner.innerHTML = `<span>"${stripStageNum(STAGE_LABELS[poStageFilter])}" 단계만 보는 중 (${filtered.length}건)</span><button id="poFilterClearBtn">전체보기</button>`;
     document.getElementById('poFilterClearBtn').addEventListener('click', resetPoFilter);
@@ -1853,7 +1902,7 @@ function renderPoTable(){
       <td class="money">${p.piAmount? fmtMoneyCur(deposit, p.currency) + krwSubCur(deposit, p.currency) : '-'}</td>
       <td class="money">${p.piAmount? fmtMoneyCur(balance, p.currency) + krwSubCur(balance, p.currency) : '-'}</td>
       <td>${p.dueDate||'-'}</td>
-      <td><span class="badge" style="background:${STAGE_COLORS[stageIdx]}">${stageLabel}${unsharedNote}</span></td>
+      <td><span class="badge" style="background:${STAGE_COLORS[stageIdx]}">${stageLabel}${unsharedNote}</span>${paymentNeededBadge(paymentNeeded(p))}</td>
       <td>${p.warehouseDate||'-'}</td>
       <td>${p.note ? `<span class="note-dot" title="${p.note.replace(/"/g,'&quot;')}">📝</span>` : ''}${docLinksHtml(p)}</td>
     </tr>`;
@@ -2866,6 +2915,7 @@ document.getElementById('poDateStart').addEventListener('input', renderPoTable);
 document.getElementById('poDateEnd').addEventListener('input', renderPoTable);
 function resetAllFilters(){
   poStageFilter = null;
+  poPayFilter = false;
   document.getElementById('poSearch').value = '';
   document.getElementById('poDateStart').value = '';
   document.getElementById('poDateEnd').value = '';
@@ -3097,6 +3147,14 @@ function computeDomAmounts(po){
   const balance = finalAmt-deposit;
   return {deposit, balance};
 }
+// 국내발주 "지급 필요" 판정 — 실제 지급일자가 비어 있으면 미지급으로 본다 (ERP입력완료여도 포함)
+// 선금=발주금액 입력 후, 잔금=입고 후가 지급 시점.
+function domPaymentNeeded(po){
+  const {deposit, balance} = computeDomAmounts(po);
+  const depositNeeded = deposit > 0 && !!po.poAmount && !po.depositDate;
+  const balanceNeeded = balance > 0 && !!po.warehouseDate && !po.balanceDate;
+  return {depositNeeded, balanceNeeded, any: depositNeeded || balanceNeeded};
+}
 function fmtKrw(n){
   if(n===null||n===undefined||isNaN(n)) return '₩0';
   return '₩' + Math.round(n).toLocaleString();
@@ -3160,7 +3218,7 @@ function renderDomTable(){
       <td class="money">${p.poAmount? fmtKrw(deposit):'-'}</td>
       <td class="money">${p.poAmount? fmtKrw(balance):'-'}</td>
       <td>${p.dueDate||'-'}</td>
-      <td><span class="badge" style="background:${DOM_STAGE_COLORS[stageIdx]}">${stageLabelText(p, stageIdx, true)}</span></td>
+      <td><span class="badge" style="background:${DOM_STAGE_COLORS[stageIdx]}">${stageLabelText(p, stageIdx, true)}</span>${paymentNeededBadge(domPaymentNeeded(p))}</td>
       <td>${p.warehouseDate||'-'}</td>
       <td>${p.note ? `<span class="note-dot" title="${p.note.replace(/"/g,'&quot;')}">📝</span>` : ''}</td>
     </tr>`;
