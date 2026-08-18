@@ -92,13 +92,15 @@
   .combo input { font:inherit; font-size:13px; padding:7px 10px; border-radius:9px; border:1px solid var(--border);
                  background:var(--surface); color:var(--text-1); box-shadow:var(--shadow); min-width:250px; }
   .combo input:focus { outline:2px solid color-mix(in srgb,var(--series-1) 55%, transparent); outline-offset:1px; }
-  .combo-list { position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:300px; overflow-y:auto;
+  .combo-list { position:absolute; top:calc(100% + 4px); right:0; min-width:100%; width:max-content; max-width:min(680px, 92vw); max-height:340px; overflow-y:auto;
                 background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.20); z-index:30; padding:4px; }
   .combo-list[hidden]{ display:none; }
   .combo-item { padding:7px 9px; border-radius:7px; font-size:13px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; justify-content:space-between; gap:10px; }
   .combo-item:hover, .combo-item.active { background:color-mix(in srgb,var(--series-1) 15%, var(--surface)); }
-  .combo-item .code { color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; }
-  .combo-item .qty  { color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; }
+  .combo-item .main { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .combo-item .pcode { color:var(--text-1); font-weight:600; font-variant-numeric:tabular-nums; }
+  .combo-item .pname { color:var(--muted); font-size:12px; margin-left:6px; }
+  .combo-item .qty  { color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; flex-shrink:0; }
   .combo-empty { padding:8px 9px; color:var(--muted); font-size:12px; }
   /* 기간(날짜) 선택 */
   .daterange { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:-4px 0 18px; font-size:13px; color:var(--text-2); }
@@ -554,7 +556,13 @@ function openFilterList(query) {
   if (q) list = filterMembers.filter(m => m.name.toLowerCase().includes(q) || (m.code && m.code.toLowerCase().includes(q)));
   const shown = list.slice(0, 80);
   let html = `<div class="combo-item" data-val="__all__"><span>${meta.all}</span></div>`;
-  html += shown.map(m => `<div class="combo-item" data-val="${String(m.name).replace(/"/g,'&quot;')}"><span>${m.name}${m.code ? ` <span class="code">${m.code}</span>` : ''}</span><span class="qty">${KRW.format(m.qty)}</span></div>`).join('');
+  html += shown.map(m => {
+    // 상품: 품번(진하게) 먼저, 품명(연하게) 뒤에. 코드가 여러 개면 2개까지만.
+    const cs = m.code ? m.code.split(', ') : [];
+    const codeTxt = cs.slice(0,2).join(', ') + (cs.length > 2 ? ` 외 ${cs.length-2}` : '');
+    const main = m.code ? `<span class="pcode">${codeTxt}</span><span class="pname">${m.name}</span>` : `<span>${m.name}</span>`;
+    return `<div class="combo-item" data-val="${String(m.name).replace(/"/g,'&quot;')}"><span class="main">${main}</span><span class="qty">${KRW.format(m.qty)}</span></div>`;
+  }).join('');
   if (!shown.length) html += `<div class="combo-empty">검색 결과가 없습니다</div>`;
   else if (list.length > shown.length) html += `<div class="combo-empty">…외 ${list.length - shown.length}개 (더 입력해 좁혀보세요)</div>`;
   const el = $('#filterList'); el.innerHTML = html; el.hidden = false;
