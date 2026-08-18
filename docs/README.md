@@ -3,13 +3,26 @@
 개발 · 자재 · 생산 · 품질 팀의 구매요청을 한 곳에서 접수하고 정리하는 단일 파일 대시보드입니다.
 별도 설치나 서버 없이 `index.html` 을 브라우저로 열면 바로 동작합니다.
 
-## 실행
+## 실행 (로컬)
 
 ```bash
 # 파일을 더블클릭하거나, 로컬 서버로 열기
-python -m http.server -d purchase-dashboard 8080
+python -m http.server -d docs 8080
 # → http://localhost:8080
 ```
+
+## 공개 주소로 배포 (GitHub Pages)
+
+팀원이 링크로 접속하려면 공용 주소가 필요합니다. 이 저장소는 GitHub Pages로 바로 배포됩니다.
+
+**한 번만 켜기** — GitHub 저장소 → **Settings → Pages**
+- **Source**: `Deploy from a branch`
+- **Branch**: `claude/purchase-request-dashboard-9xcp9x` , 폴더: `/docs` → **Save**
+
+1~2분 뒤 주소가 생성됩니다: `https://asdf86226-crypto.github.io/-/`
+이 주소를 팀원에게 공유하면 됩니다(설정 창의 '🔗 팀원 공유용 링크 복사'로 시트 연결까지 담아 전달 가능).
+
+> `docs/.nojekyll` 파일은 Pages가 파일을 그대로 서빙하도록(변환 없이) 하기 위한 것입니다.
 
 ## 두 가지 모드
 
