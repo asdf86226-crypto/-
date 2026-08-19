@@ -106,6 +106,15 @@
   .daterange { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:-4px 0 18px; font-size:13px; color:var(--text-2); }
   .daterange .dr-label { font-weight:600; }
   .dinput { font:inherit; font-size:13px; padding:6px 9px; border-radius:9px; border:1px solid var(--border); background:var(--surface); color:var(--text-1); box-shadow:var(--shadow); color-scheme:light dark; }
+  /* 순위 카드: 검색 + 전체 항목 스크롤 */
+  .rank-tools { display:flex; align-items:center; gap:10px; margin:0 0 10px; }
+  .rank-tools .dinput { flex:1; min-width:0; }
+  .rank-count { font-size:12px; color:var(--muted); white-space:nowrap; }
+  .rank-scroll { max-height:420px; overflow-y:auto; overflow-x:hidden; }
+  rect.pbar { cursor:pointer; }
+  /* 상세표에서 선택 항목 강조 */
+  tbody tr.hl { background:color-mix(in srgb, var(--series-1) 16%, var(--surface)); }
+  tbody tr.hl td:first-child { box-shadow:inset 3px 0 0 var(--series-1); font-weight:700; }
   .btn.sm { padding:6px 11px; font-size:12px; box-shadow:none; }
   /* 피벗(품목×기간) 표: 첫 열 고정 느낌 */
   .pivot td:first-child, .pivot th:first-child { text-align:left; font-variant-numeric:normal; position:sticky; left:0; background:var(--surface); }
@@ -213,8 +222,12 @@
   <div class="grid2">
     <div class="card" id="prodCard">
       <h2 id="rankTitle">상품별 판매 순위</h2>
-      <p class="hint" id="rankHint">전체 기간 기준 상위 12개입니다. 막대에 올리면 매출·비중이 보입니다.</p>
-      <div class="chart"><svg id="prodChart" width="100%" height="360" role="img" aria-label="분석 기준별 판매 순위"></svg></div>
+      <p class="hint" id="rankHint">전체 항목이 판매량 순으로 나옵니다. 막대에 올리면 매출·비중이 보이고, 클릭하면 오른쪽 표에서 강조됩니다.</p>
+      <div class="rank-tools">
+        <input id="rankSearch" class="dinput" type="search" placeholder="품목코드·이름으로 찾기" aria-label="순위 검색">
+        <span class="rank-count" id="rankCount"></span>
+      </div>
+      <div class="chart rank-scroll"><svg id="prodChart" width="100%" role="img" aria-label="분석 기준별 판매 순위"></svg></div>
     </div>
     <div class="card">
       <h2 id="dimTableTitle">상품별 상세</h2>
@@ -530,6 +543,8 @@ function applyPreset(p) {
          setDateRange(f < b.min ? b.min : f, b.max); }
   render();
 }
+let rankQuery = '';       // 순위 카드 검색어
+let rankSelected = null;  // 순위에서 선택(클릭)한 항목명 → 상세표 강조
 let filterMembers = [];   // 현재 분석 기준의 항목들 {name, code, qty} — 전체 기간 기준(목록 안정성)
 function rebuildFilter() {
   const meta = DIMS[currentDim];
@@ -641,30 +656,48 @@ function renderTrend(rows) {
 /* ---------- 분석 기준별 순위 (가로 막대) ---------- */
 function renderRank(items) {
   const svg = $('#prodChart'), tip = $('#tooltip');
-  const top = items.slice(0, 12);
-  const W = svg.clientWidth || 520, rowH = 26, H = Math.max(120, top.length*rowH + 40);
-  const m = {top:8,right:16,bottom:8,left:130};
+  const q = rankQuery.trim().toLowerCase();
+  const list = q ? items.filter(p => p.name.toLowerCase().includes(q) || (p.codeFull||'').toLowerCase().includes(q)) : items;
+  $('#rankCount').textContent = q ? `${KRW.format(list.length)} / ${KRW.format(items.length)}개` : `전체 ${KRW.format(items.length)}개`;
+
+  const W = svg.clientWidth || 520, rowH = 26, H = Math.max(80, list.length*rowH + 16);
+  const m = {top:8,right:16,left:130};
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height',H);
-  if (!top.length) { svg.innerHTML=''; return; }
-  const max = Math.max(1,...top.map(p=>p.qty));
+  if (!list.length) { svg.innerHTML = `<text x="14" y="28" class="axis-label">검색 결과가 없습니다</text>`; return; }
+  const max = Math.max(1,...list.map(p=>p.qty));
   const labelW = String(KRW.format(max)).length * 7 + 12;      // 막대 끝 값 라벨이 잘리지 않도록 우측 공간 확보
   const iw = Math.max(40, W - m.left - m.right - labelW);
+  const showCode = currentDim === 'product';
   let s = '';
-  top.forEach((p,i)=>{
+  list.forEach((p,i)=>{
     const y = m.top + i*rowH, bw = (p.qty/max)*iw;
     const color = `var(${SERIES[i % SERIES.length]})`;
-    const name = p.name.length>10 ? p.name.slice(0,10)+'…' : p.name;
-    s+=`<text class="axis-label" x="${m.left-8}" y="${y+rowH/2+4}" text-anchor="end" fill="var(--text-2)">${name}</text>`;
-    s+=`<rect class="pbar" x="${m.left}" y="${y+4}" width="${Math.max(2,bw).toFixed(1)}" height="${rowH-10}" rx="4" fill="${color}" data-i="${i}"/>`;
+    const raw = showCode && p.code ? p.code : p.name;           // 상품은 품목코드로 표기
+    const lbl = raw.length>14 ? raw.slice(0,14)+'…' : raw;
+    const sel = p.name === rankSelected;
+    s+=`<text class="axis-label" x="${m.left-8}" y="${y+rowH/2+4}" text-anchor="end" fill="${sel?'var(--text-1)':'var(--text-2)'}" font-weight="${sel?700:400}">${lbl}</text>`;
+    s+=`<rect class="pbar" x="${m.left}" y="${y+4}" width="${Math.max(2,bw).toFixed(1)}" height="${rowH-10}" rx="4" fill="${color}" data-i="${i}"${sel?' stroke="var(--text-1)" stroke-width="1.5"':''}/>`;
     s+=`<text class="axis-label" x="${m.left+bw+6}" y="${y+rowH/2+4}" fill="var(--text-2)">${KRW.format(p.qty)}</text>`;
   });
   svg.innerHTML = s;
   svg.querySelectorAll('rect.pbar').forEach(rect=>{
-    rect.addEventListener('mousemove',e=>{ const p=top[+rect.dataset.i];
+    rect.addEventListener('mousemove',e=>{ const p=list[+rect.dataset.i];
       tip.innerHTML=`<div>${p.name}</div>${p.code?`<div style="opacity:.75">코드 ${p.code}</div>`:''}<div>판매량 <b>${KRW.format(p.qty)}</b> 개</div><div>매출 <b>${KRW.format(Math.round(p.amount))}</b> 원</div><div>비중 <b>${p.share.toFixed(1)}</b>%</div>`;
       tip.style.opacity=1; tip.style.left=Math.min(e.clientX+14, innerWidth-tip.offsetWidth-12)+'px'; tip.style.top=(e.clientY-10)+'px'; });
     rect.addEventListener('mouseleave',()=>{ tip.style.opacity=0; });
+    rect.addEventListener('click',()=>{ const p=list[+rect.dataset.i];
+      rankSelected = (rankSelected === p.name) ? null : p.name;   // 다시 누르면 해제
+      renderRank(items); highlightDimRow();
+    });
   });
+}
+/* 상세표에서 선택 항목 강조 + 스크롤 */
+function highlightDimRow() {
+  const tb = $('#prodTable').querySelector('tbody');
+  tb.querySelectorAll('tr.hl').forEach(tr=>tr.classList.remove('hl'));
+  if (!rankSelected) return;
+  const tr = tb.querySelector(`tr[data-name="${String(rankSelected).replace(/"/g,'&quot;')}"]`);
+  if (tr) { tr.classList.add('hl'); tr.scrollIntoView({ block:'nearest' }); }
 }
 
 /* ---------- 기간 상세 테이블 ---------- */
@@ -691,7 +724,7 @@ function renderDimTable(items, dimLabel) {
     const unit = p.qty ? KRW.format(Math.round(p.amount/p.qty)) : '-';
     const codeCell = showCode ? `<td style="text-align:left;font-variant-numeric:normal;color:var(--text-2)">${p.code || '-'}</td>` : '';
     const catCell = showCode ? `<td style="text-align:left;font-variant-numeric:normal;color:var(--text-2);white-space:nowrap">${p.category || '-'}</td>` : '';
-    return `<tr>${codeCell}<td style="text-align:left;font-variant-numeric:normal">${p.name}</td>${catCell}
+    return `<tr data-name="${String(p.name).replace(/"/g,'&quot;')}">${codeCell}<td style="text-align:left;font-variant-numeric:normal">${p.name}</td>${catCell}
       <td class="bar-cell" style="--w:${w}%">${KRW.format(p.qty)}</td>
       <td>${KRW.format(Math.round(p.amount))}</td><td>${unit}</td><td>${p.share.toFixed(1)}%</td></tr>`;
   }).join('');
@@ -790,13 +823,15 @@ function render(mapping, fname) {
   $('#chartTitle').textContent = `${name} 판매량 추이${pf}`;
   $('#tableTitle').textContent = `${name} 상세${pf}`;
   $('#rankTitle').textContent  = `${meta.label}별 판매 순위`;
-  $('#rankHint').textContent   = `전체 기간 기준 ${meta.label} 판매량 상위 12개입니다. 막대에 올리면 매출·비중이 보입니다.`;
+  $('#rankHint').textContent   = `${meta.label} 전체가 판매량 순으로 나옵니다. 막대를 클릭하면 오른쪽 ${meta.label}별 상세 표에서 강조됩니다.`;
+  $('#rankSearch').placeholder = currentDim === 'product' ? '품목코드·품목명으로 찾기' : `${meta.label} 이름으로 찾기`;
   $('#dimTableTitle').textContent = `${meta.label}별 상세`;
   renderKPIs(rows, currentPeriod);
   renderTrend(rows);
   renderRank(dimItems);
   renderTable(rows, currentPeriod);
   renderDimTable(dimItems, meta.label);
+  highlightDimRow();
   renderItemQuarter();
   renderCustomerDrill();
   if (amountKey) $('#amtLegend').textContent = `매출(${amountKey})`;
@@ -917,7 +952,8 @@ function makeSampleData() {
 /* ---------- 이벤트 ---------- */
 $('#tabs').addEventListener('click', e=>{ const t=e.target.closest('.tab'); if(!t) return;
   currentPeriod=t.dataset.period; [...$('#tabs').children].forEach(x=>x.setAttribute('aria-selected',x===t)); render(); });
-$('#dimSelect').addEventListener('change', e=>{ currentDim=e.target.value; rebuildFilter(); render(); });
+$('#dimSelect').addEventListener('change', e=>{ currentDim=e.target.value; rankQuery=''; rankSelected=null; $('#rankSearch').value=''; rebuildFilter(); render(); });
+$('#rankSearch').addEventListener('input', e=>{ rankQuery=e.target.value; renderRank(aggregateDim(currentDim)); highlightDimRow(); });
 $('#dateFrom').addEventListener('change', applyDateInputs);
 $('#dateTo').addEventListener('change', applyDateInputs);
 $('#daterange').addEventListener('click', e=>{ const btn=e.target.closest('[data-preset]'); if(btn) applyPreset(btn.dataset.preset); });
