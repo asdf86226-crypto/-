@@ -845,6 +845,9 @@ function renderItemQuarter() {
   ratio = Math.min(2, Math.max(0.5, ratio));
   const nextMonth = Math.round(r3avg * ratio);
   const next3 = nextMonth * 3;
+  // 예상 대상 기간: 기준월부터 3개월 (기준월은 아직 진행 중이므로 포함)
+  const nextMonths = [0,1,2].map(i => monthBack(ref, -i));
+  const nextLabels = `${nextMonths[0].label}~${nextMonths[2].label}`;
   const diffPct = p6avg > 0 ? (r3avg - p6avg) / p6avg * 100 : null;
   const dirCls = diffPct == null ? '' : (diffPct >= 0 ? 'up' : 'down');
   const dirTxt = diffPct == null ? '비교 기간 데이터 없음'
@@ -862,9 +865,9 @@ function renderItemQuarter() {
       <div class="sub ${dirCls}">${dirTxt}</div>
     </div>
     <div class="stat-row accent">
-      <div class="k">다음 1개월 예상 필요량</div>
-      <div class="v">${KRW.format(nextMonth)}<span class="u">개</span></div>
-      <div class="sub">다음 3개월이면 약 ${KRW.format(next3)}개</div>
+      <div class="k">다음 3개월 예상 필요량</div>
+      <div class="v">${KRW.format(next3)}<span class="u">개</span></div>
+      <div class="sub">월평균 약 ${KRW.format(nextMonth)}개 기준 · ${nextLabels}</div>
     </div>
     <div class="stat-note">
       예상치 = 최근 3개월 월평균 × 추세비(최근 3개월 ÷ 직전 6개월 = ${ratioRaw.toFixed(2)}${ratioRaw !== ratio ? ` → ${ratio.toFixed(2)}로 제한` : ''}).
