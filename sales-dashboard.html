@@ -750,7 +750,8 @@ function renderRank(items) {
     rect.addEventListener('mouseleave',()=>{ tip.style.opacity=0; });
     rect.addEventListener('click',()=>{ const p=list[+rect.dataset.i];
       rankSelected = (rankSelected === p.name) ? null : p.name;   // 다시 누르면 해제
-      renderRank(items); highlightDimRow();
+      if (currentDim === 'group') render();                       // 분류 선택 → 그 분류의 품목 표로 교체
+      else { renderRank(items); highlightDimRow(); }
     });
   });
 }
@@ -783,17 +784,30 @@ function renderTable(rows, period) {
   }).reverse().join('');
 }
 
+/* ---------- 상세 테이블에 쓸 데이터 (표시·복사·내보내기 공용) ----------
+ * 상품분류 기준일 때는 분류 요약이 아니라 품목코드 단위로 보여준다.
+ * 순위에서 분류를 고르면(또는 상단 필터로 고르면) 그 분류의 품목만. */
+function dimTableData() {
+  if (currentDim === 'group') {
+    const cat = currentFilter !== '__all__' ? currentFilter : rankSelected;
+    const rows = cat ? rankRows().filter(r => categoryOf(r.product, r.code) === cat) : rankRows();
+    return { items: aggregateDim('product', rows), label: '품목', showCode: true, showCategory: !cat, cat };
+  }
+  return { items: aggregateDim(currentDim), label: DIMS[currentDim].label,
+           showCode: currentDim === 'product', showCategory: currentDim === 'product', cat: null };
+}
+
 /* ---------- 분석 기준별 상세 테이블 ---------- */
-function renderDimTable(items, dimLabel) {
-  const showCode = currentDim === 'product';
+function renderDimTable(d) {
+  const items = d.items, dimLabel = d.label, showCode = d.showCode, showCat = d.showCategory;
   const maxQty = Math.max(1,...items.map(p=>p.qty));
   $('#prodTable').querySelector('thead').innerHTML =
-    `<tr>${showCode ? '<th style="text-align:left">품목코드</th>' : ''}<th style="text-align:left">${dimLabel}</th>${showCode ? '<th style="text-align:left">상품분류</th>' : ''}<th>판매량</th><th>매출</th><th>평균 단가</th><th>비중</th></tr>`;
+    `<tr>${showCode ? '<th style="text-align:left">품목코드</th>' : ''}<th style="text-align:left">${dimLabel}</th>${showCat ? '<th style="text-align:left">상품분류</th>' : ''}<th>판매량</th><th>매출</th><th>평균 단가</th><th>비중</th></tr>`;
   $('#prodTable').querySelector('tbody').innerHTML = items.map(p=>{
     const w = (p.qty/maxQty*100).toFixed(1);
     const unit = p.qty ? KRW.format(Math.round(p.amount/p.qty)) : '-';
     const codeCell = showCode ? `<td style="text-align:left;font-variant-numeric:normal;color:var(--text-2)">${p.code || '-'}</td>` : '';
-    const catCell = showCode ? `<td style="text-align:left;font-variant-numeric:normal;color:var(--text-2);white-space:nowrap">${p.category || '-'}</td>` : '';
+    const catCell = showCat ? `<td style="text-align:left;font-variant-numeric:normal;color:var(--text-2);white-space:nowrap">${p.category || '-'}</td>` : '';
     return `<tr data-name="${String(p.name).replace(/"/g,'&quot;')}">${codeCell}<td class="name-cell" title="${String(p.name).replace(/"/g,'&quot;')}">${p.name}</td>${catCell}
       <td class="bar-cell" style="--w:${w}%">${KRW.format(p.qty)}</td>
       <td>${KRW.format(Math.round(p.amount))}</td><td>${unit}</td><td>${p.share.toFixed(1)}%</td></tr>`;
@@ -957,14 +971,22 @@ function render(mapping, fname) {
   const fd = d => `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
   const rangeTxt = (rankFrom && rankTo) ? `${fd(rankFrom)} ~ ${fd(rankTo)}` : '전체 기간';
   $('#rankHint').textContent   = `${rangeTxt} 기준, ${meta.label} 전체가 판매량 순으로 나옵니다. 막대를 클릭하면 오른쪽 표에서 강조됩니다.`;
-  $('#dimTableHint').textContent = `${rangeTxt} 기준. 비중은 총 판매량 대비 각 항목의 비율입니다.`;
   $('#rankSearch').placeholder = currentDim === 'product' ? '품목코드·품목명으로 찾기' : `${meta.label} 이름으로 찾기`;
-  $('#dimTableTitle').textContent = `${meta.label}별 상세`;
+  const dt = dimTableData();
+  if (currentDim === 'group') {
+    $('#dimTableTitle').textContent = dt.cat ? `${dt.cat} · 품목별 상세` : '품목별 상세 (전체 분류)';
+    $('#dimTableHint').textContent = dt.cat
+      ? `${rangeTxt} 기준 · ${dt.cat} 품목 ${KRW.format(dt.items.length)}종. 비중은 ${dt.cat} 안에서의 비율입니다. 왼쪽 순위에서 다른 분류를 클릭하면 바뀝니다.`
+      : `${rangeTxt} 기준. 왼쪽 순위에서 분류를 클릭하면 그 분류의 품목만 봅니다. 비중은 총 판매량 대비 비율입니다.`;
+  } else {
+    $('#dimTableTitle').textContent = `${meta.label}별 상세`;
+    $('#dimTableHint').textContent = `${rangeTxt} 기준. 비중은 총 판매량 대비 각 항목의 비율입니다.`;
+  }
   renderKPIs(rows, currentPeriod);
   renderTrend(rows);
   renderRank(dimItems);
   renderTable(rows, currentPeriod);
-  renderDimTable(dimItems, meta.label);
+  renderDimTable(dt);
   highlightDimRow();
   renderItemQuarter();
   renderCustomerDrill();
@@ -985,15 +1007,14 @@ function render(mapping, fname) {
 
 /* ---------- 현재 뷰 표 데이터 (복사·내보내기 공용) ---------- */
 function currentViewTable() {
-  const meta = DIMS[currentDim];
-  const showCode = currentDim === 'product';
+  const d = dimTableData();                  // 화면에 보이는 표와 동일하게
   const money = amountKey ? `매출(${amountKey})` : '매출';
-  const headers = (showCode ? ['품목코드'] : []).concat([meta.label], showCode ? ['상품분류'] : [], ['판매량', money, '평균단가', '비중(%)']);
-  const rows = aggregateDim(currentDim).map(p => {
+  const headers = (d.showCode ? ['품목코드'] : []).concat([d.label], d.showCategory ? ['상품분류'] : [], ['판매량', money, '평균단가', '비중(%)']);
+  const rows = d.items.map(p => {
     const unit = p.qty ? Math.round(p.amount / p.qty) : 0;
-    return (showCode ? [p.codeFull || p.code] : []).concat([p.name], showCode ? [p.category] : [], [p.qty, Math.round(p.amount), unit, Number(p.share.toFixed(1))]);
+    return (d.showCode ? [p.codeFull || p.code] : []).concat([p.name], d.showCategory ? [p.category] : [], [p.qty, Math.round(p.amount), unit, Number(p.share.toFixed(1))]);
   });
-  return { headers, rows, label: meta.label };
+  return { headers, rows, label: d.cat ? `${d.cat} 품목` : d.label };
 }
 const todayStr = () => new Date().toISOString().slice(0,10);
 
