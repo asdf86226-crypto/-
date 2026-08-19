@@ -78,6 +78,8 @@
   thead th { color:var(--muted); font-weight:600; font-size:12px; border-bottom:1px solid var(--baseline); position:sticky; top:0; background:var(--surface); z-index:2; white-space:nowrap; }
   tbody tr:hover { background:color-mix(in srgb,var(--surface) 90%,var(--text-1)); }
   .table-scroll { max-height:380px; overflow-y:auto; overflow-x:auto; }
+  /* 품목명: 한 줄 + 넘치면 말줄임 (표가 세로로 눌리지 않게) */
+  td.name-cell { text-align:left; font-variant-numeric:normal; max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   /* 판매량 셀: 막대를 셀 배경 그라디언트로 그려 절대위치·z-index 없이 안전하게 (sticky 헤더와 겹치지 않음) */
   .bar-cell { background-image:linear-gradient(to right, color-mix(in srgb,var(--series-1) 20%, transparent) var(--w,0%), transparent var(--w,0%));
               background-repeat:no-repeat; background-position:left center; background-size:100% 66%; }
@@ -107,10 +109,11 @@
   .daterange .dr-label { font-weight:600; }
   .dinput { font:inherit; font-size:13px; padding:6px 9px; border-radius:9px; border:1px solid var(--border); background:var(--surface); color:var(--text-1); box-shadow:var(--shadow); color-scheme:light dark; }
   /* 순위 카드: 검색 + 전체 항목 스크롤 */
-  .rank-tools { display:flex; align-items:center; gap:10px; margin:0 0 10px; }
-  .rank-tools .dinput { flex:1; min-width:0; }
+  .rank-tools { display:flex; align-items:center; justify-content:flex-end; gap:10px; margin:0 0 10px; }
+  .rank-tools .dinput { width:min(280px, 60%); }
   .rank-count { font-size:12px; color:var(--muted); white-space:nowrap; }
   .rank-scroll { max-height:420px; overflow-y:auto; overflow-x:hidden; }
+  .rank-scroll svg { display:block; }
   rect.pbar { cursor:pointer; }
   /* 상세표에서 선택 항목 강조 */
   tbody tr.hl { background:color-mix(in srgb, var(--series-1) 16%, var(--surface)); }
@@ -660,9 +663,12 @@ function renderRank(items) {
   const list = q ? items.filter(p => p.name.toLowerCase().includes(q) || (p.codeFull||'').toLowerCase().includes(q)) : items;
   $('#rankCount').textContent = q ? `${KRW.format(list.length)} / ${KRW.format(items.length)}개` : `전체 ${KRW.format(items.length)}개`;
 
-  const W = svg.clientWidth || 520, rowH = 26, H = Math.max(80, list.length*rowH + 16);
+  const W = svg.clientWidth || 520, rowH = 30, H = Math.max(80, list.length*rowH + 16);
   const m = {top:8,right:16,left:130};
-  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height',H);
+  // viewBox와 실제 픽셀 높이를 1:1로 맞춰야 스크롤 영역 안에서 어긋나지 않는다
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  svg.setAttribute('preserveAspectRatio','xMinYMin meet');
+  svg.style.height = H + 'px'; svg.style.width = '100%'; svg.style.display = 'block';
   if (!list.length) { svg.innerHTML = `<text x="14" y="28" class="axis-label">검색 결과가 없습니다</text>`; return; }
   const max = Math.max(1,...list.map(p=>p.qty));
   const labelW = String(KRW.format(max)).length * 7 + 12;      // 막대 끝 값 라벨이 잘리지 않도록 우측 공간 확보
@@ -724,7 +730,7 @@ function renderDimTable(items, dimLabel) {
     const unit = p.qty ? KRW.format(Math.round(p.amount/p.qty)) : '-';
     const codeCell = showCode ? `<td style="text-align:left;font-variant-numeric:normal;color:var(--text-2)">${p.code || '-'}</td>` : '';
     const catCell = showCode ? `<td style="text-align:left;font-variant-numeric:normal;color:var(--text-2);white-space:nowrap">${p.category || '-'}</td>` : '';
-    return `<tr data-name="${String(p.name).replace(/"/g,'&quot;')}">${codeCell}<td style="text-align:left;font-variant-numeric:normal">${p.name}</td>${catCell}
+    return `<tr data-name="${String(p.name).replace(/"/g,'&quot;')}">${codeCell}<td class="name-cell" title="${String(p.name).replace(/"/g,'&quot;')}">${p.name}</td>${catCell}
       <td class="bar-cell" style="--w:${w}%">${KRW.format(p.qty)}</td>
       <td>${KRW.format(Math.round(p.amount))}</td><td>${unit}</td><td>${p.share.toFixed(1)}%</td></tr>`;
   }).join('');
