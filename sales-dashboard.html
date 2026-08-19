@@ -351,6 +351,21 @@ const DICT = {
 // 부가세/단가처럼 매출로 오해하기 쉬운 열은 매출 후보에서 제외
 const AMT_EXCLUDE = ['부가세','vat','세액','단가','unit','원가','잔액','미수'];
 const EXCLUDE = ['코드','code','번호','no.','구분','id'];
+
+/* ---------- 거래처 사명 변경 통합 ----------
+ * 옛 사명으로 기록된 거래처를 현재 사명으로 합친다.
+ * 키는 (주)·주식회사·공백 등을 뗀 핵심 이름 → 통합 후 표기.
+ * 예) 대림비앤코(주) · 대림비앤코주식회사 → 대림바스(주)
+ *     (이건비앤코(주)처럼 앞부분이 다른 회사는 영향 없음) */
+const CUSTOMER_ALIAS = {
+  '대림비앤코': '대림바스(주)',
+};
+function canonCustomer(name) {
+  const s = String(name == null ? '' : name).trim();
+  if (!s) return '(미지정)';
+  const core = s.replace(/㈜|\(주\)|\(株\)|주식회사/g, '').replace(/[\s.,·\-_()]/g, '');
+  return CUSTOMER_ALIAS[core] || s;
+}
 const norm = (s) => String(s == null ? '' : s).toLowerCase().replace(/\s/g,'');
 
 function findHeaderRow(rows) {
@@ -427,7 +442,7 @@ function ingestRows(rows) {
     if (qty === 0 && !anyAmt) continue;           // 합계행·export시각 footer·공백행 skip
     const product  = pi >= 0 ? (String(r[pi]).trim() || '(미지정)') : '(미지정)';
     const code     = pci >= 0 ? String(r[pci]).trim() : '';
-    const customer = ci >= 0 ? (String(r[ci]).trim() || '(미지정)') : '(미지정)';
+    const customer = ci >= 0 ? canonCustomer(r[ci]) : '(미지정)';
     out.push({ date: dt, qty, amounts, product, code, customer });
   }
   if (!out.length) throw new Error('읽을 수 있는 판매 데이터 행이 없습니다.');
