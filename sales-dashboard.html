@@ -750,7 +750,7 @@ function renderRank(items) {
     rect.addEventListener('mouseleave',()=>{ tip.style.opacity=0; });
     rect.addEventListener('click',()=>{ const p=list[+rect.dataset.i];
       rankSelected = (rankSelected === p.name) ? null : p.name;   // 다시 누르면 해제
-      if (currentDim === 'group') render();                       // 분류 선택 → 그 분류의 품목 표로 교체
+      if (currentDim === 'group' || currentDim === 'customer') render();  // 선택 항목의 품목 표로 교체
       else { renderRank(items); highlightDimRow(); }
     });
   });
@@ -792,6 +792,13 @@ function dimTableData() {
     const cat = currentFilter !== '__all__' ? currentFilter : rankSelected;
     const rows = cat ? rankRows().filter(r => categoryOf(r.product, r.code) === cat) : rankRows();
     return { items: aggregateDim('product', rows), label: '품목', showCode: true, showCategory: !cat, cat };
+  }
+  if (currentDim === 'customer') {
+    const cust = currentFilter !== '__all__' ? currentFilter : rankSelected;
+    if (cust) {   // 거래처를 고르면 그 거래처가 산 품목들
+      const rows = rankRows().filter(r => (r.customer || '(미지정)') === cust);
+      return { items: aggregateDim('product', rows), label: '품목', showCode: true, showCategory: true, cat: cust };
+    }
   }
   return { items: aggregateDim(currentDim), label: DIMS[currentDim].label,
            showCode: currentDim === 'product', showCategory: currentDim === 'product', cat: null };
@@ -973,14 +980,17 @@ function render(mapping, fname) {
   $('#rankHint').textContent   = `${rangeTxt} 기준, ${meta.label} 전체가 판매량 순으로 나옵니다. 막대를 클릭하면 오른쪽 표에서 강조됩니다.`;
   $('#rankSearch').placeholder = currentDim === 'product' ? '품목코드·품목명으로 찾기' : `${meta.label} 이름으로 찾기`;
   const dt = dimTableData();
-  if (currentDim === 'group') {
-    $('#dimTableTitle').textContent = dt.cat ? `${dt.cat} · 품목별 상세` : '품목별 상세 (전체 분류)';
-    $('#dimTableHint').textContent = dt.cat
-      ? `${rangeTxt} 기준 · ${dt.cat} 품목 ${KRW.format(dt.items.length)}종. 비중은 ${dt.cat} 안에서의 비율입니다. 왼쪽 순위에서 다른 분류를 클릭하면 바뀝니다.`
-      : `${rangeTxt} 기준. 왼쪽 순위에서 분류를 클릭하면 그 분류의 품목만 봅니다. 비중은 총 판매량 대비 비율입니다.`;
+  if (dt.cat) {                       // 분류·거래처를 골라 품목 단위로 파고든 상태
+    $('#dimTableTitle').textContent = `${dt.cat} · 품목별 상세`;
+    $('#dimTableHint').textContent =
+      `${rangeTxt} 기준 · 품목 ${KRW.format(dt.items.length)}종. 비중은 ${dt.cat} 안에서의 비율입니다. 왼쪽 순위에서 다른 ${meta.label}를 클릭하면 바뀌고, 같은 것을 다시 클릭하면 해제됩니다.`;
+  } else if (currentDim === 'group') {
+    $('#dimTableTitle').textContent = '품목별 상세 (전체 분류)';
+    $('#dimTableHint').textContent = `${rangeTxt} 기준. 왼쪽 순위에서 분류를 클릭하면 그 분류의 품목만 봅니다. 비중은 총 판매량 대비 비율입니다.`;
   } else {
     $('#dimTableTitle').textContent = `${meta.label}별 상세`;
-    $('#dimTableHint').textContent = `${rangeTxt} 기준. 비중은 총 판매량 대비 각 항목의 비율입니다.`;
+    $('#dimTableHint').textContent = `${rangeTxt} 기준. 비중은 총 판매량 대비 각 항목의 비율입니다.`
+      + (currentDim === 'customer' ? ' 왼쪽 순위에서 거래처를 클릭하면 그 거래처가 산 품목이 나옵니다.' : '');
   }
   renderKPIs(rows, currentPeriod);
   renderTrend(rows);
