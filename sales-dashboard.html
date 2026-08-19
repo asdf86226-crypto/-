@@ -113,6 +113,18 @@
   .daterange .dr-label { font-weight:600; }
   .dinput { font:inherit; font-size:13px; padding:6px 9px; border-radius:9px; border:1px solid var(--border); background:var(--surface); color:var(--text-1); box-shadow:var(--shadow); color-scheme:light dark; }
   /* 순위 카드: 검색 + 전체 항목 스크롤 */
+  /* 최근 3개월 카드: 차트 + 수치 패널 */
+  .recent-grid { display:grid; grid-template-columns:1.5fr 1fr; gap:22px; align-items:start; }
+  @media (max-width:960px){ .recent-grid{grid-template-columns:1fr;} }
+  .stat-panel { display:flex; flex-direction:column; gap:10px; }
+  .stat-row { border:1px solid var(--border); border-radius:12px; padding:12px 14px; background:var(--surface); }
+  .stat-row .k { font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .stat-row .v { font-size:22px; font-weight:700; letter-spacing:-0.01em; }
+  .stat-row .v .u { font-size:12px; font-weight:500; color:var(--text-2); margin-left:3px; }
+  .stat-row .sub { font-size:11px; color:var(--muted); margin-top:4px; }
+  .stat-row.accent { border-color:color-mix(in srgb,var(--series-1) 45%,var(--border)); background:color-mix(in srgb,var(--series-1) 8%,var(--surface)); }
+  .stat-row .up { color:var(--good); } .stat-row .down { color:var(--bad); }
+  .stat-note { font-size:11px; color:var(--muted); line-height:1.5; }
   .rank-tools { display:flex; align-items:center; justify-content:flex-end; gap:10px; margin:0 0 10px; }
   .rank-tools .dinput { width:min(280px, 60%); }
   .rank-count { font-size:12px; color:var(--muted); white-space:nowrap; }
@@ -213,9 +225,12 @@
   </div>
 
   <div class="card" id="itemQuarterCard" hidden>
-    <h2 id="itemQuarterTitle">품목 3개월 단위 판매량</h2>
-    <p class="hint">선택한 품목의 3개월(분기) 단위 판매량입니다.</p>
-    <div class="chart"><svg id="itemQuarterChart" width="100%" height="300" role="img" aria-label="품목 3개월 단위 판매량"></svg></div>
+    <h2 id="itemQuarterTitle">품목 최근 3개월 판매량</h2>
+    <p class="hint" id="itemRecentHint">기준일 직전 3개월의 월별 판매량입니다.</p>
+    <div class="recent-grid">
+      <div class="chart"><svg id="itemQuarterChart" width="100%" height="300" role="img" aria-label="품목 최근 3개월 판매량"></svg></div>
+      <div class="stat-panel" id="itemStats"></div>
+    </div>
   </div>
 
   <div class="card" id="custDrillCard" hidden>
@@ -786,17 +801,75 @@ function renderVBars(sel, buckets) {
   });
 }
 
-/* ---------- 품목 3개월(분기) 단위 판매량 (상품 필터 시) ---------- */
+/* ---------- 품목: 기준일 직전 3개월 판매량 + 직전 6개월 대비 예상 (상품 필터 시) ---------- */
+const monthKeyOf = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+// 기준월(기준일이 속한 달)을 제외하고 back개월 전의 달
+function monthBack(ref, back) {
+  const d = new Date(ref.getFullYear(), ref.getMonth() - back, 1);
+  return { key: monthKeyOf(d), label: `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}`, start: d, end: new Date(d.getFullYear(), d.getMonth()+1, 0) };
+}
 function renderItemQuarter() {
   const card = $('#itemQuarterCard');
   if (!(currentDim === 'product' && currentFilter !== '__all__')) { card.hidden = true; return; }
   card.hidden = false;
-  $('#itemQuarterTitle').textContent = `${currentFilter} · 3개월(분기) 단위 판매량`;
-  const periods = periodsInSpan('quarter');
-  const idx = new Map(periods.map((p,i)=>[p.key,i]));
-  const qty = periods.map(()=>0);
-  for (const r of viewRows()) { if (r.product !== currentFilter) continue; const i = idx.get(periodKey(r.date,'quarter').key); if (i!=null) qty[i]+=r.qty; }
-  renderVBars('#itemQuarterChart', periods.map((p,i)=>({label:p.label, qty:qty[i]})));
+
+  const bounds = dataBounds();
+  const ref = (dateTo || bounds.max);                    // 기준일 (선택 종료일, 없으면 데이터 마지막 날)
+  const recent3 = [3,2,1].map(b => monthBack(ref, b));    // 직전 3개월 (기준월 제외)
+  const prior6  = [9,8,7,6,5,4].map(b => monthBack(ref, b)); // 그 직전 6개월
+
+  // 품목의 월별 판매량 (기간 선택과 무관하게 전체 데이터에서 — 직전 6개월 비교를 위해)
+  const monthly = new Map();
+  for (const r of RAW) { if (r.product !== currentFilter) continue;
+    const k = monthKeyOf(r.date); monthly.set(k, (monthly.get(k)||0) + r.qty); }
+  const qtyOf = (m) => monthly.get(m.key) || 0;
+
+  // 데이터가 실제로 존재할 수 있는 달만 평균 분모로 사용 (데이터 이전 달은 제외)
+  const covered = (m) => m.end >= bounds.min && m.start <= bounds.max;
+  const avgOf = (arr) => { const c = arr.filter(covered); return c.length ? c.reduce((s,m)=>s+qtyOf(m),0)/c.length : 0; };
+
+  const r3avg = avgOf(recent3), p6avg = avgOf(prior6);
+  const r3sum = recent3.reduce((s,m)=>s+qtyOf(m),0);
+  const p6cov = prior6.filter(covered).length;
+
+  const f = d => `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+  $('#itemQuarterTitle').textContent = `${currentFilter} · 최근 3개월 판매량`;
+  $('#itemRecentHint').textContent =
+    `기준일 ${f(ref)} · 직전 3개월(${recent3[0].label}~${recent3[2].label}) 월별 판매량입니다. 오른쪽은 직전 6개월(${prior6[0].label}~${prior6[5].label})과 비교한 수치입니다.`;
+
+  renderVBars('#itemQuarterChart', recent3.map(m => ({ label:m.label, qty:qtyOf(m) })));
+
+  // 추세비 = 최근 3개월 월평균 ÷ 직전 6개월 월평균 (안정성을 위해 0.5~2.0로 제한)
+  let ratio = p6avg > 0 ? r3avg / p6avg : 1;
+  const ratioRaw = ratio;
+  ratio = Math.min(2, Math.max(0.5, ratio));
+  const nextMonth = Math.round(r3avg * ratio);
+  const next3 = nextMonth * 3;
+  const diffPct = p6avg > 0 ? (r3avg - p6avg) / p6avg * 100 : null;
+  const dirCls = diffPct == null ? '' : (diffPct >= 0 ? 'up' : 'down');
+  const dirTxt = diffPct == null ? '비교 기간 데이터 없음'
+    : `${diffPct >= 0 ? '▲' : '▼'} ${Math.abs(diffPct).toFixed(1)}% <span style="color:var(--muted)">직전 6개월 월평균 대비</span>`;
+
+  $('#itemStats').innerHTML = `
+    <div class="stat-row accent">
+      <div class="k">최근 3개월 월평균 판매량</div>
+      <div class="v">${KRW.format(Math.round(r3avg))}<span class="u">개/월</span></div>
+      <div class="sub">3개월 합계 ${KRW.format(r3sum)}개 · ${recent3[0].label}~${recent3[2].label}</div>
+    </div>
+    <div class="stat-row">
+      <div class="k">직전 6개월 월평균 판매량</div>
+      <div class="v">${KRW.format(Math.round(p6avg))}<span class="u">개/월</span></div>
+      <div class="sub ${dirCls}">${dirTxt}</div>
+    </div>
+    <div class="stat-row accent">
+      <div class="k">다음 1개월 예상 필요량</div>
+      <div class="v">${KRW.format(nextMonth)}<span class="u">개</span></div>
+      <div class="sub">다음 3개월이면 약 ${KRW.format(next3)}개</div>
+    </div>
+    <div class="stat-note">
+      예상치 = 최근 3개월 월평균 × 추세비(최근 3개월 ÷ 직전 6개월 = ${ratioRaw.toFixed(2)}${ratioRaw !== ratio ? ` → ${ratio.toFixed(2)}로 제한` : ''}).
+      ${p6cov < 6 ? `<br>직전 6개월 중 <b>${p6cov}개월</b>만 데이터에 포함되어 그 개월로 평균했습니다.` : ''}
+    </div>`;
 }
 
 /* ---------- 거래처 품목별 기간 판매 (거래처 필터 시) ---------- */
