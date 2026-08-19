@@ -241,6 +241,18 @@
     </div>
   </div>
 
+  <div class="daterange" id="rankRange">
+    <span class="dr-label">순위·상세 기간</span>
+    <input type="date" id="rankFrom" class="dinput" aria-label="순위 시작일">
+    <span>~</span>
+    <input type="date" id="rankTo" class="dinput" aria-label="순위 종료일">
+    <button class="btn ghost sm" data-rpreset="all">전체</button>
+    <button class="btn ghost sm" data-rpreset="3m">최근 3개월</button>
+    <button class="btn ghost sm" data-rpreset="6m">최근 6개월</button>
+    <button class="btn ghost sm" data-rpreset="ytd">올해</button>
+    <span class="rank-count" id="rankRangeNote">위쪽 기간과 별개로 아래 두 카드에만 적용됩니다</span>
+  </div>
+
   <div class="grid2">
     <div class="card" id="prodCard">
       <h2 id="rankTitle">상품별 판매 순위</h2>
@@ -253,7 +265,7 @@
     </div>
     <div class="card">
       <h2 id="dimTableTitle">상품별 상세</h2>
-      <p class="hint">전체 기간 기준. 비중은 총 판매량 대비 각 항목의 비율입니다.</p>
+      <p class="hint" id="dimTableHint">비중은 총 판매량 대비 각 항목의 비율입니다.</p>
       <div class="table-scroll">
         <table id="prodTable"><thead></thead><tbody></tbody></table>
       </div>
@@ -494,6 +506,17 @@ function setDateRange(from, to) {   // from/to: Date(일 단위) 또는 null →
   if ($('#dateFrom')) { $('#dateFrom').value = fmtYMD(dateFrom); $('#dateTo').value = fmtYMD(dateTo); }
 }
 const viewRows = () => (dateFrom && dateTo) ? RAW.filter(r => r.date >= dateFrom && r.date <= dateTo) : RAW;
+
+// 순위·상세 카드 전용 기간 (위쪽 기간과 독립)
+let rankFrom = null, rankTo = null;
+function setRankRange(from, to) {
+  const b = dataBounds(); if (!b) return;
+  const f = from || b.min, t = to || b.max;
+  rankFrom = new Date(f.getFullYear(), f.getMonth(), f.getDate());
+  rankTo   = new Date(t.getFullYear(), t.getMonth(), t.getDate(), 23, 59, 59, 999);
+  if ($('#rankFrom')) { $('#rankFrom').value = fmtYMD(rankFrom); $('#rankTo').value = fmtYMD(rankTo); }
+}
+const rankRows = () => (rankFrom && rankTo) ? RAW.filter(r => r.date >= rankFrom && r.date <= rankTo) : RAW;
 const spanBounds = () => (dateFrom && dateTo) ? { lo:dateFrom, hi:dateTo } : (dataBounds() ? { lo:dataBounds().min, hi:dataBounds().max } : null);
 
 /* ---------- 집계 ---------- */
@@ -520,10 +543,10 @@ function aggregate(period) {
   return [...map.values()].sort((a,b) => a.sort - b.sort);
 }
 // 분석 기준(상품/상품그룹/거래처)별 전체 기간 집계
-function aggregateDim(dim) {
+function aggregateDim(dim, rows) {
   const map = new Map();
   let total = 0;
-  for (const r of viewRows()) {
+  for (const r of (rows || rankRows())) {
     const k = dimValue(r, dim);
     if (!map.has(k)) map.set(k, { name:k, qty:0, amount:0, codes:new Set() });
     const g = map.get(k); g.qty += r.qty; g.amount += amtOf(r); total += r.qty;
@@ -548,8 +571,9 @@ function setupDims() {
   $('#dimSelect').value = currentDim;
   const b = dataBounds();
   if (b) { const lo=fmtYMD(b.min), hi=fmtYMD(b.max);
-    ['#dateFrom','#dateTo'].forEach(id=>{ $(id).min=lo; $(id).max=hi; }); }
+    ['#dateFrom','#dateTo','#rankFrom','#rankTo'].forEach(id=>{ $(id).min=lo; $(id).max=hi; }); }
   setDateRange(null, null);                   // 전체 기간으로 초기화
+  setRankRange(null, null);                   // 순위·상세도 전체 기간으로 초기화
   rebuildFilter();
 }
 function applyDateInputs() {
@@ -563,6 +587,20 @@ function applyPreset(p) {
   else if (p === 'ytd') setDateRange(new Date(b.max.getFullYear(),0,1), b.max);
   else { const months = p==='3m' ? 3 : 6; const f = new Date(b.max); f.setMonth(f.getMonth()-months); f.setDate(f.getDate()+1);
          setDateRange(f < b.min ? b.min : f, b.max); }
+  render();
+}
+/* 순위·상세 전용 기간 */
+function applyRankInputs() {
+  let f = parseYMD($('#rankFrom').value), t = parseYMD($('#rankTo').value);
+  if (f && t && f > t) { const x=f; f=t; t=x; }
+  setRankRange(f, t); render();
+}
+function applyRankPreset(p) {
+  const b = dataBounds(); if (!b) return;
+  if (p === 'all') setRankRange(null, null);
+  else if (p === 'ytd') setRankRange(new Date(b.max.getFullYear(),0,1), b.max);
+  else { const months = p==='3m' ? 3 : 6; const f = new Date(b.max); f.setMonth(f.getMonth()-months); f.setDate(f.getDate()+1);
+         setRankRange(f < b.min ? b.min : f, b.max); }
   render();
 }
 let rankQuery = '';       // 순위 카드 검색어
@@ -916,7 +954,10 @@ function render(mapping, fname) {
   $('#chartTitle').textContent = `${name} 판매량 추이${pf}`;
   $('#tableTitle').textContent = `${name} 상세${pf}`;
   $('#rankTitle').textContent  = `${meta.label}별 판매 순위`;
-  $('#rankHint').textContent   = `${meta.label} 전체가 판매량 순으로 나옵니다. 막대를 클릭하면 오른쪽 ${meta.label}별 상세 표에서 강조됩니다.`;
+  const fd = d => `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+  const rangeTxt = (rankFrom && rankTo) ? `${fd(rankFrom)} ~ ${fd(rankTo)}` : '전체 기간';
+  $('#rankHint').textContent   = `${rangeTxt} 기준, ${meta.label} 전체가 판매량 순으로 나옵니다. 막대를 클릭하면 오른쪽 표에서 강조됩니다.`;
+  $('#dimTableHint').textContent = `${rangeTxt} 기준. 비중은 총 판매량 대비 각 항목의 비율입니다.`;
   $('#rankSearch').placeholder = currentDim === 'product' ? '품목코드·품목명으로 찾기' : `${meta.label} 이름으로 찾기`;
   $('#dimTableTitle').textContent = `${meta.label}별 상세`;
   renderKPIs(rows, currentPeriod);
@@ -931,8 +972,8 @@ function render(mapping, fname) {
   if (RAW.length) {
     const f = d => `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
     const src = fname ? `${fname} · ` : '';
-    const nProd = aggregateDim('product').length;
-    const custInfo = hasCustomerData() ? ` · 거래처 ${aggregateDim('customer').length}곳` : '';
+    const nProd = aggregateDim('product', viewRows()).length;
+    const custInfo = hasCustomerData() ? ` · 거래처 ${aggregateDim('customer', viewRows()).length}곳` : '';
     const b = dataBounds();
     const isFull = dateFrom && dateTo && dateFrom.getTime() <= b.min.getTime() && dateTo.getTime() >= b.max.getTime();
     const rangeTxt = (dateFrom && dateTo) ? `${f(dateFrom)} ~ ${f(dateTo)}${isFull ? ' (전체)' : ''}` : '';
@@ -1050,6 +1091,9 @@ $('#rankSearch').addEventListener('input', e=>{ rankQuery=e.target.value; render
 $('#dateFrom').addEventListener('change', applyDateInputs);
 $('#dateTo').addEventListener('change', applyDateInputs);
 $('#daterange').addEventListener('click', e=>{ const btn=e.target.closest('[data-preset]'); if(btn) applyPreset(btn.dataset.preset); });
+$('#rankFrom').addEventListener('change', applyRankInputs);
+$('#rankTo').addEventListener('change', applyRankInputs);
+$('#rankRange').addEventListener('click', e=>{ const btn=e.target.closest('[data-rpreset]'); if(btn) applyRankPreset(btn.dataset.rpreset); });
 $('#filterInput').addEventListener('input', e=>openFilterList(e.target.value));
 $('#filterInput').addEventListener('focus', e=>openFilterList(e.target.value));
 $('#filterInput').addEventListener('keydown', e=>{
