@@ -77,7 +77,7 @@
   th:first-child,td:first-child { text-align:left; font-variant-numeric:normal; }
   thead th { color:var(--muted); font-weight:600; font-size:12px; border-bottom:1px solid var(--baseline); position:sticky; top:0; background:var(--surface); z-index:2; white-space:nowrap; }
   tbody tr:hover { background:color-mix(in srgb,var(--surface) 90%,var(--text-1)); }
-  .table-scroll { max-height:380px; overflow-y:auto; overflow-x:auto; }
+  .table-scroll { max-height:380px; overflow-y:auto; overflow-x:auto; position:relative; }
   /* 품목명: 한 줄 + 넘치면 말줄임 (표가 세로로 눌리지 않게) */
   td.name-cell { text-align:left; font-variant-numeric:normal; max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   /* 판매량 셀: 막대를 셀 배경 그라디언트로 그려 절대위치·z-index 없이 안전하게 (sticky 헤더와 겹치지 않음) */
@@ -703,7 +703,14 @@ function highlightDimRow() {
   tb.querySelectorAll('tr.hl').forEach(tr=>tr.classList.remove('hl'));
   if (!rankSelected) return;
   const tr = tb.querySelector(`tr[data-name="${String(rankSelected).replace(/"/g,'&quot;')}"]`);
-  if (tr) { tr.classList.add('hl'); tr.scrollIntoView({ block:'nearest' }); }
+  if (!tr) return;
+  tr.classList.add('hl');
+  // 선택 행을 표 스크롤 영역의 세로 중앙으로 (페이지 전체는 스크롤하지 않음)
+  const box = tr.closest('.table-scroll');
+  if (box) {
+    const top = tr.offsetTop - (box.clientHeight - tr.offsetHeight) / 2;
+    box.scrollTo({ top: Math.max(0, Math.min(top, box.scrollHeight - box.clientHeight)), behavior:'smooth' });
+  }
 }
 
 /* ---------- 기간 상세 테이블 ---------- */
