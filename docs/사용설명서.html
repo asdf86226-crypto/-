@@ -181,6 +181,9 @@
     display:flex; flex-wrap:wrap; gap:14px; align-items:baseline;
     font-size:13.5px; color:var(--faint)}
   .foot b{color:var(--ink)}
+  .foot .tel{color:var(--accent); font-weight:700; text-decoration:none;
+    font-variant-numeric:tabular-nums; letter-spacing:.01em}
+  .foot .tel:hover{text-decoration:underline}
   .foot .right{margin-left:auto}
 
   @media print{
@@ -438,7 +441,8 @@
   </section>
 
   <div class="foot">
-    <span>문의 — <b>구매 담당</b></span>
+    <span>문의 — <b>오정민</b> 매니저 · 구매 담당</span>
+    <a href="tel:010-6655-4706" class="tel">010-6655-4706</a>
     <span class="right">구매요청 대시보드 사용 안내</span>
   </div>
 
