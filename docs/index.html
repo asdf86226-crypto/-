@@ -741,6 +741,14 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
 <script>
 (function(){
   "use strict";
+  /* ────────────────────────────────────────────────────────────────
+     팀 공유 기본 연결 주소 (구글 Apps Script 웹앱 …/exec)
+     여기에 주소를 넣어두면 팀원은 긴 공유링크 없이
+     이 페이지 주소만 열어도 자동으로 연결됩니다.
+     주소가 바뀌면(재배포로 URL이 새로 생기면) 이 줄만 고치면 됩니다.
+     ──────────────────────────────────────────────────────────────── */
+  const BUILTIN_EXEC = "https://script.google.com/macros/s/AKfycbyj3El9auofAYnNNA1ZqDjwmtikeGiglSpLi5cYlIydfsgyI2BJAbeHNx74ldCmEgLPGA/exec";
+
   const KEY="purchase_requests_v1";
   const CFGKEY="purchase_dashboard_share";
   const TEAMS=["개발","자재","생산","품질"];
@@ -1241,10 +1249,14 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
   $("#shareBtn").onclick=()=>{
     if(!cfg||!cfg.exec) return;
     const base=location.origin+location.pathname;
-    const link=base+"#exec="+encodeURIComponent(cfg.exec);
-    const note=(location.protocol==="file:")?" (먼저 이 대시보드를 웹에 올려야 팀원이 열 수 있어요)":"";
+    // 파일에 기본 주소가 들어 있고 지금 연결된 주소와 같으면, 짧은 주소만으로 충분함
+    // (긴 #exec= 링크는 카톡·문자에서 잘리는 일이 많아 짧은 쪽을 우선 사용)
+    const builtinMatches = (typeof BUILTIN_EXEC==="string") && BUILTIN_EXEC.trim()===cfg.exec.trim();
+    const link = builtinMatches ? base : base+"#exec="+encodeURIComponent(cfg.exec);
+    const note = (location.protocol==="file:") ? " (먼저 이 대시보드를 웹에 올려야 팀원이 열 수 있어요)" : "";
     (navigator.clipboard?navigator.clipboard.writeText(link):Promise.reject())
-      .then(()=>toast("공유 링크가 복사되었습니다"+note)).catch(()=>prompt("아래 링크를 복사해 팀원에게 보내세요:", link));
+      .then(()=>toast((builtinMatches?"공유 링크(짧은 주소)가 복사되었습니다":"공유 링크가 복사되었습니다")+note))
+      .catch(()=>prompt("아래 링크를 복사해 팀원에게 보내세요:", link));
   };
   $("#disconnectBtn").onclick=async ()=>{
     saveCfg(null); applyCfg(); stopPoll(); closeModal(); toast("로컬 모드로 전환했습니다");
@@ -1266,8 +1278,11 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     }
   }catch(e){ /* 저장이 막힌 환경에서는 그냥 넘어감 */ }
   const hashCfg=readHashCfg();
-  cfg = hashCfg || loadCfg();
+  // 기본 연결 주소가 파일에 들어 있으면, 긴 공유링크 없이 짧은 주소만으로 바로 연결됨
+  const builtinCfg = (typeof BUILTIN_EXEC==="string" && BUILTIN_EXEC.trim()) ? {exec:BUILTIN_EXEC.trim()} : null;
+  cfg = hashCfg || loadCfg() || builtinCfg;
   if(hashCfg){ saveCfg(hashCfg); history.replaceState(null,"",location.pathname+location.search); }
+  else if(!loadCfg() && builtinCfg){ saveCfg(builtinCfg); }
   applyCfg();
   refresh(); startPoll();
 })();
