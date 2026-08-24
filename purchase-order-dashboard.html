@@ -1261,6 +1261,7 @@ let approvalBatches = [];
 let suppliers = [];
 let memoNote = '';
 let teamsWebhookUrl = ''; // Teams 채널 수신 URL (Workflows/Incoming Webhook) — 이 기기에만 저장, 공유파일에는 포함되지 않음
+let sharedFileUrl = ''; // 팀즈 메시지 하단에 붙일 "상세 진행현황 보기" 링크 URL (SharePoint/OneDrive 등에 올린 공유 HTML의 주소)
 let editingPoId = null;
 let poPanelReturnToPiGroup = null; // PI그룹 팝업에서 건을 눌러 들어온 경우, 닫을 때 다시 그 그룹으로 되돌아가기 위한 값
 let editingDomId = null;
@@ -1370,6 +1371,10 @@ async function loadData(){
       const r = await window.storage.get('teamsWebhookUrl', false);
       teamsWebhookUrl = r ? r.value : '';
     }catch(e){ teamsWebhookUrl = ''; }
+    try{
+      const r = await window.storage.get('sharedFileUrl', false);
+      sharedFileUrl = r ? r.value : '';
+    }catch(e){ sharedFileUrl = ''; }
   }else{
     pos = [];
     domesticPos = [];
@@ -1517,6 +1522,12 @@ async function saveTeamsUrl(){
   if(!hasStorage) return;
   try{
     await window.storage.set('teamsWebhookUrl', teamsWebhookUrl, false);
+  }catch(e){ console.error(e); }
+}
+async function saveSharedFileUrl(){
+  if(!hasStorage) return;
+  try{
+    await window.storage.set('sharedFileUrl', sharedFileUrl, false);
   }catch(e){ console.error(e); }
 }
 function renderMemoPreview(){
@@ -1794,15 +1805,23 @@ function buildTeamsCard(){
   return { type:'message', text: md, attachments:[{ contentType:'application/vnd.microsoft.card.adaptive', content:card }] };
 }
 function configureTeamsUrl(sendAfter){
-  const v = window.prompt('팀즈 채널 수신 URL을 붙여넣으세요.\n(팀즈 채널 ⋯ → 워크플로 → "웹후크 요청이 오면 채널에 게시"에서 만든 URL)\n\n비우고 확인하면 URL이 삭제됩니다.', teamsWebhookUrl||'');
+  // ① 팀즈 수신 URL
+  const v = window.prompt('[1/2] 팀즈 채널 수신 URL을 붙여넣으세요.\n(Power Automate 흐름의 HTTP 트리거 URL)\n\n비우고 확인하면 URL이 삭제됩니다.', teamsWebhookUrl||'');
   if(v===null) return; // 취소
   const val = v.trim();
   if(val && !/^https:\/\//i.test(val)){ toast('https:// 로 시작하는 URL을 입력해주세요'); return; }
   teamsWebhookUrl = val;
   saveTeamsUrl();
-  if(!val){ toast('팀즈 URL을 삭제했습니다'); return; }
-  toast('팀즈 URL을 저장했습니다');
-  if(sendAfter) sendToTeams();
+  // ② 공유파일 링크 (상세 진행현황 보기용) — 선택
+  const v2 = window.prompt('[2/2] 공유파일 링크 URL (선택)\n\n"🔗 진행현황 공유파일 내보내기"로 만든 HTML을 SharePoint/OneDrive에 올린 후 그 파일의 공유 링크를 붙여넣으세요. 팀즈 메시지 아래에 "📎 상세 진행현황 보기" 링크로 붙습니다.\n\n비우고 확인하면 링크가 삭제됩니다. 취소하면 기존 값이 유지됩니다.', sharedFileUrl||'');
+  if(v2!==null){
+    const val2 = v2.trim();
+    if(val2 && !/^https:\/\//i.test(val2)){ toast('공유파일 URL은 https:// 로 시작해야 합니다'); return; }
+    sharedFileUrl = val2;
+    saveSharedFileUrl();
+  }
+  toast(val ? '설정을 저장했습니다' : '팀즈 URL을 삭제했습니다');
+  if(sendAfter && val) sendToTeams();
 }
 // 팀즈 채널에 게시할 HTML 본문 생성 —
 // 팀즈는 인라인 스타일 span을 통째로 삭제하므로, 컬러는 이모지로 대체한다(살아남는다).
@@ -1846,30 +1865,6 @@ function buildTeamsHtml(){
       + '</tr>';
   }).join('');
 
-  // 임박·지연 납기 (7일 이내, 미입고)
-  const today = new Date(); today.setHours(0,0,0,0);
-  const soon = pos.filter(function(p){ return p.dueDate && !p.warehouseDate; }).map(function(p){
-    const d = new Date(p.dueDate+'T00:00:00');
-    const diff = Math.round((d-today)/86400000);
-    return {p:p, diff:diff};
-  }).filter(function(x){ return x.diff <= 7; }).sort(function(a,b){ return a.diff-b.diff; });
-
-  const soonRows = soon.slice(0,20).map(function(x){
-    const isOverdue = x.diff < 0;
-    const isSoon = x.diff >= 0 && x.diff <= 3;
-    const tagEmoji = isOverdue ? '🚨' : (isSoon ? '⚠️' : '🗓️');
-    const tag = isOverdue ? ('지남 '+(-x.diff)+'일') : (x.diff===0 ? '오늘' : ('D-'+x.diff));
-    const st = sharedStatusOf(x.p);
-    return '<tr>'
-      + '<td><b>'+esc(x.p.itemName||'-')+'</b></td>'
-      + '<td>'+esc(x.p.supplier||'-')+'</td>'
-      + '<td>'+esc(x.p.dueDate)+'</td>'
-      + '<td>'+tagEmoji+' '+tag+'</td>'
-      + '<td>'+emojiOf[st[1]]+' '+nameOf[st[1]]+'</td>'
-      + '</tr>';
-  }).join('');
-  const soonExtra = soon.length > 20 ? ('<p>…외 '+(soon.length-20)+'건</p>') : '';
-
   let html = ''
     + '<h2>📦 발주 진행현황 요약</h2>'
     + '<p><b>'+stamp+'</b> 기준 · 전체 <b>'+pos.length+'건</b></p>'
@@ -1879,14 +1874,8 @@ function buildTeamsHtml(){
     +   '<thead><tr><th>업체</th><th>건수</th><th>상태</th></tr></thead>'
     +   '<tbody>'+supRows+'</tbody>'
     + '</table>';
-  if(soon.length){
-    html += '<h3>⚠️ 임박·지연 납기 (7일 이내·미입고, '+soon.length+'건)</h3>'
-      + '<p><i>🚨 지남&nbsp;&nbsp;⚠️ 오늘~D-3&nbsp;&nbsp;🗓️ D-4~7</i></p>'
-      + '<table border="1" cellpadding="6" cellspacing="0">'
-      +   '<thead><tr><th>품명</th><th>공급사</th><th>납기</th><th>D-</th><th>진행상태</th></tr></thead>'
-      +   '<tbody>'+soonRows+'</tbody>'
-      + '</table>'
-      + soonExtra;
+  if(sharedFileUrl){
+    html += '<p>👉 <a href="'+esc(sharedFileUrl)+'"><b>📎 상세 진행현황 보기 (전체 목록 · 납기 · 생산/선적/통관 일자 · 문서 링크)</b></a></p>';
   }
   html += '<p><i>색상: 🟠 생산중 &nbsp; 🟢 생산완료·공장입고 &nbsp; 🔵 선적·항구도착 &nbsp; ⚪ 발주준비</i></p>';
   return html;
