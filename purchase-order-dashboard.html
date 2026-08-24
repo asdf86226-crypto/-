@@ -1804,25 +1804,110 @@ function configureTeamsUrl(sendAfter){
   toast('팀즈 URL을 저장했습니다');
   if(sendAfter) sendToTeams();
 }
-function sendToTeams(){
-  if(!teamsWebhookUrl){ configureTeamsUrl(true); return; }
-  if(pos.length===0){ toast('보낼 발주 건이 없습니다'); return; }
-  // 흐름 트리거 스키마({text: string})에 정확히 맞춰 최소 본문만 전송. Content-Type은 application/json.
-  // Power Automate HTTP 트리거는 CORS 프리플라이트(OPTIONS)에 Access-Control-Allow-Origin:* 로 응답하므로
-  // file:// 로 열어도(Origin: null) 정상 동작한다.
-  const s = buildTeamsSummaryText();
+// 팀즈 채널에 게시할 HTML 본문 생성 —
+// Power Automate "채팅 또는 채널에 메시지 게시" 액션의 메시지 필드는 HTML 태그를 렌더링한다.
+// 색상은 <span style="color:..."> 로 지정하면 대부분 그대로 표시됨.
+function buildTeamsHtml(){
+  const STK = [
+    ['st-prod','생산중','#d97706'], ['st-made','생산완료','#0d9488'],
+    ['st-ship','선적완료','#0284c7'], ['st-port','항구도착','#2563eb'],
+    ['st-in','공장입고','#16a34a'], ['st-prep','발주준비','#94a3b8'],
+  ];
+  const colorOf = {}; STK.forEach(function(s){ colorOf[s[0]] = s[2]; });
+  const nameOf  = {}; STK.forEach(function(s){ nameOf[s[0]]  = s[1]; });
+  const esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); };
+  const pill = function(stKey, count){
+    return '<span style="background:'+colorOf[stKey]+';color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;">'+nameOf[stKey]+' '+count+'</span>';
+  };
+  const overall = {};
+  const bySup = {}; const supOrder = [];
+  pos.forEach(function(p){
+    const st = sharedStatusOf(p)[1];
+    overall[st] = (overall[st]||0)+1;
+    const k = p.supplier || '(공급사 미지정)';
+    if(!bySup[k]){ bySup[k] = {n:0}; supOrder.push(k); }
+    bySup[k].n++; bySup[k][st] = (bySup[k][st]||0)+1;
+  });
+  supOrder.sort(function(a,b){ return a.localeCompare(b); });
   const now = new Date();
   const pad = function(n){ return String(n).padStart(2,'0'); };
   const stamp = now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+' '+pad(now.getHours())+':'+pad(now.getMinutes());
-  const text = '📦 발주 진행현황 요약 ('+stamp+' 기준 · 전체 '+s.total+'건)\n\n'
-    + s.overallLine + '\n\n'
-    + '■ 업체별 현황\n' + s.supLines.join('\n')
-    + (s.soonLines.length ? ('\n\n■ 임박·지연 납기 (7일 이내·미입고, '+s.soonCount+'건)\n' + s.soonLines.join('\n')
-        + (s.soonCount>s.soonLines.length ? ('\n…외 '+(s.soonCount-s.soonLines.length)+'건') : '')) : '');
+
+  const overallPills = STK.filter(function(s){ return overall[s[0]]; })
+    .map(function(s){ return pill(s[0], overall[s[0]]); }).join(' ');
+
+  const supRows = supOrder.map(function(k){
+    const g = bySup[k];
+    const pills = STK.filter(function(s){ return g[s[0]]; })
+      .map(function(s){ return pill(s[0], g[s[0]]); }).join(' ');
+    return '<tr>'
+      + '<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-weight:700;">'+esc(k)+'</td>'
+      + '<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;color:#6b7280;">'+g.n+'건</td>'
+      + '<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">'+pills+'</td>'
+      + '</tr>';
+  }).join('');
+
+  // 임박·지연 납기 (7일 이내, 미입고)
+  const today = new Date(); today.setHours(0,0,0,0);
+  const soon = pos.filter(function(p){ return p.dueDate && !p.warehouseDate; }).map(function(p){
+    const d = new Date(p.dueDate+'T00:00:00');
+    const diff = Math.round((d-today)/86400000);
+    return {p:p, diff:diff};
+  }).filter(function(x){ return x.diff <= 7; }).sort(function(a,b){ return a.diff-b.diff; });
+
+  const soonRows = soon.slice(0,15).map(function(x){
+    const isOverdue = x.diff < 0;
+    const tag = isOverdue ? ('지남 '+(-x.diff)+'일') : (x.diff===0 ? '오늘' : ('D-'+x.diff));
+    const tagColor = isOverdue ? '#dc2626' : (x.diff<=3 ? '#ea580c' : '#6b7280');
+    const st = sharedStatusOf(x.p);
+    return '<tr>'
+      + '<td style="padding:5px 10px;border-bottom:1px solid #f3f4f6;"><b>'+esc(x.p.itemName||'-')+'</b></td>'
+      + '<td style="padding:5px 10px;border-bottom:1px solid #f3f4f6;color:#6b7280;">'+esc(x.p.supplier||'-')+'</td>'
+      + '<td style="padding:5px 10px;border-bottom:1px solid #f3f4f6;">'+esc(x.p.dueDate)+'</td>'
+      + '<td style="padding:5px 10px;border-bottom:1px solid #f3f4f6;"><span style="background:'+tagColor+';color:#fff;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:700;">'+tag+'</span></td>'
+      + '<td style="padding:5px 10px;border-bottom:1px solid #f3f4f6;">'+pill(st[1], 1).replace(nameOf[st[1]]+' 1', nameOf[st[1]])+'</td>'
+      + '</tr>';
+  }).join('');
+  const soonExtra = soon.length > 15 ? ('<p style="color:#6b7280;font-size:12px;">…외 '+(soon.length-15)+'건</p>') : '';
+
+  let html = ''
+    + '<h2 style="margin:0 0 4px 0;">📦 발주 진행현황 요약</h2>'
+    + '<p style="margin:0 0 12px 0;color:#6b7280;font-size:12px;">'+stamp+' 기준 · 전체 '+pos.length+'건</p>'
+    + '<p style="margin:0 0 16px 0;">'+overallPills+'</p>'
+    + '<h3 style="margin:12px 0 8px 0;">업체별 현황</h3>'
+    + '<table style="border-collapse:collapse;width:100%;font-size:13px;">'
+    +   '<thead><tr>'
+    +     '<th style="text-align:left;padding:6px 10px;background:#f3f4f6;border-bottom:1px solid #d1d5db;">업체</th>'
+    +     '<th style="text-align:left;padding:6px 10px;background:#f3f4f6;border-bottom:1px solid #d1d5db;">건수</th>'
+    +     '<th style="text-align:left;padding:6px 10px;background:#f3f4f6;border-bottom:1px solid #d1d5db;">상태</th>'
+    +   '</tr></thead>'
+    +   '<tbody>'+supRows+'</tbody>'
+    + '</table>';
+  if(soon.length){
+    html += '<h3 style="margin:16px 0 8px 0;color:#dc2626;">⚠ 임박·지연 납기 <span style="color:#6b7280;font-size:12px;font-weight:400;">(7일 이내·미입고, '+soon.length+'건)</span></h3>'
+      + '<table style="border-collapse:collapse;width:100%;font-size:12.5px;">'
+      +   '<thead><tr>'
+      +     '<th style="text-align:left;padding:5px 10px;background:#f3f4f6;border-bottom:1px solid #d1d5db;">품명</th>'
+      +     '<th style="text-align:left;padding:5px 10px;background:#f3f4f6;border-bottom:1px solid #d1d5db;">공급사</th>'
+      +     '<th style="text-align:left;padding:5px 10px;background:#f3f4f6;border-bottom:1px solid #d1d5db;">납기</th>'
+      +     '<th style="text-align:left;padding:5px 10px;background:#f3f4f6;border-bottom:1px solid #d1d5db;">D-</th>'
+      +     '<th style="text-align:left;padding:5px 10px;background:#f3f4f6;border-bottom:1px solid #d1d5db;">진행상태</th>'
+      +   '</tr></thead>'
+      +   '<tbody>'+soonRows+'</tbody>'
+      + '</table>'
+      + soonExtra;
+  }
+  return html;
+}
+function sendToTeams(){
+  if(!teamsWebhookUrl){ configureTeamsUrl(true); return; }
+  if(pos.length===0){ toast('보낼 발주 건이 없습니다'); return; }
+  // 흐름의 "메시지" 필드는 HTML 태그를 렌더링한다. text 키에 HTML을 담아 보낸다.
+  const html = buildTeamsHtml();
   fetch(teamsWebhookUrl, {
     method:'POST',
     headers:{ 'Content-Type':'application/json' },
-    body: JSON.stringify({ text: text }),
+    body: JSON.stringify({ text: html }),
   }).then(function(r){
     if(r.ok || r.status===202){ toast('팀즈로 전송했습니다 (' + r.status + ') · 채널에서 확인해주세요'); }
     else { toast('전송 실패 · 상태 ' + r.status + ' (F12 네트워크 탭에서 응답 확인)'); }
