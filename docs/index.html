@@ -258,6 +258,91 @@
   .test-out{font-size:12px; margin-top:10px; min-height:16px}
   .test-out.ok{color:var(--s-done)} .test-out.bad{color:var(--s-late)}
 
+  /* 사용설명서 버튼 */
+  .guide-btn{
+    display:inline-flex; align-items:center; gap:6px; height:34px; padding:0 13px; border-radius:9px;
+    background:var(--accent-soft); color:var(--accent); border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);
+    font-weight:700; font-size:12.5px; white-space:nowrap;
+  }
+  .guide-btn:hover{filter:brightness(1.04); border-color:var(--accent)}
+
+  /* 사용설명서 모달 */
+  .guide-modal{
+    background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow);
+    width:100%; max-width:760px; max-height:90vh; display:flex; flex-direction:column; overflow:hidden;
+  }
+  .guide-head{
+    padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; flex:none;
+  }
+  .guide-head h2{font-size:17px}
+  .guide-head p{margin:2px 0 0; font-size:12px; color:var(--muted)}
+  .guide-head .x{margin-left:auto; border:0; background:transparent; color:var(--faint); font-size:22px; line-height:1; cursor:pointer; padding:0 4px}
+  .guide-head .x:hover{color:var(--ink)}
+  .guide-body{padding:4px 20px 22px; overflow-y:auto; font-size:14px; line-height:1.7; color:var(--muted)}
+  .guide-body h3{
+    font-size:15px; color:var(--ink); margin:22px 0 8px; padding-bottom:7px;
+    border-bottom:1px solid var(--border); display:flex; align-items:center; gap:9px;
+  }
+  .guide-body h3 .n{
+    width:22px; height:22px; border-radius:6px; background:var(--accent); color:var(--accent-ink);
+    font-size:11.5px; font-weight:800; display:grid; place-items:center; flex:none;
+  }
+  .guide-body p{margin:0 0 8px}
+  .guide-body b{color:var(--ink)}
+  .guide-body code{
+    font-family:ui-monospace,Menlo,monospace; font-size:12px; background:var(--surface-2);
+    border:1px solid var(--border); padding:1px 6px; border-radius:5px; white-space:nowrap;
+  }
+  .g-table{width:100%; border-collapse:collapse; font-size:13.5px; margin:10px 0 4px}
+  .g-table th{
+    text-align:left; font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+    color:var(--faint); padding:8px 12px; border-bottom:1px solid var(--border); white-space:nowrap;
+  }
+  .g-table td{padding:8px 12px; border-bottom:1px solid var(--border); vertical-align:top}
+  .g-table td:first-child{font-weight:700; color:var(--ink); white-space:nowrap}
+  .g-req{display:inline-block; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px; margin-left:5px;
+    background:color-mix(in srgb,var(--s-late) 14%,transparent); color:var(--s-late);
+    border:1px solid color-mix(in srgb,var(--s-late) 32%,transparent)}
+  .g-opt{display:inline-block; font-size:10px; font-weight:700; padding:1px 5px; border-radius:4px; margin-left:5px;
+    background:var(--surface-2); color:var(--faint); border:1px solid var(--border)}
+  .g-note{
+    border-radius:10px; padding:12px 15px; margin:12px 0; border:1px solid; display:flex; gap:10px;
+    align-items:flex-start; font-size:13.5px; line-height:1.62;
+  }
+  .g-note .ic{flex:none; font-weight:800}
+  .g-note.ok{background:color-mix(in srgb,var(--s-done) 10%,var(--surface)); border-color:color-mix(in srgb,var(--s-done) 30%,transparent)}
+  .g-note.ok .ic{color:var(--s-done)}
+  .g-note.warn{background:color-mix(in srgb,var(--s-new) 12%,var(--surface)); border-color:color-mix(in srgb,var(--s-new) 34%,transparent)}
+  .g-note.warn .ic{color:var(--s-new)}
+  .g-note.danger{background:color-mix(in srgb,var(--s-late) 10%,var(--surface)); border-color:color-mix(in srgb,var(--s-late) 30%,transparent)}
+  .g-note.danger .ic{color:var(--s-late)}
+  .g-note.info{background:var(--accent-soft); border-color:color-mix(in srgb,var(--accent) 28%,transparent)}
+  .g-note.info .ic{color:var(--accent)}
+  .g-cols{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:10px 0}
+  .g-col{font-family:ui-monospace,Menlo,monospace; font-size:11.5px; font-weight:700; padding:5px 10px;
+    background:var(--surface); border:1px solid var(--border-strong); border-radius:6px; color:var(--ink)}
+  .g-arrow{color:var(--faint); font-size:11px}
+  .g-sheet{overflow-x:auto; border:1px solid var(--border-strong); border-radius:8px; margin:10px 0}
+  .g-sheet table{width:100%; border-collapse:collapse; font-size:12.5px; min-width:480px}
+  .g-sheet th{background:var(--surface-2); color:var(--muted); font-size:11px; font-weight:700;
+    text-align:left; padding:8px 12px; border-bottom:1px solid var(--border); white-space:nowrap}
+  .g-sheet td{padding:8px 12px; border-bottom:1px solid var(--border); color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap}
+  .g-sheet tr:last-child td{border-bottom:0}
+  .g-pill{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700;
+    padding:2px 9px; border-radius:20px; border:1px solid; white-space:nowrap; vertical-align:middle}
+  .g-pill i{width:7px; height:7px; border-radius:50%; display:block}
+  .g-pill.green{background:color-mix(in srgb,var(--s-done) 12%,transparent); color:var(--s-done);
+    border-color:color-mix(in srgb,var(--s-done) 32%,transparent)}
+  .g-pill.green i{background:var(--s-done)}
+  .g-pill.grey{background:var(--surface-2); color:var(--s-new); border-color:var(--border-strong)}
+  .g-pill.grey i{background:var(--s-new)}
+  .guide-body details{border:1px solid var(--border); border-radius:9px; margin-bottom:7px; background:var(--surface-2)}
+  .guide-body summary{cursor:pointer; padding:10px 14px; font-weight:700; font-size:13.5px; color:var(--ink); list-style:none; display:flex; gap:9px; align-items:center}
+  .guide-body summary::-webkit-details-marker{display:none}
+  .guide-body summary::before{content:"+"; font-family:ui-monospace,Menlo,monospace; color:var(--accent); font-weight:800; flex:none}
+  .guide-body details[open] summary::before{content:"−"}
+  .guide-body details .ans{padding:0 14px 12px 32px; font-size:13.5px}
+
   /* 토스트 */
   #toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px); opacity:0;
     background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:10px; font-size:13px; font-weight:600;
@@ -275,6 +360,7 @@
         <p>개발 · 자재 · 생산 · 품질 팀 구매요청 통합 관리</p>
       </div>
     </div>
+    <button class="guide-btn" id="guideBtn" title="사용설명서 열기">📖 사용설명서</button>
     <button class="conn local" id="connBtn" title="공유 연결 설정"><span class="dot"></span><span id="connLabel">로컬 저장</span></button>
     <button class="icon-btn" id="refreshBtn" title="새로고침" style="display:none">⟳</button>
     <button class="icon-btn" id="themeBtn" title="테마 전환">◑</button>
@@ -401,6 +487,129 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
         </div>
         <p class="paste-help" style="margin-top:10px">※ 코드를 새로 붙여넣었으면 <b>배포 → 배포 관리 → 편집 → 새 버전</b>으로 다시 배포하고, 실행 권한 재승인(외부 서비스 연결) 후 이용하세요.</p>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 사용설명서 ===== -->
+<div class="modal-bg" id="guideBg">
+  <div class="guide-modal">
+    <div class="guide-head">
+      <div>
+        <h2>📖 구매요청, 이렇게 올려주세요</h2>
+        <p>개발 · 자재 · 생산 · 품질 팀 공통 안내</p>
+      </div>
+      <button class="x" id="guideClose" title="닫기">×</button>
+    </div>
+    <div class="guide-body">
+
+      <h3><span class="n">1</span>시작하기</h3>
+      <p>전달받은 <b>링크를 열면</b> 바로 사용할 수 있습니다. 즐겨찾기에 추가해 두면 편합니다.</p>
+      <div class="g-note ok">
+        <span class="ic">✓</span>
+        <span><b>화면 오른쪽 위를 먼저 확인하세요.</b><br>
+          <span class="g-pill green"><i></i>구글 시트 연결</span> 초록색이면 정상입니다. 입력한 내용이 팀 전체에 공유됩니다.</span>
+      </div>
+      <div class="g-note warn">
+        <span class="ic">!</span>
+        <span><b><span class="g-pill grey"><i></i>로컬 저장</span> 회색으로 보인다면 멈춰주세요.</b><br>
+          공유가 안 되는 상태라 입력해도 담당자에게 전달되지 않습니다.
+          <b>전달받은 링크로 다시 접속</b>하거나 담당자에게 알려주세요.</span>
+      </div>
+
+      <h3><span class="n">2</span>한 건 올리기 — 직접 입력</h3>
+      <p>왼쪽 <code>직접 입력</code> 탭에서 내용을 채우고 <b>＋ 구매요청 추가</b>를 누르면 끝입니다.</p>
+      <table class="g-table">
+        <thead><tr><th>입력 항목</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td>요청팀<span class="g-req">필수</span></td><td>개발 · 자재 · 생산 · 품질 중 본인 팀 선택</td></tr>
+          <tr><td>품목코드<span class="g-req">필수</span></td><td>사내 품목코드 (예: <code>MAT-00123</code>)</td></tr>
+          <tr><td>수량<span class="g-req">필수</span></td><td>숫자만 입력</td></tr>
+          <tr><td>품명<span class="g-req">필수</span></td><td>규격이 있으면 함께 (예: 스테인리스 볼트 M4)</td></tr>
+          <tr><td>입고요청일<span class="g-req">필수</span></td><td>언제까지 들어와야 하는 날짜</td></tr>
+          <tr><td>요청자<span class="g-opt">선택</span></td><td>본인 이름. 문의가 필요할 때 담당자가 연락합니다</td></tr>
+          <tr><td>기타사항<span class="g-opt">선택</span></td><td>표면처리 · 납품처 · 긴급 여부 등 참고사항</td></tr>
+        </tbody>
+      </table>
+      <div class="g-note info">
+        <span class="ic">→</span>
+        <span>등록하면 목록에 바로 나타나고 <b>요청팀은 그대로 남습니다.</b> 연달아 여러 건 올릴 때 팀을 다시 고르지 않아도 됩니다.</span>
+      </div>
+
+      <h3><span class="n">3</span>여러 건 올리기 — 엑셀 파일</h3>
+      <p>이미 엑셀로 정리해 두셨다면 <code>엑셀 파일</code> 탭에서 파일을 올리시면 됩니다.
+        <b>붙여넣기가 아니라 파일을 그대로</b> 선택하거나 끌어다 놓으면 자동으로 읽어옵니다.</p>
+      <p><b>올리는 순서</b> ① 요청팀 선택 → ② 파일 선택(또는 끌어다 놓기) → ③ <b>“○건 인식”</b> 확인 → ④ <b>인식된 항목 일괄 추가</b></p>
+      <p style="margin-top:10px"><b>열 순서</b>는 아래와 같아야 합니다. 맨 윗줄 제목은 자동으로 걸러내니 그대로 두셔도 됩니다.</p>
+      <div class="g-cols">
+        <span class="g-col">품목코드</span><span class="g-arrow">›</span>
+        <span class="g-col">품명</span><span class="g-arrow">›</span>
+        <span class="g-col">수량</span><span class="g-arrow">›</span>
+        <span class="g-col">입고요청일</span><span class="g-arrow">›</span>
+        <span class="g-col">기타사항</span>
+      </div>
+      <div class="g-sheet">
+        <table>
+          <thead><tr><th>품목코드</th><th>품명</th><th>수량</th><th>입고요청일</th><th>기타사항</th></tr></thead>
+          <tbody>
+            <tr><td>MAT-00123</td><td>스테인리스 볼트 M4</td><td>500</td><td>2026-08-25</td><td>아연도금</td></tr>
+            <tr><td>MAT-00988</td><td>육각너트 M4</td><td>500</td><td>2026-08-25</td><td></td></tr>
+            <tr><td>PKG-10021</td><td>완충 에어캡 롤</td><td>10</td><td>2026-09-01</td><td>폭 500mm</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="g-note ok">
+        <span class="ic">✓</span>
+        <span><b>날짜는 엑셀 날짜 셀 그대로 두셔도 됩니다.</b> <code>2026-08-25</code>, <code>2026.08.25</code> 등 어떤 형식이든 자동으로 맞춰집니다.
+          양식이 없으면 <b>양식(CSV) 내려받기</b>를 눌러 받으세요.</span>
+      </div>
+      <div class="g-note warn">
+        <span class="ic">!</span>
+        <span><b>추가 버튼을 누르기 전, 인식 건수를 꼭 확인하세요.</b> 올린 파일의 품목 수와 다르면 열 순서가 어긋났을 가능성이 큽니다.</span>
+      </div>
+
+      <h3><span class="n">4</span>올린 뒤 확인하기</h3>
+      <p>오른쪽 목록에 <b>모든 팀의 요청이 함께</b> 표시됩니다. 다른 사람이 올린 내용도 10초 안팎이면 자동으로 나타납니다.</p>
+      <p>• <b>내 팀만 보기</b> — 목록 위 팀 이름(개발·자재·생산·품질)을 누르면 그 팀만 걸러 봅니다. <b>전체</b>를 누르면 다시 모두 보입니다.<br>
+         • <b>찾기·정렬</b> — 검색창에 품목코드나 품명을 넣으면 바로 찾고, 표 제목을 누르면 그 기준으로 정렬됩니다.<br>
+         • <b>엑셀로 받기</b> — 목록 아래 <b>⬇ CSV 내보내기</b>를 누르면 지금 보이는 목록을 파일로 받습니다.</p>
+
+      <h3><span class="n">5</span>주의사항</h3>
+      <div class="g-note danger">
+        <span class="ic">⚠</span>
+        <span><b>삭제는 모두에게 적용됩니다.</b> 각 줄 끝의 <code>✕</code>를 누르면 그 요청이 <b>모든 사람의 화면에서</b> 사라집니다.
+          내가 올린 것이 아니라면 지우지 마시고, 잘못 올렸을 때만 본인 것을 지워주세요.
+          아래쪽 <b>전체 삭제</b>는 되돌릴 수 없으니 누르지 마세요.</span>
+      </div>
+      <div class="g-note warn">
+        <span class="ic">!</span>
+        <span><b>수정 기능은 아직 없습니다.</b> 잘못 올렸다면 그 줄을 지우고 다시 올려주세요.</span>
+      </div>
+      <div class="g-note info">
+        <span class="ic">i</span>
+        <span><b>요청이 접수되면 구매 담당자에게 알림이 갑니다.</b> 올리신 뒤 따로 연락하지 않으셔도 됩니다.
+          급한 건은 <b>기타사항에 “긴급”</b>이라고 적어주세요.</span>
+      </div>
+
+      <h3><span class="n">6</span>자주 묻는 질문</h3>
+      <details><summary>휴대폰으로도 되나요?</summary>
+        <div class="ans">됩니다. 링크를 열면 화면 크기에 맞춰 표시됩니다. 다만 <b>엑셀 파일 올리기는 PC가 편합니다.</b></div></details>
+      <details><summary>품목코드를 모르면 어떻게 하나요?</summary>
+        <div class="ans"><b>품명을 최대한 자세히</b> 적고, 기타사항에 규격·용도·사용처를 남겨주세요.
+          품목코드 칸에는 <code>미상</code>이라고 적어두시면 담당자가 확인 후 채웁니다.</div></details>
+      <details><summary>같은 품목을 또 올렸어요.</summary>
+        <div class="ans">중복된 줄 하나를 <code>✕</code>로 지워주세요. 그대로 두면 담당자가 두 건으로 볼 수 있습니다.</div></details>
+      <details><summary>올렸는데 목록에 안 보여요.</summary>
+        <div class="ans">잠시 뒤 자동으로 나타납니다. 그래도 안 보이면 오른쪽 위 <b>새로고침(⟳)</b>을 눌러보세요.
+          그래도 없다면 연결 표시가 <b>초록색</b>인지 확인하고, 회색이면 담당자에게 알려주세요.</div></details>
+      <details><summary>수량을 아직 확정 못 했어요.</summary>
+        <div class="ans">예상 수량을 적고 <b>기타사항에 “수량 확정 전”</b>이라고 남겨주세요. 확정되면 지우고 다시 올리시면 됩니다.</div></details>
+      <details><summary>화면이 눈부셔요 / 어둡게 보고 싶어요.</summary>
+        <div class="ans">오른쪽 위 <code>◑</code> 버튼을 누르면 밝은 화면과 어두운 화면이 바뀝니다.</div></details>
+
+      <p style="margin-top:22px; padding-top:14px; border-top:1px solid var(--border); font-size:12.5px; color:var(--faint)">
+        문의 — <b style="color:var(--ink)">구매 담당</b>
+      </p>
     </div>
   </div>
 </div>
@@ -966,6 +1175,19 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     $("#modalBg").classList.add("show");
   }
   function closeModal(){ $("#modalBg").classList.remove("show"); }
+
+  /* 사용설명서 */
+  function openGuide(){ $("#guideBg").classList.add("show"); }
+  function closeGuide(){ $("#guideBg").classList.remove("show"); }
+  $("#guideBtn").onclick=openGuide;
+  $("#guideClose").onclick=closeGuide;
+  $("#guideBg").addEventListener("click",e=>{ if(e.target===$("#guideBg")) closeGuide(); });
+  document.addEventListener("keydown",e=>{
+    if(e.key!=="Escape") return;
+    if($("#guideBg").classList.contains("show")) closeGuide();
+    else if($("#modalBg").classList.contains("show")) closeModal();
+  });
+
   $("#connBtn").onclick=openModal;
   $("#bannerSetup").onclick=openModal;
   $("#modalClose").onclick=closeModal;
@@ -1034,6 +1256,13 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
       return ex?{exec:ex}:null; }catch(e){ return null; }
   }
   const dd=document.querySelector('input[name="dueDate"]'); if(dd) dd.value=todayISO();
+  // 이 브라우저에서 처음 열었다면 사용설명서를 한 번 보여줌
+  try{
+    if(!localStorage.getItem("guide_seen_v1")){
+      openGuide();
+      localStorage.setItem("guide_seen_v1","1");
+    }
+  }catch(e){ /* 저장이 막힌 환경에서는 그냥 넘어감 */ }
   const hashCfg=readHashCfg();
   cfg = hashCfg || loadCfg();
   if(hashCfg){ saveCfg(hashCfg); history.replaceState(null,"",location.pathname+location.search); }
