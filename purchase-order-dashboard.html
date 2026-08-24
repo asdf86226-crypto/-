@@ -1785,7 +1785,13 @@ function buildTeamsCard(){
     '$schema':'http://adaptivecards.io/schemas/adaptive-card.json',
     type:'AdaptiveCard', version:'1.4', body:body,
   };
-  return { type:'message', attachments:[{ contentType:'application/vnd.microsoft.card.adaptive', content:card }] };
+  // 간단한 흐름(메시지 게시)에서도 쓸 수 있도록 마크다운 요약 텍스트도 함께 담는다.
+  const md = '**📦 발주 진행현황 요약** ('+stamp+' 기준 · 전체 '+s.total+'건)\n\n'
+    + s.overallLine + '\n\n'
+    + '**업체별 현황**\n' + s.supLines.join('\n')
+    + (s.soonLines.length ? ('\n\n**임박·지연 납기 (7일 이내·미입고, '+s.soonCount+'건)**\n' + s.soonLines.join('\n')
+        + (s.soonCount>s.soonLines.length ? ('\n…외 '+(s.soonCount-s.soonLines.length)+'건') : '')) : '');
+  return { type:'message', text: md, attachments:[{ contentType:'application/vnd.microsoft.card.adaptive', content:card }] };
 }
 function configureTeamsUrl(sendAfter){
   const v = window.prompt('팀즈 채널 수신 URL을 붙여넣으세요.\n(팀즈 채널 ⋯ → 워크플로 → "웹후크 요청이 오면 채널에 게시"에서 만든 URL)\n\n비우고 확인하면 URL이 삭제됩니다.', teamsWebhookUrl||'');
