@@ -1624,8 +1624,8 @@ function buildSharedProgressHtml(){
   order.sort(function(a,b){ return a.localeCompare(b); });
   const rowsHtml = order.map(function(sup){
     const items = groups[sup].slice().sort(function(a,b){
-      const da=a.dueDate||'9999', db=b.dueDate||'9999';
-      if(da!==db) return da.localeCompare(db);
+      const da=a.dueDate||'', db=b.dueDate||''; // 각 업체 안에서 납기요청일 최근(큰 날짜)이 위로, 날짜 없는 건은 맨 아래
+      if(da!==db) return db.localeCompare(da);
       return (a.itemName||'').localeCompare(b.itemName||'');
     });
     const head = '<tr class="grp" data-sup="'+sharedEsc(sup)+'"><td colspan="10">'+sharedEsc(sup)+' <span class="grp-n">'+items.length+'건</span></td></tr>';
