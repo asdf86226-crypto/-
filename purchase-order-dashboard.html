@@ -600,7 +600,7 @@
       <div class="console-head">
         <h2>발주 현황판</h2>
         <div style="display:flex; align-items:center; gap:14px;">
-          <button class="btn brass no-print" id="btnShareExport" style="padding:8px 14px; font-size:12.5px;" title="협력사/외부에 보낼 진행현황 페이지를 생성합니다 — 품명·공급사·진행상태·생산/선적/통관 일자·PI·CI·PL 문서만 담기고, 금액 등 내부정보는 제외됩니다">🔗 진행현황 공유파일 내보내기</button>
+          <button class="btn brass no-print" id="btnShareExport" style="padding:8px 14px; font-size:12.5px;" title="협력사/외부에 보낼 진행현황 페이지를 생성합니다 — 업체별로 품명·공급사·진행상태·생산/선적/통관 일자만 담기고, 금액·첨부문서 등 내부정보는 제외됩니다">🔗 진행현황 공유파일 내보내기</button>
           <span class="stamp" id="stampDate"></span>
         </div>
       </div>
@@ -1564,8 +1564,8 @@ document.getElementById('btnImport').addEventListener('click', ()=> document.get
 // 받은 사람은 로그인·인터넷 없이 파일만 열면 대시보드를 그대로 볼 수 있다(편집 불가).
 // 공유용 진행현황 페이지 생성 —
 // 외부(협력사/고객)에게 보낼 때 필요한 정보만 담은 독립 HTML을 만든다.
-// 담는 것: 품명/품목코드/공급사/수량/납기 + 진행상태(생산·선적·통관) + 생산완료/선적/항구도착/공장입고 일자 + PI·CI·PL 문서 링크
-// 담지 않는 것: 금액·선금·잔금·지급상태·거래처 연락처/결제조건·메모·DHL계정·결재·국내발주 (파일 소스에도 포함되지 않음)
+// 담는 것: 품명/품목코드/공급사/수량/납기 + 진행상태(생산·선적·통관) + 생산완료/선적/항구도착/공장입고 일자 (업체별 그룹)
+// 담지 않는 것: 금액·선금·잔금·지급상태·거래처 연락처/결제조건·메모·DHL계정·결재·국내발주·첨부문서(PI/CI/PL) 링크 (파일 소스에도 포함되지 않음)
 function sharedEsc(s){
   return String(s==null?'':s).replace(/[&<>"]/g, function(c){
     return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c];
@@ -1616,7 +1616,6 @@ function buildSharedProgressHtml(){
       + '<td class="mono">'+sharedDateCell(p.shipDate, '')+'</td>'
       + '<td class="mono">'+sharedDateCell(p.etaDate, p.etaPlanned)+'</td>'
       + '<td class="mono">'+sharedDateCell(p.warehouseDate, p.warehousePlanned)+'</td>'
-      + '<td>'+sharedDocCell(p)+'</td>'
       + '</tr>';
   }
   // 공급사별로 묶어서 표시 (그룹 헤더 + 그 업체의 건들)
@@ -1629,7 +1628,7 @@ function buildSharedProgressHtml(){
       if(da!==db) return da.localeCompare(db);
       return (a.itemName||'').localeCompare(b.itemName||'');
     });
-    const head = '<tr class="grp" data-sup="'+sharedEsc(sup)+'"><td colspan="11">'+sharedEsc(sup)+' <span class="grp-n">'+items.length+'건</span></td></tr>';
+    const head = '<tr class="grp" data-sup="'+sharedEsc(sup)+'"><td colspan="10">'+sharedEsc(sup)+' <span class="grp-n">'+items.length+'건</span></td></tr>';
     return head + items.map(itemRow).join('');
   }).join('');
   const chip = function(label,key,color){ return '<span class="sum-chip"><i style="background:'+color+'"></i>'+label+' <b>'+(counts[key]||0)+'</b></span>'; };
@@ -1687,14 +1686,14 @@ function buildSharedProgressHtml(){
   return '<!DOCTYPE html>\n<html lang="ko"><head><meta charset="UTF-8">'
     + '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
     + '<title>발주 진행현황</title><style>'+CSS+'</style></head><body>'
-    + '<div class="top"><h1>발주 진행현황</h1><div class="meta">공유용 · 생산/선적/통관 진행상태 및 PI·CI·PL 문서 · 기준시점 '+stampStr+'</div></div>'
+    + '<div class="top"><h1>발주 진행현황</h1><div class="meta">공유용 · 생산/선적/통관 진행상태 · 기준시점 '+stampStr+'</div></div>'
     + '<div class="wrap">'
-    + '<div class="note">각 발주 건의 <b>진행 상태(생산중 → 생산완료 → 선적완료 → 항구도착 → 공장입고)</b>와 <b>PI·CI·PL 문서</b>만 표시합니다. 날짜는 실제 완료일이며, 아직 진행 전인 항목은 <span class="plan">예정일</span>로 표시됩니다. 금액·결제 등 내부 정보는 포함되지 않습니다.</div>'
+    + '<div class="note">각 발주 건의 <b>진행 상태(생산중 → 생산완료 → 선적완료 → 항구도착 → 공장입고)</b>를 업체별로 표시합니다. 날짜는 실제 완료일이며, 아직 진행 전인 항목은 <span class="plan">예정일</span>로 표시됩니다. 금액·결제·첨부문서 등 내부 정보는 포함되지 않습니다.</div>'
     + '<div class="bar"><div class="sum">'+summary+'</div>'
-    + '<input id="q" class="search" type="text" placeholder="품명 / 품목코드 / 공급사 / PI / CI 검색" autocomplete="off"></div>'
+    + '<input id="q" class="search" type="text" placeholder="품명 / 품목코드 / 공급사 검색" autocomplete="off"></div>'
     + '<div class="tbl-wrap"><table><thead><tr>'
     + '<th>품명</th><th>품목코드</th><th>공급사</th><th>수량</th><th>납기요청일</th><th>진행상태</th>'
-    + '<th>생산완료</th><th>선적</th><th>항구도착</th><th>공장입고</th><th>문서(PI·CI·PL)</th>'
+    + '<th>생산완료</th><th>선적</th><th>항구도착</th><th>공장입고</th>'
     + '</tr></thead><tbody id="tb">'+rowsHtml+'</tbody></table></div>'+emptyHtml
     + '<div class="foot">표시 <span id="cnt">'+rowsSrc.length+'</span>건 · 이 페이지는 공유 시점의 스냅샷입니다.</div>'
     + '</div><script>'+SCRIPT+'<\/script></body></html>';
