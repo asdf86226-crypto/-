@@ -1599,13 +1599,13 @@ function buildSharedProgressHtml(){
     return (a.itemName||'').localeCompare(b.itemName||'');
   });
   const counts = {'st-prep':0,'st-prod':0,'st-made':0,'st-ship':0,'st-port':0,'st-in':0};
-  const rowsHtml = rowsSrc.map(function(p){
+  function itemRow(p){
     const st = sharedStatusOf(p); counts[st[1]] = (counts[st[1]]||0)+1;
     const search = [p.itemName,p.itemCode,p.supplier,p.piNo,p.ciNo].join(' ').toLowerCase();
     const badges = (p.isFirstBatch?'<span class="tg tg-first">초도</span>':'')
                  + (p.isSample?'<span class="tg tg-sample">샘플</span>':'')
                  + (p.isUrgent?'<span class="tg tg-urgent">긴급</span>':'');
-    return '<tr data-s="'+sharedEsc(search)+'">'
+    return '<tr class="item" data-sup="'+sharedEsc(p.supplier||'(공급사 미지정)')+'" data-s="'+sharedEsc(search)+'">'
       + '<td class="nm">'+sharedEsc(p.itemName||'-')+badges+'</td>'
       + '<td class="mono">'+sharedEsc(p.itemCode||'-')+'</td>'
       + '<td>'+sharedEsc(p.supplier||'-')+'</td>'
@@ -1618,6 +1618,19 @@ function buildSharedProgressHtml(){
       + '<td class="mono">'+sharedDateCell(p.warehouseDate, p.warehousePlanned)+'</td>'
       + '<td>'+sharedDocCell(p)+'</td>'
       + '</tr>';
+  }
+  // 공급사별로 묶어서 표시 (그룹 헤더 + 그 업체의 건들)
+  const groups = {}; const order = [];
+  rowsSrc.forEach(function(p){ const k=p.supplier||'(공급사 미지정)'; if(!groups[k]){groups[k]=[];order.push(k);} groups[k].push(p); });
+  order.sort(function(a,b){ return a.localeCompare(b); });
+  const rowsHtml = order.map(function(sup){
+    const items = groups[sup].slice().sort(function(a,b){
+      const da=a.dueDate||'9999', db=b.dueDate||'9999';
+      if(da!==db) return da.localeCompare(db);
+      return (a.itemName||'').localeCompare(b.itemName||'');
+    });
+    const head = '<tr class="grp" data-sup="'+sharedEsc(sup)+'"><td colspan="11">'+sharedEsc(sup)+' <span class="grp-n">'+items.length+'건</span></td></tr>';
+    return head + items.map(itemRow).join('');
   }).join('');
   const chip = function(label,key,color){ return '<span class="sum-chip"><i style="background:'+color+'"></i>'+label+' <b>'+(counts[key]||0)+'</b></span>'; };
   const summary = chip('생산중','st-prod','#d97706')+chip('생산완료','st-made','#0d9488')
@@ -1644,7 +1657,9 @@ function buildSharedProgressHtml(){
     + 'table{border-collapse:collapse;width:100%;min-width:1050px;}'
     + 'th{background:#16233d;color:#f3efe4;font-size:12px;font-weight:700;text-align:left;padding:10px;white-space:nowrap;position:sticky;top:0;}'
     + 'td{padding:9px 10px;border-bottom:1px solid #eceae3;font-size:13px;white-space:nowrap;vertical-align:middle;}'
-    + 'tbody tr:hover{background:#faf8f2;}'
+    + 'tbody tr.item:hover{background:#faf8f2;}'
+    + '.grp td{background:#dfe7ea;color:#16233d;font-weight:800;font-size:12.5px;padding:9px 12px;border-top:2px solid #16233d;}'
+    + '.grp-n{font-weight:700;font-size:11px;color:#4c5a62;margin-left:8px;}'
     + '.mono{font-family:"JetBrains Mono","SF Mono",Consolas,monospace;}'
     + '.qty{text-align:right;}'
     + '.nm{font-weight:700;white-space:normal;min-width:170px;}'
@@ -1661,9 +1676,12 @@ function buildSharedProgressHtml(){
     + '.empty{padding:60px 20px;text-align:center;color:#4c5a62;}'
     + '.foot{margin-top:16px;font-size:11.5px;color:#8a97a0;text-align:center;}'
     + '@media print{.search{display:none;}.top{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}';
-  const SCRIPT = '(function(){var q=document.getElementById("q");var rows=[].slice.call(document.querySelectorAll("#tb tr"));'
-    + 'function apply(){var v=(q.value||"").toLowerCase().trim();var n=0;'
-    + 'rows.forEach(function(r){var m=!v||r.getAttribute("data-s").indexOf(v)>=0;r.style.display=m?"":"none";if(m)n++;});'
+  const SCRIPT = '(function(){var q=document.getElementById("q");'
+    + 'var items=[].slice.call(document.querySelectorAll("#tb tr.item"));'
+    + 'var heads=[].slice.call(document.querySelectorAll("#tb tr.grp"));'
+    + 'function apply(){var v=(q.value||"").toLowerCase().trim();var n=0;var vis={};'
+    + 'items.forEach(function(r){var m=!v||r.getAttribute("data-s").indexOf(v)>=0;r.style.display=m?"":"none";if(m){n++;vis[r.getAttribute("data-sup")]=true;}});'
+    + 'heads.forEach(function(h){h.style.display=(!v||vis[h.getAttribute("data-sup")])?"":"none";});'
     + 'var c=document.getElementById("cnt");if(c)c.textContent=n;}'
     + 'q.addEventListener("input",apply);apply();})();';
   return '<!DOCTYPE html>\n<html lang="ko"><head><meta charset="UTF-8">'
