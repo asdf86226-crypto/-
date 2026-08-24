@@ -1807,16 +1807,27 @@ function configureTeamsUrl(sendAfter){
 function sendToTeams(){
   if(!teamsWebhookUrl){ configureTeamsUrl(true); return; }
   if(pos.length===0){ toast('보낼 발주 건이 없습니다'); return; }
-  const payload = buildTeamsCard();
-  // 브라우저 CORS 프리플라이트를 피하기 위해 text/plain + no-cors 로 전송(응답은 읽지 못함 = 게시 여부는 채널에서 확인)
+  // 흐름 트리거 스키마({text: string})에 정확히 맞춰 최소 본문만 전송. Content-Type은 application/json.
+  // Power Automate HTTP 트리거는 CORS 프리플라이트(OPTIONS)에 Access-Control-Allow-Origin:* 로 응답하므로
+  // file:// 로 열어도(Origin: null) 정상 동작한다.
+  const s = buildTeamsSummaryText();
+  const now = new Date();
+  const pad = function(n){ return String(n).padStart(2,'0'); };
+  const stamp = now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+' '+pad(now.getHours())+':'+pad(now.getMinutes());
+  const text = '📦 발주 진행현황 요약 ('+stamp+' 기준 · 전체 '+s.total+'건)\n\n'
+    + s.overallLine + '\n\n'
+    + '■ 업체별 현황\n' + s.supLines.join('\n')
+    + (s.soonLines.length ? ('\n\n■ 임박·지연 납기 (7일 이내·미입고, '+s.soonCount+'건)\n' + s.soonLines.join('\n')
+        + (s.soonCount>s.soonLines.length ? ('\n…외 '+(s.soonCount-s.soonLines.length)+'건') : '')) : '');
   fetch(teamsWebhookUrl, {
-    method:'POST', mode:'no-cors',
-    headers:{ 'Content-Type':'text/plain;charset=UTF-8' },
-    body: JSON.stringify(payload),
-  }).then(function(){
-    toast('팀즈로 전송했습니다 · 채널에서 확인해주세요');
-  }).catch(function(){
-    toast('전송을 시도했습니다 — 팀즈 채널에서 게시 여부를 확인해주세요');
+    method:'POST',
+    headers:{ 'Content-Type':'application/json' },
+    body: JSON.stringify({ text: text }),
+  }).then(function(r){
+    if(r.ok || r.status===202){ toast('팀즈로 전송했습니다 (' + r.status + ') · 채널에서 확인해주세요'); }
+    else { toast('전송 실패 · 상태 ' + r.status + ' (F12 네트워크 탭에서 응답 확인)'); }
+  }).catch(function(err){
+    toast('전송 실패 · ' + (err && err.message ? err.message : '네트워크 오류') + ' (F12 확인)');
   });
 }
 const btnTeamsSend = document.getElementById('btnTeamsSend');
