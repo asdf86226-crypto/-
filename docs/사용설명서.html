@@ -1,0 +1,445 @@
+<title>구매요청 접수 안내</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+<style>
+  :root{
+    --bg:#F7F8FA; --surface:#FFFFFF; --surface-2:#F1F3F6; --surface-3:#E9EDF3;
+    --border:#E3E7ED; --border-strong:#CDD4DE;
+    --ink:#1A2230; --muted:#5B6675; --faint:#8A94A3;
+    --accent:#3B5BDB; --accent-soft:#EDF0FE; --accent-line:#C7D2FB;
+    --dev:#4C6EF5; --mat:#F08C00; --prod:#12B886; --qa:#AE3EC9;
+    --ok:#2F9E44; --ok-soft:#E9F6EC; --ok-line:#BCE3C6;
+    --warn:#E8590C; --warn-soft:#FDF0E6; --warn-line:#F8D3B6;
+    --danger:#E03131; --danger-soft:#FDECEC; --danger-line:#F6C6C6;
+    --radius:12px;
+    --shadow:0 1px 2px rgba(16,24,40,.04), 0 6px 18px rgba(16,24,40,.05);
+    --sans:"Noto Sans KR",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Malgun Gothic",monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#12151C; --surface:#1A1F29; --surface-2:#222836; --surface-3:#2A3140;
+      --border:#2A3140; --border-strong:#3A4356;
+      --ink:#E8ECF2; --muted:#9AA5B5; --faint:#6B7688;
+      --accent:#6C8BFF; --accent-soft:#222C46; --accent-line:#3A4a7a;
+      --dev:#6C8BFF; --mat:#FFB454; --prod:#38D9A9; --qa:#DA77F2;
+      --ok:#51CF66; --ok-soft:#1B2A20; --ok-line:#2F5238;
+      --warn:#FF922B; --warn-soft:#2C2119; --warn-line:#573D24;
+      --danger:#FF6B6B; --danger-soft:#2C1B1D; --danger-line:#5A3034;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12151C; --surface:#1A1F29; --surface-2:#222836; --surface-3:#2A3140;
+    --border:#2A3140; --border-strong:#3A4356;
+    --ink:#E8ECF2; --muted:#9AA5B5; --faint:#6B7688;
+    --accent:#6C8BFF; --accent-soft:#222C46; --accent-line:#3A4a7a;
+    --dev:#6C8BFF; --mat:#FFB454; --prod:#38D9A9; --qa:#DA77F2;
+    --ok:#51CF66; --ok-soft:#1B2A20; --ok-line:#2F5238;
+    --warn:#FF922B; --warn-soft:#2C2119; --warn-line:#573D24;
+    --danger:#FF6B6B; --danger-soft:#2C1B1D; --danger-line:#5A3034;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--sans); font-size:15.5px; line-height:1.72;
+    -webkit-font-smoothing:antialiased;
+  }
+  .page{max-width:760px; margin:0 auto; padding:40px 22px 72px}
+  h1,h2,h3{margin:0; font-weight:900; letter-spacing:-.02em; text-wrap:balance}
+  p{margin:0}
+  b,strong{font-weight:700}
+  code{font-family:var(--mono); font-size:.9em; background:var(--surface-2);
+    border:1px solid var(--border); padding:1px 6px; border-radius:5px; white-space:nowrap}
+
+  /* 헤더 */
+  .head{border-bottom:2px solid var(--ink); padding-bottom:22px; margin-bottom:34px}
+  .eyebrow{display:inline-flex; align-items:center; gap:7px; font-size:11.5px; font-weight:700;
+    letter-spacing:.1em; color:var(--accent); text-transform:uppercase; margin-bottom:12px}
+  .eyebrow::before{content:""; width:18px; height:2px; background:var(--accent)}
+  .head h1{font-size:clamp(27px,5.4vw,36px); line-height:1.25}
+  .head .lede{margin-top:12px; font-size:16px; color:var(--muted); max-width:56ch}
+  .teams{display:flex; flex-wrap:wrap; gap:7px; margin-top:18px}
+  .team{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700;
+    padding:4px 11px; border-radius:20px; background:var(--surface); border:1px solid var(--border)}
+  .team i{width:8px; height:8px; border-radius:50%; display:block}
+
+  /* 목차 */
+  .toc{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:16px 18px; margin-bottom:38px; box-shadow:var(--shadow)}
+  .toc-t{font-size:11.5px; font-weight:700; letter-spacing:.08em; color:var(--faint);
+    text-transform:uppercase; margin-bottom:10px}
+  .toc ol{margin:0; padding:0; list-style:none; display:grid; gap:7px}
+  .toc a{color:var(--ink); text-decoration:none; font-size:14.5px; font-weight:500;
+    display:flex; gap:10px; align-items:baseline; border-radius:6px}
+  .toc a:hover{color:var(--accent)}
+  .toc a span{font-family:var(--mono); font-size:12px; color:var(--accent); font-weight:700; flex:none}
+  .toc a:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
+
+  /* 섹션 */
+  section{margin-bottom:44px; scroll-margin-top:20px}
+  .sec-head{display:flex; align-items:baseline; gap:12px; margin-bottom:16px;
+    padding-bottom:10px; border-bottom:1px solid var(--border)}
+  .sec-n{font-family:var(--mono); font-size:13px; font-weight:700; color:#fff;
+    background:var(--accent); width:26px; height:26px; border-radius:7px;
+    display:grid; place-items:center; flex:none; align-self:center}
+  .sec-head h2{font-size:21px}
+  .sec-note{margin-left:auto; font-size:12.5px; color:var(--faint); font-weight:500; align-self:center}
+  .body-copy{color:var(--muted); max-width:62ch}
+  .body-copy + .body-copy{margin-top:10px}
+
+  /* 카드 */
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:18px 20px; box-shadow:var(--shadow)}
+  .stack{display:grid; gap:14px; margin-top:16px}
+  .card h3{font-size:16px; margin-bottom:4px}
+  .card .sub{font-size:13px; color:var(--faint); font-weight:500}
+
+  /* 두 방법 비교 */
+  .methods{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px}
+  @media (max-width:660px){ .methods{grid-template-columns:1fr} }
+  .method{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:18px 20px; box-shadow:var(--shadow); display:flex; flex-direction:column}
+  .method-tag{align-self:flex-start; font-size:11.5px; font-weight:700; letter-spacing:.04em;
+    padding:3px 10px; border-radius:20px; margin-bottom:11px;
+    background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent-line)}
+  .method h3{font-size:17px}
+  .method .when{font-size:13px; color:var(--faint); margin:3px 0 13px; font-weight:500}
+  .method ol{margin:0; padding-left:19px; display:grid; gap:7px; font-size:14.5px; color:var(--muted)}
+  .method ol strong{color:var(--ink)}
+
+  /* 입력 항목 표 */
+  .tbl-wrap{overflow-x:auto; margin-top:16px; border:1px solid var(--border);
+    border-radius:var(--radius); background:var(--surface); box-shadow:var(--shadow)}
+  table{width:100%; border-collapse:collapse; font-size:14.5px; min-width:430px}
+  th{text-align:left; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--faint); padding:11px 16px; border-bottom:1px solid var(--border); white-space:nowrap}
+  td{padding:11px 16px; border-bottom:1px solid var(--border); vertical-align:top; color:var(--muted)}
+  tr:last-child td{border-bottom:0}
+  td.f{font-weight:700; color:var(--ink); white-space:nowrap}
+  .req{display:inline-block; font-size:10.5px; font-weight:700; padding:1px 6px; border-radius:4px;
+    background:var(--danger-soft); color:var(--danger); border:1px solid var(--danger-line); margin-left:6px}
+  .opt{display:inline-block; font-size:10.5px; font-weight:700; padding:1px 6px; border-radius:4px;
+    background:var(--surface-2); color:var(--faint); border:1px solid var(--border); margin-left:6px}
+
+  /* 엑셀 열 순서 */
+  .cols{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; align-items:center}
+  .col-chip{font-family:var(--mono); font-size:12.5px; font-weight:700; padding:6px 12px;
+    background:var(--surface); border:1px solid var(--border-strong); border-radius:7px; color:var(--ink)}
+  .col-arrow{color:var(--faint); font-size:12px}
+  .sheet{margin-top:14px; overflow-x:auto; border:1px solid var(--border-strong);
+    border-radius:9px; background:var(--surface)}
+  .sheet table{min-width:520px; font-size:13px}
+  .sheet th{background:var(--surface-2); color:var(--muted); font-size:11.5px;
+    letter-spacing:.02em; text-transform:none; padding:9px 14px}
+  .sheet td{padding:9px 14px; font-variant-numeric:tabular-nums; color:var(--ink)}
+
+  /* 콜아웃 */
+  .note{border-radius:var(--radius); padding:15px 18px; margin-top:16px; font-size:14.5px;
+    border:1px solid; display:flex; gap:12px; align-items:flex-start; line-height:1.65}
+  .note .ic{flex:none; font-size:16px; line-height:1.4}
+  .note .txt{color:var(--muted)}
+  .note .txt b{color:var(--ink)}
+  .note.ok{background:var(--ok-soft); border-color:var(--ok-line)}
+  .note.ok .ic{color:var(--ok)}
+  .note.warn{background:var(--warn-soft); border-color:var(--warn-line)}
+  .note.warn .ic{color:var(--warn)}
+  .note.danger{background:var(--danger-soft); border-color:var(--danger-line)}
+  .note.danger .ic{color:var(--danger)}
+  .note.info{background:var(--accent-soft); border-color:var(--accent-line)}
+  .note.info .ic{color:var(--accent)}
+
+  /* 상태 배지(화면과 동일하게) */
+  .pill{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700;
+    padding:3px 11px; border-radius:20px; border:1px solid; white-space:nowrap; vertical-align:middle}
+  .pill i{width:8px; height:8px; border-radius:50%; display:block}
+  .pill.green{background:var(--ok-soft); color:var(--ok); border-color:var(--ok-line)}
+  .pill.green i{background:var(--ok)}
+  .pill.grey{background:var(--surface-2); color:var(--warn); border-color:var(--border-strong)}
+  .pill.grey i{background:var(--warn)}
+
+  /* FAQ */
+  .faq{display:grid; gap:10px; margin-top:16px}
+  details{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:0; overflow:hidden; box-shadow:var(--shadow)}
+  summary{cursor:pointer; padding:14px 18px; font-weight:700; font-size:15px; list-style:none;
+    display:flex; align-items:center; gap:11px}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"+"; font-family:var(--mono); color:var(--accent); font-weight:700;
+    font-size:16px; flex:none; transition:transform .18s}
+  details[open] summary::before{content:"−"}
+  summary:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
+  details .ans{padding:0 18px 16px 41px; color:var(--muted); font-size:14.5px}
+  details .ans b{color:var(--ink)}
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important} }
+
+  /* 마무리 */
+  .foot{margin-top:52px; padding-top:22px; border-top:1px solid var(--border);
+    display:flex; flex-wrap:wrap; gap:14px; align-items:baseline;
+    font-size:13.5px; color:var(--faint)}
+  .foot b{color:var(--ink)}
+  .foot .right{margin-left:auto}
+
+  @media print{
+    body{background:#fff}
+    .page{max-width:none; padding:0}
+    .toc{display:none}
+    section{break-inside:avoid; margin-bottom:26px}
+    details{break-inside:avoid}
+    details .ans{display:block !important}
+    .card,.method,.tbl-wrap,.note,details{box-shadow:none}
+  }
+</style>
+
+<div class="page">
+
+  <header class="head">
+    <div class="eyebrow">구매요청 대시보드</div>
+    <h1>구매요청, 이렇게 올려주세요</h1>
+    <p class="lede">개발·자재·생산·품질 팀의 구매요청을 한 곳에 모으는 화면입니다.
+      링크만 열면 바로 쓸 수 있고, 따로 설치하거나 가입할 것은 없습니다.</p>
+    <div class="teams">
+      <span class="team"><i style="background:var(--dev)"></i>개발</span>
+      <span class="team"><i style="background:var(--mat)"></i>자재</span>
+      <span class="team"><i style="background:var(--prod)"></i>생산</span>
+      <span class="team"><i style="background:var(--qa)"></i>품질</span>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="목차">
+    <div class="toc-t">목차</div>
+    <ol>
+      <li><a href="#s1"><span>01</span>시작하기 — 링크 열고 확인할 것</a></li>
+      <li><a href="#s2"><span>02</span>한 건 올리기 — 직접 입력</a></li>
+      <li><a href="#s3"><span>03</span>여러 건 올리기 — 엑셀 파일</a></li>
+      <li><a href="#s4"><span>04</span>올린 뒤 확인하기</a></li>
+      <li><a href="#s5"><span>05</span>주의사항</a></li>
+      <li><a href="#s6"><span>06</span>자주 묻는 질문</a></li>
+    </ol>
+  </nav>
+
+  <section id="s1">
+    <div class="sec-head">
+      <span class="sec-n">1</span>
+      <h2>시작하기</h2>
+      <span class="sec-note">처음 한 번만 확인</span>
+    </div>
+    <p class="body-copy">전달받은 <b>링크를 열면</b> 바로 사용할 수 있습니다. 즐겨찾기에 추가해 두면 편합니다.</p>
+
+    <div class="note ok">
+      <span class="ic">✓</span>
+      <span class="txt"><b>화면 오른쪽 위를 먼저 확인하세요.</b><br>
+        <span class="pill green"><i></i>구글 시트 연결</span> 초록색이면 정상입니다.
+        입력한 내용이 팀 전체에 공유됩니다.</span>
+    </div>
+
+    <div class="note warn">
+      <span class="ic">!</span>
+      <span class="txt"><b><span class="pill grey"><i></i>로컬 저장</span> 회색으로 보인다면 멈춰주세요.</b><br>
+        공유가 안 되는 상태라, 입력해도 담당자에게 전달되지 않습니다.
+        받으신 링크 대신 주소만 입력해 들어온 경우일 수 있으니, <b>전달받은 링크로 다시 접속</b>하거나 담당자에게 알려주세요.</span>
+    </div>
+  </section>
+
+  <section id="s2">
+    <div class="sec-head">
+      <span class="sec-n">2</span>
+      <h2>한 건 올리기 — 직접 입력</h2>
+    </div>
+    <p class="body-copy">화면 왼쪽 <code>직접 입력</code> 탭에서 내용을 채우고
+      <b>＋ 구매요청 추가</b>를 누르면 끝입니다.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>입력 항목</th><th>설명</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="f">요청팀<span class="req">필수</span></td><td>개발 · 자재 · 생산 · 품질 중 본인 팀 선택</td></tr>
+          <tr><td class="f">품목코드<span class="req">필수</span></td><td>사내 품목코드 (예: <code>MAT-00123</code>)</td></tr>
+          <tr><td class="f">수량<span class="req">필수</span></td><td>숫자만 입력</td></tr>
+          <tr><td class="f">품명<span class="req">필수</span></td><td>규격이 있으면 함께 (예: 스테인리스 볼트 M4)</td></tr>
+          <tr><td class="f">입고요청일<span class="req">필수</span></td><td>언제까지 들어와야 하는 날짜</td></tr>
+          <tr><td class="f">요청자<span class="opt">선택</span></td><td>본인 이름. 문의가 필요할 때 담당자가 연락합니다</td></tr>
+          <tr><td class="f">기타사항<span class="opt">선택</span></td><td>표면처리·납품처·긴급 여부 등 참고사항</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note info">
+      <span class="ic">→</span>
+      <span class="txt">등록하면 목록에 바로 나타나고, <b>요청팀은 그대로 남습니다.</b>
+        연달아 여러 건 올릴 때 팀을 매번 다시 고르지 않아도 됩니다.</span>
+    </div>
+  </section>
+
+  <section id="s3">
+    <div class="sec-head">
+      <span class="sec-n">3</span>
+      <h2>여러 건 올리기 — 엑셀 파일</h2>
+      <span class="sec-note">한 번에 수십 건</span>
+    </div>
+    <p class="body-copy">이미 엑셀로 정리해 두셨다면 <code>엑셀 파일</code> 탭에서 파일을 올리시면 됩니다.
+      <b>붙여넣기가 아니라 파일을 그대로</b> 선택하거나 끌어다 놓으면 자동으로 읽어옵니다.</p>
+
+    <div class="methods">
+      <div class="method">
+        <span class="method-tag">순서</span>
+        <h3>올리는 방법</h3>
+        <p class="when">.xlsx 또는 CSV 파일</p>
+        <ol>
+          <li><strong>요청팀</strong>을 먼저 선택합니다</li>
+          <li>상자를 눌러 <strong>파일을 선택</strong>하거나, 상자 위로 <strong>끌어다 놓습니다</strong></li>
+          <li><strong>“3건 인식”</strong>처럼 건수가 뜨는지 확인합니다</li>
+          <li><strong>인식된 항목 일괄 추가</strong>를 누릅니다</li>
+        </ol>
+      </div>
+      <div class="method">
+        <span class="method-tag">준비</span>
+        <h3>파일 만들기</h3>
+        <p class="when">양식이 없다면</p>
+        <ol>
+          <li><strong>양식(CSV) 내려받기</strong>를 누릅니다</li>
+          <li>엑셀로 열어 <strong>아래 줄에 품목을 채웁니다</strong></li>
+          <li>저장한 뒤 위 순서대로 올립니다</li>
+        </ol>
+      </div>
+    </div>
+
+    <p class="body-copy" style="margin-top:22px"><b>열 순서</b>는 아래와 같아야 합니다. 맨 윗줄 제목은 자동으로 걸러내니 그대로 두셔도 됩니다.</p>
+    <div class="cols">
+      <span class="col-chip">품목코드</span><span class="col-arrow">›</span>
+      <span class="col-chip">품명</span><span class="col-arrow">›</span>
+      <span class="col-chip">수량</span><span class="col-arrow">›</span>
+      <span class="col-chip">입고요청일</span><span class="col-arrow">›</span>
+      <span class="col-chip">기타사항</span>
+    </div>
+
+    <div class="sheet">
+      <table>
+        <thead>
+          <tr><th>품목코드</th><th>품명</th><th>수량</th><th>입고요청일</th><th>기타사항</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>MAT-00123</td><td>스테인리스 볼트 M4</td><td>500</td><td>2026-08-25</td><td>아연도금</td></tr>
+          <tr><td>MAT-00988</td><td>육각너트 M4</td><td>500</td><td>2026-08-25</td><td></td></tr>
+          <tr><td>PKG-10021</td><td>완충 에어캡 롤</td><td>10</td><td>2026-09-01</td><td>폭 500mm</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note ok">
+      <span class="ic">✓</span>
+      <span class="txt"><b>날짜는 엑셀 날짜 셀 그대로 두셔도 됩니다.</b>
+        <code>2026-08-25</code>, <code>2026.08.25</code> 등 어떤 형식이든 자동으로 맞춰집니다.
+        기타사항이 비어 있어도 괜찮습니다.</span>
+    </div>
+
+    <div class="note warn">
+      <span class="ic">!</span>
+      <span class="txt"><b>추가 버튼을 누르기 전, 인식 건수를 꼭 확인하세요.</b>
+        올린 파일의 품목 수와 다르다면 열 순서가 어긋났을 가능성이 큽니다.
+        빨간 글씨로 오류가 나오면 양식을 내려받아 다시 만들어 보세요.</span>
+    </div>
+  </section>
+
+  <section id="s4">
+    <div class="sec-head">
+      <span class="sec-n">4</span>
+      <h2>올린 뒤 확인하기</h2>
+    </div>
+    <p class="body-copy">오른쪽 목록에 <b>모든 팀의 요청이 함께</b> 표시됩니다.
+      다른 사람이 올린 내용도 10초 안팎이면 자동으로 나타납니다.</p>
+
+    <div class="stack">
+      <div class="card">
+        <h3>내 팀 것만 보기</h3>
+        <p class="sub">목록 위쪽의 팀 이름(개발·자재·생산·품질)을 누르면 그 팀 요청만 걸러서 봅니다. <b>전체</b>를 누르면 다시 모두 보입니다.</p>
+      </div>
+      <div class="card">
+        <h3>찾기와 정렬</h3>
+        <p class="sub">오른쪽 위 검색창에 품목코드나 품명을 넣으면 바로 찾습니다. 표의 <b>제목(접수일·수량·입고요청일 등)을 누르면</b> 그 기준으로 정렬됩니다.</p>
+      </div>
+      <div class="card">
+        <h3>엑셀로 내려받기</h3>
+        <p class="sub">목록 아래 <b>⬇ CSV 내보내기</b>를 누르면 지금 보이는 목록을 엑셀에서 열 수 있는 파일로 받습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="s5">
+    <div class="sec-head">
+      <span class="sec-n">5</span>
+      <h2>주의사항</h2>
+      <span class="sec-note">꼭 읽어주세요</span>
+    </div>
+
+    <div class="note danger">
+      <span class="ic">⚠</span>
+      <span class="txt"><b>삭제는 모두에게 적용됩니다.</b>
+        각 줄 끝의 <code>✕</code>를 누르면 그 요청이 <b>모든 사람의 화면에서</b> 사라집니다.
+        내가 올린 것이 아니라면 지우지 마시고, 잘못 올렸을 때만 본인 것을 지워주세요.
+        아래쪽 <b>전체 삭제</b>는 되돌릴 수 없으니 누르지 마세요.</span>
+    </div>
+
+    <div class="note warn">
+      <span class="ic">!</span>
+      <span class="txt"><b>수정 기능은 아직 없습니다.</b>
+        잘못 올렸다면 그 줄을 지우고 다시 올려주세요.</span>
+    </div>
+
+    <div class="note info">
+      <span class="ic">i</span>
+      <span class="txt"><b>요청이 접수되면 구매 담당자에게 알림이 갑니다.</b>
+        올리신 뒤 따로 연락하지 않으셔도 됩니다. 급한 건은 <b>기타사항에 “긴급”</b>이라고 적어주세요.</span>
+    </div>
+  </section>
+
+  <section id="s6">
+    <div class="sec-head">
+      <span class="sec-n">6</span>
+      <h2>자주 묻는 질문</h2>
+    </div>
+
+    <div class="faq">
+      <details>
+        <summary>휴대폰으로도 되나요?</summary>
+        <div class="ans">됩니다. 링크를 열면 화면 크기에 맞춰 표시됩니다.
+          다만 <b>엑셀 파일 올리기는 PC가 편합니다.</b></div>
+      </details>
+      <details>
+        <summary>품목코드를 모르면 어떻게 하나요?</summary>
+        <div class="ans"><b>품명을 최대한 자세히</b> 적고, 기타사항에 규격·용도·사용처를 남겨주세요.
+          품목코드 칸에는 <code>미상</code>이라고 적어두시면 담당자가 확인 후 채웁니다.</div>
+      </details>
+      <details>
+        <summary>같은 품목을 또 올렸어요.</summary>
+        <div class="ans">중복된 줄 하나를 <code>✕</code>로 지워주세요.
+          그대로 두면 담당자가 두 건으로 볼 수 있습니다.</div>
+      </details>
+      <details>
+        <summary>올렸는데 목록에 안 보여요.</summary>
+        <div class="ans">잠시 뒤 자동으로 나타납니다. 그래도 안 보이면 오른쪽 위 <b>새로고침(⟳)</b>을 눌러보세요.
+          그래도 없다면 연결 표시가 <b>초록색</b>인지 확인하고, 회색이면 담당자에게 알려주세요.</div>
+      </details>
+      <details>
+        <summary>수량을 아직 확정 못 했어요.</summary>
+        <div class="ans">예상 수량을 적고 <b>기타사항에 “수량 확정 전”</b>이라고 남겨주세요.
+          확정되면 지우고 다시 올리시면 됩니다.</div>
+      </details>
+      <details>
+        <summary>화면이 눈부셔요 / 어둡게 보고 싶어요.</summary>
+        <div class="ans">오른쪽 위 <code>◑</code> 버튼을 누르면 밝은 화면과 어두운 화면이 바뀝니다.</div>
+      </details>
+    </div>
+  </section>
+
+  <div class="foot">
+    <span>문의 — <b>구매 담당</b></span>
+    <span class="right">구매요청 대시보드 사용 안내</span>
+  </div>
+
+</div>
