@@ -3161,11 +3161,12 @@ const CI_SYNC_FIELDS = [
   {key:'plDocUrl',           label:'패킹리스트(PL) 링크'},
   {key:'coDocUrl',           label:'원산지증명서 링크'},
 ];
+// CI번호가 같으면 실제 같은 화물 단위 — PI가 서로 달라도 같은 CI로 묶여 들어올 수 있으므로 CI번호만으로 그룹화한다.
+// (piNo 인자는 이전 시그니처 호환용으로 남겨두었으나 실제 매칭에는 사용하지 않음)
 function getCiGroup(ciNo, piNo, excludeId){
   const ciKey = (ciNo||'').trim();
-  const piKey = (piNo||'').trim();
   if(!ciKey) return [];
-  return pos.filter(p => (p.ciNo||'').trim()===ciKey && (p.piNo||'').trim()===piKey && p.id !== excludeId);
+  return pos.filter(p => (p.ciNo||'').trim()===ciKey && p.id !== excludeId);
 }
 // CI번호를 입력했는데 이 항목엔 CI/선적/잔금 관련 필드가 비어있고 같은 CI를 쓰는 다른 건엔 있다면, 그 값을 가져와 채운다.
 // (이걸 안 하면 새 건을 추가할 때 빈 값이 그대로 autoSyncCiFields로 넘어가 기존 건들의 값을 지워버리게 됨)
