@@ -1885,12 +1885,23 @@ function buildTeamsHtml(){
 function sendToTeams(){
   if(!teamsWebhookUrl){ configureTeamsUrl(true); return; }
   if(pos.length===0){ toast('보낼 발주 건이 없습니다'); return; }
-  // 흐름의 "메시지" 필드는 HTML 태그를 렌더링한다. text 키에 HTML을 담아 보낸다.
+  // 흐름의 "메시지" 필드는 HTML 태그를 렌더링한다. text 키에 요약 HTML, sharedHtml 키에 전체 진행현황 HTML을 담아 보낸다.
+  // 흐름 쪽에서 sharedHtml 을 SharePoint(팀즈 파일함)에 filename으로 덮어써주면 링크는 그대로 유지되면서 최신 상태로 갱신된다.
   const html = buildTeamsHtml();
+  const sharedHtml = buildSharedProgressHtml();
+  const now = new Date();
+  const pad = function(n){ return String(n).padStart(2,'0'); };
+  const stamp = now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+' '+pad(now.getHours())+':'+pad(now.getMinutes());
+  const payload = {
+    text: html,
+    sharedHtml: sharedHtml,
+    filename: '발주진행현황.html',      // 흐름에서 이 이름 그대로 SharePoint에 덮어씀 (URL 유지)
+    updatedAt: stamp,
+  };
   fetch(teamsWebhookUrl, {
     method:'POST',
     headers:{ 'Content-Type':'application/json' },
-    body: JSON.stringify({ text: html }),
+    body: JSON.stringify(payload),
   }).then(function(r){
     if(r.ok || r.status===202){ toast('팀즈로 전송했습니다 (' + r.status + ') · 채널에서 확인해주세요'); }
     else { toast('전송 실패 · 상태 ' + r.status + ' (F12 네트워크 탭에서 응답 확인)'); }
