@@ -800,7 +800,7 @@
   <!-- ===================== MONTHLY COST FORECAST ===================== -->
   <div class="view" id="view-monthcost">
     <div class="view-header"><span class="vlabel">월별 예상 비용</span></div>
-    <div class="cal-hint">각 발주의 납기요청일 기준으로 월별 예상 지출 합계를 보여줍니다. 해외는 CI금액(없으면 PI금액)을 환율로 환산, 국내는 실제입고금액(없으면 발주금액) 기준입니다. <b>선금·잔금 지급일이 입력되지 않은(=아직 지급 전) 금액만 예상비용으로 합산</b>되며, 지급일이 입력된 금액은 합계에서 빠지고 아래 <b>"선금 지급내역"·"잔금 지급내역"</b>에 <b>CI번호 기준</b>으로 묶여 표시됩니다(CI 미발행이면 PI 기준, 국내발주는 건별). 종결(ERP입력완료)된 건은 월별 합계에서 제외되며, 그중 <b>아직 지급되지 않은 금액이 남은 건은 맨 아래 "ERP입력 완료 · 미지급"</b>에 따로 모아 보여줍니다.</div>
+    <div class="cal-hint">각 발주의 납기요청일 기준으로 월별 예상 지출 합계를 보여줍니다. 해외는 CI금액(없으면 PI금액)을 환율로 환산, 국내는 실제입고금액(없으면 발주금액) 기준입니다. <b>선금·잔금 지급일이 입력되지 않은(=아직 지급 전) 금액만 예상비용으로 합산</b>되며, 지급일이 입력된 금액은 합계에서 빠지고 아래 <b>"선금 지급내역"·"잔금 지급내역"</b>에 <b>CI번호 기준</b>으로 묶여 표시됩니다(PI가 달라도 CI가 같으면 한 묶음. CI 미발행이면 PI 기준, 국내발주는 건별). 종결(ERP입력완료)된 건은 월별 합계에서 제외되며, 그중 <b>아직 지급되지 않은 금액이 남은 건은 맨 아래 "ERP입력 완료 · 미지급"</b>에 따로 모아 보여줍니다.</div>
     <div class="mc-grand-row">
       <span class="mc-grand-label">진행중인 전체 예상 비용 합계</span>
       <span class="mc-grand-total" id="monthCostGrandTotal">₩0</span>
@@ -811,7 +811,7 @@
     <!-- ERP입력 완료됐지만 아직 지급되지 않은 건 -->
     <div id="mcClosedUnpaidWrap" style="display:none; margin-top:26px;">
       <div class="view-header"><span class="vlabel" style="color:#dc2626;">⚠ ERP입력 완료 · 미지급</span></div>
-      <div class="cal-hint">ERP입력까지 끝났지만 <b>선금 또는 잔금 지급일이 입력되지 않은</b> 건입니다. <b>CI번호 기준</b>으로 묶어서 보여줍니다(CI 미발행이면 PI 기준, 국내발주는 건별). 위 월별 합계에는 포함되지 않으니 별도로 확인하세요. (실제로 지급했다면 해당 건을 열어 지급일을 입력해 주세요)</div>
+      <div class="cal-hint">ERP입력까지 끝났지만 <b>선금 또는 잔금 지급일이 입력되지 않은</b> 건입니다. <b>CI번호 기준</b>으로 묶어서 보여줍니다(PI가 달라도 CI가 같으면 한 묶음. CI 미발행이면 PI 기준, 국내발주는 건별). 위 월별 합계에는 포함되지 않으니 별도로 확인하세요. (실제로 지급했다면 해당 건을 열어 지급일을 입력해 주세요)</div>
       <div class="mc-grand-row" style="border-color:#dc2626;">
         <span class="mc-grand-label">미지급 합계</span>
         <span class="mc-grand-total" id="mcClosedUnpaidTotal" style="color:#dc2626;">₩0</span>
@@ -2227,8 +2227,9 @@ function payGroupKeyOf(it){
   if(it.source!=='overseas') return {key:'item:'+it.id, label: it.itemName||'(품명 미입력)'};
   const ci = (it.ciNo||'').trim();
   const pi = (it.piNo||'').trim();
-  if(ci) return {key:'ci:'+pi+'|'+ci, label:'CI '+ci + (pi?` (PI ${pi})`:'')};
-  if(pi) return {key:'pi:'+pi,        label:'PI '+pi + ' · CI 미발행'};
+  // CI번호가 같으면 PI가 달라도 한 묶음으로 본다
+  if(ci) return {key:'ci:'+ci, label:'CI '+ci};
+  if(pi) return {key:'pi:'+pi, label:'PI '+pi + ' · CI 미발행'};
   return {key:'item:'+it.id, label: it.itemName||'(품명 미입력)'};
 }
 // 종결(ERP입력완료)되지 않았고 납기요청일이 있는 건 — 해외/국내 통합
@@ -2469,7 +2470,7 @@ function openPiGroupPanel(piNo){
       <span class="badge" style="background:${STAGE_COLORS[stageIdx]}">${stageLabelText(p, stageIdx, false)}</span>
     </div>`;
   }
-  // CI번호로 서브 그룹핑 (CI가 같으면 실제로 같은 선적묶음일 가능성이 높음)
+  // CI번호로 서브 그룹핑 (CI가 같으면 같은 선적묶음 — PI가 달라도 함께 묶임)
   function renderCiClustered(items){
     const ciGroups = {}; // key: ciNo 또는 '__none__'
     const ciOrder = [];
@@ -2856,19 +2857,19 @@ const CI_SYNC_FIELDS = [
   {key:'plDocUrl',           label:'패킹리스트(PL) 링크'},
   {key:'coDocUrl',           label:'원산지증명서 링크'},
 ];
-function getCiGroup(ciNo, piNo, excludeId){
+// CI번호만 같으면 같은 선적묶음으로 본다.
+// (PI를 나눠 받았더라도 한 CI로 함께 들어오는 경우가 있어 PI는 따지지 않음)
+function getCiGroup(ciNo, _piNoIgnored, excludeId){
   const ciKey = (ciNo||'').trim();
-  const piKey = (piNo||'').trim();
   if(!ciKey) return [];
-  return pos.filter(p => (p.ciNo||'').trim()===ciKey && (p.piNo||'').trim()===piKey && p.id !== excludeId);
+  return pos.filter(p => (p.ciNo||'').trim()===ciKey && p.id !== excludeId);
 }
 // CI번호를 입력했는데 이 항목엔 CI/선적/잔금 관련 필드가 비어있고 같은 CI를 쓰는 다른 건엔 있다면, 그 값을 가져와 채운다.
 // (이걸 안 하면 새 건을 추가할 때 빈 값이 그대로 autoSyncCiFields로 넘어가 기존 건들의 값을 지워버리게 됨)
 function autoFillCiFieldsFromGroup(){
-  const piNo = (poForm.elements['piNo'].value||'').trim();
   const ciNo = (poForm.elements['ciNo'].value||'').trim();
   if(!ciNo) return;
-  const others = getCiGroup(ciNo, piNo, editingPoId);
+  const others = getCiGroup(ciNo, null, editingPoId);
   if(others.length === 0) return;
   let filled = false;
   let etaJustFilled = false;
@@ -2889,10 +2890,9 @@ function autoFillCiFieldsFromGroup(){
   if(filled){ updateFieldsetFillState(); syncShareDisplays(); }
 }
 async function autoSyncCiFields(){
-  const piNo = (poForm.elements['piNo'].value||'').trim();
   const ciNo = (poForm.elements['ciNo'].value||'').trim();
   if(!ciNo) return;
-  const others = getCiGroup(ciNo, piNo, editingPoId);
+  const others = getCiGroup(ciNo, null, editingPoId);
   if(others.length === 0) return;
   const balanceDeferredVal = poForm.elements['balanceDeferred'].checked;
   const toUpdate = others.filter(p => CI_SYNC_FIELDS.some(f => (p[f.key]||'') !== (poForm.elements[f.key].value||'')) || !!p.balanceDeferred !== balanceDeferredVal);
