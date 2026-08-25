@@ -990,9 +990,9 @@
               <div class="share-status" id="balanceSharedDisplay">미공유</div>
               <input type="hidden" name="balanceShared">
             </div>
-            <div class="fgroup"><label>선적일</label><input type="date" name="shipDate"></div>
+            <div class="fgroup"><label>선적 예정일</label><input type="date" name="shipPlannedDate"></div>
           </div>
-          <div class="fgroup"><label>BL NO. (참고용)</label><input type="text" name="blNo"></div>
+          <div class="fgroup"><label>선적일 <span style="font-weight:400; color:var(--ink-soft); text-transform:none;">(실제 선적된 날)</span></label><input type="date" name="shipDate"></div>
           <div class="frow">
             <div class="fgroup"><label>항구 도착 예정일</label><input type="date" name="etaPlanned"></div>
             <div class="fgroup"><label>공장 입고 예정일 <span style="font-weight:400; color:var(--ink-soft); text-transform:none;">(자동: 영업일 +5일)</span></label><input type="date" name="warehousePlanned"></div>
@@ -1440,10 +1440,10 @@ function reqToPo(r){
     supplier:'', currency:'', currencyPi:'', currencyCi:'',
     piNo:'', piDate:'', piAmount:'', piDocUrl:'',
     ciNo:'', ciDate:'', ciAmount:'', ciQty:'', ciDocUrl:'',
-    blNo:'', blDocUrl:'', plDocUrl:'', coDocUrl:'',
+    blDocUrl:'', plDocUrl:'', coDocUrl:'',
     depositPct:'', depositPlannedDate:'', depositDate:'',
     balancePlannedDate:'', balanceDate:'',
-    prodDueDate:'', shipDate:'', etaPlanned:'', etaDate:'',
+    prodDueDate:'', shipPlannedDate:'', shipDate:'', etaPlanned:'', etaDate:'',
     warehousePlanned:'', warehouseDate:'', qcDate:'', erpDate:'',
     customsCost:'', changeLog:'',
     depositShared:'', balanceShared:'', warehouseShared:'',
@@ -1639,7 +1639,7 @@ function buildSharedProgressHtml(){
       + '<td class="mono">'+sharedEsc(p.dueDate||'-')+'</td>'
       + '<td><span class="st '+st[1]+'">'+st[0]+'</span></td>'
       + '<td class="mono">'+sharedDateCell(p.ciDate, p.prodDueDate)+'</td>'
-      + '<td class="mono">'+sharedDateCell(p.shipDate, '')+'</td>'
+      + '<td class="mono">'+sharedDateCell(p.shipDate, p.shipPlannedDate)+'</td>'
       + '<td class="mono">'+sharedDateCell(p.etaDate, p.etaPlanned)+'</td>'
       + '<td class="mono">'+sharedDateCell(p.warehouseDate, p.warehousePlanned)+'</td>'
       + '</tr>';
@@ -1979,8 +1979,8 @@ const PI_DOC_FIELDS = [
 const PI_SHIPMENT_FIELDS = [
   {key:'ciDate',              label:'CI수령일'},
   {key:'ciNo',                label:'CI번호'},
+  {key:'shipPlannedDate',     label:'선적 예정일'},
   {key:'shipDate',            label:'선적일'},
-  {key:'blNo',                label:'BL NO.'},
   {key:'etaDate',             label:'항구도착일'},
   {key:'warehouseDate',       label:'공장입고일'},
   {key:'customsCost',         label:'통관비용'},
@@ -3148,8 +3148,8 @@ async function autoSyncSupplier(){
 // CI를 받은 뒤부터는 "같은 CI번호"가 실제 같은 화물 단위 — 이 항목들은 CI번호가 같은 건들끼리 자동 동기화
 const CI_SYNC_FIELDS = [
   {key:'ciDate',             label:'CI수령일'},
+  {key:'shipPlannedDate',    label:'선적 예정일'},
   {key:'shipDate',           label:'선적일'},
-  {key:'blNo',               label:'BL NO.'},
   {key:'etaPlanned',         label:'항구도착예정일'},
   {key:'etaDate',            label:'항구도착일'},
   {key:'warehouseDate',      label:'공장입고일'},
@@ -3370,7 +3370,7 @@ document.getElementById('poDuplicateBtn').addEventListener('click', async ()=>{
   const resetFields = [
     'ciNo','ciDate','ciQty','ciAmount',
     'balancePlannedDate','balanceDate','balanceShared','balanceDeferred',
-    'shipDate','blNo','etaPlanned','warehousePlanned','etaDate','customsCost',
+    'shipPlannedDate','shipDate','etaPlanned','warehousePlanned','etaDate','customsCost',
     'warehouseDate','warehouseShared','qcDate','erpDate',
     'note','changeLog','approvalBatchId','approvalStatus',
     'ciDocUrl','blDocUrl','plDocUrl','coDocUrl',
@@ -3420,7 +3420,7 @@ function downloadPoList(){
     '요청일','요청자','구분','품명','품목코드','수량','공급사','납기요청일','결제통화',
     'PI수령일','PI번호','PI금액','선금비율(%)','선금액','선금액(KRW)','선금지급예정일','선금지급일','선금공유(정향미)',
     '생산완료예정일','CI수령일','CI번호','CI수량','CI금액','잔금액','잔금액(KRW)','잔금지급예정일','잔금지급일','잔금공유(정향미)',
-    'BL NO.','선적일','항구도착예정일','공장입고예정일','항구도착일(ETA)','통관비용(KRW)',
+    '선적예정일','선적일','항구도착예정일','공장입고예정일','항구도착일(ETA)','통관비용(KRW)',
     '공장입고일','입고공유(정명재)','품질검수완료일','ERP입력일','상태','특이사항','변경사항',
   ];
   const rows = list.map(p=>{
@@ -3432,7 +3432,7 @@ function downloadPoList(){
       p.reqDate, p.requester, itemType, p.itemName, p.itemCode, p.qty, p.supplier, p.dueDate, cur,
       p.piDate, p.piNo, p.piAmount, p.depositPct, p.piAmount?deposit.toFixed(2):'', p.piAmount?Math.round(toKrwCur(deposit,cur)):'', p.depositPlannedDate, p.depositDate, isDepositShared(p)?'공유완료':'미공유',
       p.prodDueDate, p.ciDate, p.ciNo, p.ciQty, p.ciAmount, p.piAmount?balance.toFixed(2):'', p.piAmount?Math.round(toKrwCur(balance,cur)):'', p.balancePlannedDate, p.balanceDate, p.balanceShared==='O'?'공유완료':'미공유',
-      p.blNo, p.shipDate, p.etaPlanned, p.warehousePlanned, p.etaDate, p.customsCost,
+      p.shipPlannedDate, p.shipDate, p.etaPlanned, p.warehousePlanned, p.etaDate, p.customsCost,
       p.warehouseDate, p.warehouseShared==='O'?'공유완료':'미공유', p.qcDate, p.erpDate, stageLabelText(p, stageIdx, false), p.note, p.changeLog,
     ];
   });
