@@ -1074,8 +1074,12 @@
         <fieldset class="fieldset" id="dfs2">
           <legend>② 발주금액 / 선금</legend>
           <div class="frow">
-            <div class="fgroup"><label>발주금액 (KRW)</label><input type="number" step="1" name="poAmount"></div>
+            <div class="fgroup"><label>단가 (KRW)<span style="display:block; font-weight:400; color:var(--ink-soft); text-transform:none; font-size:11px; margin-top:2px;">개당 매입가 (입력하면 발주금액 자동 계산)</span></label><input type="number" step="0.01" name="unitPrice" placeholder="예: 15000"></div>
+            <div class="fgroup"><label>발주금액 (KRW)<span style="display:block; font-weight:400; color:var(--ink-soft); text-transform:none; font-size:11px; margin-top:2px;">단가 × 수량 자동 · 필요 시 직접 수정</span></label><input type="number" step="1" name="poAmount"></div>
+          </div>
+          <div class="frow">
             <div class="fgroup"><label>선금 비율 (%)</label><input type="number" name="depositPct" placeholder="예: 30"></div>
+            <div class="fgroup"></div>
           </div>
           <div class="frow">
             <div class="fgroup"><label>선금지급 예정일</label><input type="date" name="depositPlannedDate"></div>
@@ -3475,8 +3479,9 @@ function renderPocSupplierSelect(){
 
 function getPocList(){
   const supplier = document.getElementById('pocSupplier').value;
-  const overseas = pos.filter(p=>computeStageIndex(p)===0); // 아직 PI를 받지 않은, 제조사에 전달 전 단계
-  const domestic = domesticPos.filter(p=>computeDomStageIndex(p)===0); // 아직 선금을 지급하지 않은, 발주 전 단계
+  // 국내/해외 판별을 위해 각 아이템에 _isDom 플래그를 붙여둔다 (렌더 시 단가·금액 컬럼 표시 여부에 사용)
+  const overseas = pos.filter(p=>computeStageIndex(p)===0).map(p=> Object.assign({}, p, {_isDom:false}));
+  const domestic = domesticPos.filter(p=>computeDomStageIndex(p)===0).map(p=> Object.assign({}, p, {_isDom:true}));
   return [...overseas, ...domestic].filter(p=>{
     if(supplier && p.supplier !== supplier) return false;
     return true;
@@ -3511,67 +3516,90 @@ function renderPocResult(){
     groups[key].push(p);
   });
 
+  // 국내발주 아이템은 단가·금액 컬럼을 함께 보여주기 위해, 그룹 안에 국내가 하나라도 있으면 그 두 컬럼을 추가한다.
+  // 한 아이템의 매입가는 (단가 있으면) 단가×수량, 아니면 저장된 발주금액(poAmount)을 사용.
+  function domLineAmount(p){
+    const unit = parseFloat(p.unitPrice)||0;
+    const qty = parseFloat(p.qty)||0;
+    if(unit>0 && qty>0) return unit*qty;
+    return parseFloat(p.poAmount)||0;
+  }
+
   // 화면 표시용 (한글)
-  resultEl.innerHTML = Object.entries(groups).map(([supName, items])=>`
-    <div class="poc-group">
-      <div class="poc-group-head">
-        <span>${supName}</span>
-        <span class="sub">${items.length}건</span>
-      </div>
-      <table class="poc-table">
-        <colgroup>
-          <col style="width:11%"><col style="width:24%"><col style="width:13%">
-          <col style="width:8%"><col style="width:13%"><col style="width:31%">
-        </colgroup>
-        <thead>
-          <tr><th>요청일</th><th>품명</th><th>품목코드</th><th>수량</th><th>납기요청일</th><th>특이사항</th></tr>
-        </thead>
-        <tbody>
-          ${items.map(p=>`
-            <tr>
-              <td>${todayStr}</td>
-              <td>${p.itemName||'-'}${p.isFirstBatch?'<span class="item-badge">초도</span>':''}${p.isSample?'<span class="item-badge sample">샘플</span>':''}${p.isUrgent?'<span class="item-badge urgent">긴급</span>':''}</td>
-              <td>${p.itemCode||'-'}</td>
-              <td>${fmtQty(p.qty)}</td>
-              <td>${p.dueDate||'-'}</td>
-              <td>${p.note || '&nbsp;'}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  `).join('');
+  resultEl.innerHTML = Object.entries(groups).map(([supName, items])=>{
+    const hasDom = items.some(p=>p._isDom);
+    const domTotal = hasDom ? items.filter(p=>p._isDom).reduce((s,p)=> s + domLineAmount(p), 0) : 0;
+    const cols = hasDom
+      ? '<col style="width:9%"><col style="width:22%"><col style="width:11%"><col style="width:6%"><col style="width:11%"><col style="width:12%"><col style="width:11%"><col style="width:18%">'
+      : '<col style="width:11%"><col style="width:24%"><col style="width:13%"><col style="width:8%"><col style="width:13%"><col style="width:31%">';
+    const head = hasDom
+      ? '<tr><th>요청일</th><th>품명</th><th>품목코드</th><th>수량</th><th style="text-align:right;">단가(KRW)</th><th style="text-align:right;">매입가(KRW)</th><th>납기요청일</th><th>특이사항</th></tr>'
+      : '<tr><th>요청일</th><th>품명</th><th>품목코드</th><th>수량</th><th>납기요청일</th><th>특이사항</th></tr>';
+    const rows = items.map(p=>{
+      const badges = (p.isFirstBatch?'<span class="item-badge">초도</span>':'')+(p.isSample?'<span class="item-badge sample">샘플</span>':'')+(p.isUrgent?'<span class="item-badge urgent">긴급</span>':'');
+      const priceCells = hasDom
+        ? (p._isDom
+            ? `<td style="text-align:right; font-family:var(--sans);">${p.unitPrice ? fmtKrw(parseFloat(p.unitPrice)) : '<span style="color:var(--ink-soft)">-</span>'}</td>`
+              + `<td style="text-align:right; font-family:var(--sans); font-weight:700;">${fmtKrw(domLineAmount(p))}</td>`
+            : `<td style="text-align:right; color:var(--ink-soft);">-</td><td style="text-align:right; color:var(--ink-soft);">-</td>`)
+        : '';
+      return `<tr>
+        <td>${todayStr}</td>
+        <td>${p.itemName||'-'}${badges}</td>
+        <td>${p.itemCode||'-'}</td>
+        <td>${fmtQty(p.qty)}</td>
+        ${priceCells}
+        <td>${p.dueDate||'-'}</td>
+        <td>${p.note || '&nbsp;'}</td>
+      </tr>`;
+    }).join('');
+    const footer = hasDom
+      ? `<tfoot><tr><td colspan="5" style="text-align:right; font-weight:700; background:#f7f9f8;">국내 총 매입가</td>
+           <td style="text-align:right; font-weight:800; background:#f7f9f8; font-family:var(--sans); color:var(--console-accent);">${fmtKrw(domTotal)}</td>
+           <td colspan="2" style="background:#f7f9f8;"></td></tr></tfoot>` : '';
+    return `<div class="poc-group">
+      <div class="poc-group-head"><span>${supName}</span><span class="sub">${items.length}건${hasDom?' · 총 매입가 '+fmtKrw(domTotal):''}</span></div>
+      <table class="poc-table"><colgroup>${cols}</colgroup><thead>${head}</thead><tbody>${rows}</tbody>${footer}</table>
+    </div>`;
+  }).join('');
 
   // 인쇄/PDF·해외 발송용 (영문) — 화면에는 보이지 않고 인쇄 시에만 표시됨
-  printEl.innerHTML = Object.entries(groups).map(([supName, items])=>`
-    <div class="poc-group">
-      <div class="poc-group-head">
-        <span>${supName === '공급사 미지정' ? 'Supplier unassigned' : supName}</span>
-        <span class="sub">${items.length} item${items.length>1?'s':''}</span>
-      </div>
-      <table class="poc-table">
-        <colgroup>
-          <col style="width:11%"><col style="width:24%"><col style="width:13%">
-          <col style="width:8%"><col style="width:13%"><col style="width:31%">
-        </colgroup>
-        <thead>
-          <tr><th>Date</th><th>Item Name</th><th>Item Code</th><th>Qty</th><th>Requested Delivery</th><th>Remarks</th></tr>
-        </thead>
-        <tbody>
-          ${items.map(p=>`
-            <tr>
-              <td>${todayStr}</td>
-              <td>${p.itemName||'-'}${p.isFirstBatch?'<span class="item-badge">First Batch</span>':''}${p.isSample?'<span class="item-badge sample">Sample</span>':''}${p.isUrgent?'<span class="item-badge urgent">Urgent</span>':''}</td>
-              <td>${p.itemCode||'-'}</td>
-              <td>${fmtQty(p.qty)}</td>
-              <td>${p.dueDate||'-'}</td>
-              <td>${p.note || '&nbsp;'}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  `).join('');
+  printEl.innerHTML = Object.entries(groups).map(([supName, items])=>{
+    const hasDom = items.some(p=>p._isDom);
+    const domTotal = hasDom ? items.filter(p=>p._isDom).reduce((s,p)=> s + domLineAmount(p), 0) : 0;
+    const cols = hasDom
+      ? '<col style="width:9%"><col style="width:22%"><col style="width:11%"><col style="width:6%"><col style="width:11%"><col style="width:12%"><col style="width:11%"><col style="width:18%">'
+      : '<col style="width:11%"><col style="width:24%"><col style="width:13%"><col style="width:8%"><col style="width:13%"><col style="width:31%">';
+    const head = hasDom
+      ? '<tr><th>Date</th><th>Item Name</th><th>Item Code</th><th>Qty</th><th style="text-align:right;">Unit Price (KRW)</th><th style="text-align:right;">Amount (KRW)</th><th>Requested Delivery</th><th>Remarks</th></tr>'
+      : '<tr><th>Date</th><th>Item Name</th><th>Item Code</th><th>Qty</th><th>Requested Delivery</th><th>Remarks</th></tr>';
+    const rows = items.map(p=>{
+      const badges = (p.isFirstBatch?'<span class="item-badge">First Batch</span>':'')+(p.isSample?'<span class="item-badge sample">Sample</span>':'')+(p.isUrgent?'<span class="item-badge urgent">Urgent</span>':'');
+      const priceCells = hasDom
+        ? (p._isDom
+            ? `<td style="text-align:right; font-family:var(--sans);">${p.unitPrice ? fmtKrw(parseFloat(p.unitPrice)) : '-'}</td>`
+              + `<td style="text-align:right; font-family:var(--sans); font-weight:700;">${fmtKrw(domLineAmount(p))}</td>`
+            : `<td style="text-align:right;">-</td><td style="text-align:right;">-</td>`)
+        : '';
+      return `<tr>
+        <td>${todayStr}</td>
+        <td>${p.itemName||'-'}${badges}</td>
+        <td>${p.itemCode||'-'}</td>
+        <td>${fmtQty(p.qty)}</td>
+        ${priceCells}
+        <td>${p.dueDate||'-'}</td>
+        <td>${p.note || '&nbsp;'}</td>
+      </tr>`;
+    }).join('');
+    const footer = hasDom
+      ? `<tfoot><tr><td colspan="5" style="text-align:right; font-weight:700; background:#f7f9f8;">Domestic Total</td>
+           <td style="text-align:right; font-weight:800; background:#f7f9f8; font-family:var(--sans);">${fmtKrw(domTotal)}</td>
+           <td colspan="2" style="background:#f7f9f8;"></td></tr></tfoot>` : '';
+    return `<div class="poc-group">
+      <div class="poc-group-head"><span>${supName === '공급사 미지정' ? 'Supplier unassigned' : supName}</span><span class="sub">${items.length} item${items.length>1?'s':''}${hasDom?' · Total '+fmtKrw(domTotal):''}</span></div>
+      <table class="poc-table"><colgroup>${cols}</colgroup><thead>${head}</thead><tbody>${rows}</tbody>${footer}</table>
+    </div>`;
+  }).join('');
 }
 
 ['pocSupplier'].forEach(id=>{
@@ -3802,7 +3830,19 @@ document.getElementById('btnNewDom').addEventListener('click', ()=> openDomPanel
 document.getElementById('domPanelClose').addEventListener('click', closeDomPanel);
 document.getElementById('domCancelBtn').addEventListener('click', closeDomPanel);
 
+// 단가나 수량이 바뀌면 발주금액을 자동으로 계산해 채워준다 (사용자가 발주금액을 직접 편집해도 됨 — 다시 단가/수량을 건드릴 때만 덮음)
+function recalcDomPoAmountFromUnit(){
+  const unit = parseFloat(domForm.elements['unitPrice'].value);
+  const qty = parseFloat(domForm.elements['qty'].value);
+  if(!isNaN(unit) && unit > 0 && !isNaN(qty) && qty > 0){
+    domForm.elements['poAmount'].value = Math.round(unit * qty);
+  }
+}
 domForm.addEventListener('input', (e)=>{
+  if(e.target.name==='unitPrice' || e.target.name==='qty'){
+    recalcDomPoAmountFromUnit();
+    updateDomComputedPreview();
+  }
   if(e.target.name==='poAmount' || e.target.name==='depositPct' || e.target.name==='actualAmount') updateDomComputedPreview();
   if(e.target.name==='depositDate' || e.target.name==='depositPlannedDate' || e.target.name==='depositDeferred'){
     const hasDate = !!domForm.elements['depositDate'].value;
@@ -3898,7 +3938,7 @@ document.getElementById('btnDownloadDom').addEventListener('click', ()=>{
   if(list.length===0){ toast('다운로드할 발주 목록이 없습니다'); return; }
   const headers = [
     '요청일','요청자','품명','품목코드','수량','공급사','납기요청일',
-    '발주금액(KRW)','선금비율(%)','선금액(KRW)','선금지급예정일','선금지급일','선금공유(정향미)',
+    '단가(KRW)','발주금액(KRW)','선금비율(%)','선금액(KRW)','선금지급예정일','선금지급일','선금공유(정향미)',
     '입고예정일','입고일','실제입고수량','실제입고금액(KRW)','입고공유(정명재)','잔금액(KRW)','잔금지급예정일','잔금지급일','잔금공유(정향미)',
     '품질검수완료일','ERP입력일','상태','특이사항','변경사항',
   ];
@@ -3907,7 +3947,7 @@ document.getElementById('btnDownloadDom').addEventListener('click', ()=>{
     const stageIdx = computeDomStageIndex(p);
     return [
       p.reqDate, p.requester, p.itemName, p.itemCode, p.qty, p.supplier, p.dueDate,
-      p.poAmount, p.depositPct, p.poAmount?deposit.toFixed(0):'', p.depositPlannedDate, p.depositDate, isDomDepositShared(p)?'공유완료':'미공유',
+      p.unitPrice, p.poAmount, p.depositPct, p.poAmount?deposit.toFixed(0):'', p.depositPlannedDate, p.depositDate, isDomDepositShared(p)?'공유완료':'미공유',
       p.warehousePlanned, p.warehouseDate, p.actualQty, p.actualAmount, p.warehouseShared==='O'?'공유완료':'미공유', p.poAmount?balance.toFixed(0):'', p.balancePlannedDate, p.balanceDate, p.balanceShared==='O'?'공유완료':'미공유',
       p.qcDate, p.erpDate, stageLabelText(p, stageIdx, true), p.note, p.changeLog,
     ];
