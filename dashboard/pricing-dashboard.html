@@ -1,0 +1,779 @@
+<title>수입자재 판매가 산출표</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --bg:#EEF0EC;
+    --surface:#FFFFFF;
+    --surface-2:#F6F8F4;
+    --line:#D5DAD2;
+    --line-soft:#E4E8E0;
+    --ink:#17201D;
+    --ink-2:#59635E;
+    --ink-3:#8B948F;
+    --accent:#14606B;
+    --accent-ink:#0C3E46;
+    --accent-soft:#DDEBEB;
+    --brass:#9A6D22;
+    --brass-soft:#F0E6D2;
+    --pos:#2C7A52;
+    --warn:#A9701A;
+    --neg:#A93B2C;
+    --shadow:0 1px 2px rgba(23,32,29,.06), 0 8px 24px -16px rgba(23,32,29,.35);
+    --radius:4px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#111614;
+      --surface:#191F1C;
+      --surface-2:#202723;
+      --line:#2E3733;
+      --line-soft:#252D29;
+      --ink:#E7EDE9;
+      --ink-2:#96A29C;
+      --ink-3:#6E7A75;
+      --accent:#57B6C2;
+      --accent-ink:#9FD8DE;
+      --accent-soft:#16302F;
+      --brass:#D9A54B;
+      --brass-soft:#33291A;
+      --pos:#68C08D;
+      --warn:#D9A54B;
+      --neg:#E27C6C;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -18px rgba(0,0,0,.9);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#111614;
+    --surface:#191F1C;
+    --surface-2:#202723;
+    --line:#2E3733;
+    --line-soft:#252D29;
+    --ink:#E7EDE9;
+    --ink-2:#96A29C;
+    --ink-3:#6E7A75;
+    --accent:#57B6C2;
+    --accent-ink:#9FD8DE;
+    --accent-soft:#16302F;
+    --brass:#D9A54B;
+    --brass-soft:#33291A;
+    --pos:#68C08D;
+    --warn:#D9A54B;
+    --neg:#E27C6C;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -18px rgba(0,0,0,.9);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+    font-size:14px;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:"IBM Plex Mono","SFMono-Regular",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+  .num{font-family:"IBM Plex Mono","SFMono-Regular",ui-monospace,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+
+  /* ---------- shell ---------- */
+  .masthead{
+    border-bottom:1px solid var(--line);
+    background:var(--surface);
+    padding:18px 28px;
+    display:flex;flex-wrap:wrap;gap:16px;align-items:baseline;justify-content:space-between;
+  }
+  .brand{display:flex;flex-direction:column;gap:2px}
+  .brand .route{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-3);
+  }
+  .brand h1{
+    margin:0;font-size:21px;font-weight:600;letter-spacing:-.01em;text-wrap:balance;
+  }
+  .masthead .meta{
+    font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-2);
+    display:flex;gap:14px;flex-wrap:wrap;align-items:center;
+  }
+  .stamp{
+    border:1px solid var(--line);border-radius:2px;padding:3px 8px;
+    letter-spacing:.08em;text-transform:uppercase;font-size:10.5px;color:var(--ink-2);
+  }
+
+  .shell{
+    display:grid;
+    grid-template-columns:288px minmax(0,1fr);
+    gap:0;
+    align-items:start;
+  }
+  @media (max-width:980px){ .shell{grid-template-columns:1fr} }
+
+  /* ---------- rail ---------- */
+  .rail{
+    border-right:1px solid var(--line);
+    background:var(--surface);
+    padding:22px 22px 40px;
+    position:sticky;top:0;
+    max-height:100vh;overflow-y:auto;
+    display:flex;flex-direction:column;gap:22px;
+  }
+  @media (max-width:980px){ .rail{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line)} }
+  .rail h2{
+    margin:0 0 2px;font-size:11px;font-family:"IBM Plex Mono",monospace;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:500;
+  }
+  .field{display:flex;flex-direction:column;gap:5px;margin-top:12px}
+  .field label{font-size:12.5px;color:var(--ink-2)}
+  .field .hint{font-size:11px;color:var(--ink-3);line-height:1.4}
+  input[type="text"],input[type="number"],select{
+    width:100%;padding:8px 10px;
+    background:var(--surface-2);
+    color:var(--ink);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    font-family:"IBM Plex Mono",monospace;font-size:13px;
+    font-variant-numeric:tabular-nums;
+  }
+  input[type="text"]{font-family:"IBM Plex Sans KR",sans-serif}
+  input:focus-visible,select:focus-visible,button:focus-visible{
+    outline:2px solid var(--accent);outline-offset:1px;
+  }
+  .seg{display:flex;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .seg button{
+    flex:1;padding:8px 6px;border:0;background:var(--surface-2);color:var(--ink-2);
+    font-family:"IBM Plex Sans KR",sans-serif;font-size:12px;cursor:pointer;
+  }
+  .seg button + button{border-left:1px solid var(--line)}
+  .seg button[aria-pressed="true"]{background:var(--accent);color:#fff;font-weight:600}
+  .rail .divider{height:1px;background:var(--line-soft)}
+
+  .formula{
+    background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--radius);
+    padding:12px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-2);
+    line-height:1.9;
+  }
+  .formula b{color:var(--ink);font-weight:600}
+
+  .btn{
+    display:inline-flex;align-items:center;gap:6px;justify-content:center;
+    padding:8px 12px;border-radius:var(--radius);border:1px solid var(--line);
+    background:var(--surface-2);color:var(--ink);cursor:pointer;
+    font-family:"IBM Plex Sans KR",sans-serif;font-size:12.5px;
+  }
+  .btn:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .btn-primary:hover{filter:brightness(1.08);color:#fff}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap}
+
+  /* ---------- main ---------- */
+  main{padding:24px 28px 64px;display:flex;flex-direction:column;gap:24px;min-width:0}
+  @media (max-width:600px){ main{padding:18px 14px 48px} .masthead{padding:16px 14px} .rail{padding:18px 14px 28px} }
+
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px}
+  .tile{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px;box-shadow:var(--shadow);
+    display:flex;flex-direction:column;gap:4px;position:relative;overflow:hidden;
+  }
+  .tile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--line)}
+  .tile.is-key::before{background:var(--brass)}
+  .tile.is-accent::before{background:var(--accent)}
+  .tile .k{
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink-3);
+  }
+  .tile .v{font-family:"IBM Plex Mono",monospace;font-size:22px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .tile .v small{font-size:12px;font-weight:400;color:var(--ink-2);margin-left:2px}
+  .tile .s{font-size:11.5px;color:var(--ink-2)}
+  .tile.is-key .v{color:var(--brass)}
+
+  .flow{
+    display:flex;flex-wrap:wrap;align-items:stretch;gap:0;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    overflow:hidden;box-shadow:var(--shadow);
+  }
+  .step{
+    flex:1 1 150px;padding:12px 14px;min-width:0;
+    border-right:1px solid var(--line-soft);
+    display:flex;flex-direction:column;gap:3px;
+  }
+  .step:last-child{border-right:0}
+  .step .n{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--ink-3);letter-spacing:.12em}
+  .step .t{font-size:13px;font-weight:600}
+  .step .d{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-2)}
+  .step.terminal{background:var(--brass-soft)}
+  .step.terminal .t{color:var(--brass)}
+
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);overflow:hidden;
+  }
+  .card-head{
+    display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
+    padding:14px 16px;border-bottom:1px solid var(--line);
+  }
+  .card-head h2{margin:0;font-size:15px;font-weight:600}
+  .card-head .sub{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-3)}
+
+  .table-scroll{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;min-width:1020px}
+  thead th{
+    position:sticky;top:0;z-index:1;
+    background:var(--surface-2);
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:500;
+    letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);
+    text-align:right;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;
+  }
+  thead th.l{text-align:left}
+  tbody td{
+    padding:8px 10px;border-bottom:1px solid var(--line-soft);text-align:right;vertical-align:middle;
+  }
+  tbody td.l{text-align:left}
+  tbody tr:hover{background:var(--surface-2)}
+  tbody input,tbody select{padding:6px 8px;font-size:12.5px}
+  td.calc{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:13px;white-space:nowrap}
+  td.calc .sub{display:block;font-size:10.5px;color:var(--ink-3)}
+  td.price{font-weight:600;color:var(--brass);font-size:14px}
+  td.margin{color:var(--pos)}
+  td.margin.low{color:var(--warn)}
+  td.margin.negative{color:var(--neg)}
+  .w-name{min-width:190px}
+  .w-cur{width:88px}
+  .w-num{width:104px}
+  .w-qty{width:82px}
+  .w-rate{width:86px}
+
+  .bar{display:flex;height:4px;border-radius:2px;overflow:hidden;margin-top:5px;background:var(--line-soft)}
+  .bar i{display:block;height:100%}
+  .bar .b1{background:var(--accent)}
+  .bar .b2{background:var(--accent-soft);border-left:1px solid var(--surface)}
+  .bar .b3{background:var(--brass)}
+
+  .row-del{
+    border:1px solid transparent;background:none;color:var(--ink-3);cursor:pointer;
+    font-family:"IBM Plex Mono",monospace;font-size:14px;line-height:1;padding:4px 7px;border-radius:var(--radius);
+  }
+  .row-del:hover{color:var(--neg);border-color:var(--neg)}
+
+  tfoot td{
+    padding:11px 10px;text-align:right;border-top:2px solid var(--line);
+    font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:600;background:var(--surface-2);
+  }
+  tfoot td.l{text-align:left;font-family:"IBM Plex Sans KR",sans-serif;color:var(--ink-2);font-weight:500}
+
+  .card-foot{padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line-soft)}
+  .toast{
+    font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--pos);
+    opacity:0;transition:opacity .25s;
+  }
+  .toast.show{opacity:1}
+
+  .notes{
+    background:var(--surface);border:1px solid var(--line);border-left:2px solid var(--accent);
+    border-radius:var(--radius);padding:16px 18px;
+  }
+  .notes h2{margin:0 0 10px;font-size:13px;font-weight:600}
+  .notes ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+  .notes li{font-size:12.5px;color:var(--ink-2);line-height:1.6}
+  .notes li b{color:var(--ink);font-weight:600}
+  .notes code{
+    font-family:"IBM Plex Mono",monospace;font-size:11.5px;background:var(--surface-2);
+    border:1px solid var(--line-soft);border-radius:2px;padding:1px 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="masthead">
+  <div class="brand">
+    <span class="route mono">플로우텍 &rarr; 태성정밀 · 수입자재</span>
+    <h1>수입자재 판매가 산출표</h1>
+  </div>
+  <div class="meta mono">
+    <span class="stamp" id="stamp-mode">원가가산 30%</span>
+    <span class="stamp">부가세 별도</span>
+    <span id="stamp-date"></span>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="rail">
+    <section>
+      <h2>적용 환율</h2>
+      <div class="field">
+        <label for="fx-usd">USD / 원</label>
+        <input type="number" id="fx-usd" step="0.1" min="0" value="1380">
+      </div>
+      <div class="field">
+        <label for="fx-cny">CNY(위안) / 원</label>
+        <input type="number" id="fx-cny" step="0.1" min="0" value="190">
+      </div>
+      <p class="hint" style="margin:8px 0 0">매입일 기준 전신환매도율 또는 실제 결제 환율로 교체해 쓰세요.</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <section>
+      <h2>원가 구성</h2>
+      <div class="field">
+        <label for="overhead">부대비용률 (%)</label>
+        <input type="number" id="overhead" step="0.1" min="0" value="8">
+        <span class="hint">운임 · 관세 · 통관수수료 · 창고/내륙운송 · 환리스크를 통으로 잡은 비율.</span>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section>
+      <h2>이윤 설정</h2>
+      <div class="field">
+        <label for="profit">이윤율 (%)</label>
+        <input type="number" id="profit" step="0.5" min="0" value="30">
+      </div>
+      <div class="field">
+        <label>계산 방식</label>
+        <div class="seg" role="group" aria-label="이윤 계산 방식">
+          <button type="button" id="mode-markup" aria-pressed="true">원가 가산</button>
+          <button type="button" id="mode-margin" aria-pressed="false">판매가 마진</button>
+        </div>
+        <span class="hint" id="mode-hint"></span>
+      </div>
+      <div class="field">
+        <label for="rounding">판매단가 절상 단위</label>
+        <select id="rounding">
+          <option value="1">1원 (반올림)</option>
+          <option value="10" selected>10원 올림</option>
+          <option value="100">100원 올림</option>
+          <option value="1000">1,000원 올림</option>
+        </select>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <section>
+      <h2>계산식</h2>
+      <div class="formula" id="formula"></div>
+    </section>
+
+    <div class="btn-row">
+      <button class="btn" type="button" id="btn-reset">초기 예시로 되돌리기</button>
+    </div>
+  </aside>
+
+  <main>
+    <section class="tiles">
+      <div class="tile is-accent">
+        <span class="k">총 입고원가</span>
+        <span class="v" id="kpi-cost">–</span>
+        <span class="s">환산액 + 부대비용</span>
+      </div>
+      <div class="tile is-key">
+        <span class="k">총 판매금액</span>
+        <span class="v" id="kpi-sales">–</span>
+        <span class="s">태성정밀 공급가 (VAT 별도)</span>
+      </div>
+      <div class="tile">
+        <span class="k">총 마진</span>
+        <span class="v" id="kpi-margin">–</span>
+        <span class="s" id="kpi-margin-rate">–</span>
+      </div>
+      <div class="tile">
+        <span class="k">품목 수</span>
+        <span class="v" id="kpi-items">–</span>
+        <span class="s" id="kpi-currency">–</span>
+      </div>
+    </section>
+
+    <section class="flow" aria-label="판매가 산출 흐름">
+      <div class="step">
+        <span class="n">STEP 1</span>
+        <span class="t">외화 매입단가</span>
+        <span class="d" id="flow-1">USD / CNY</span>
+      </div>
+      <div class="step">
+        <span class="n">STEP 2</span>
+        <span class="t">원화 환산</span>
+        <span class="d" id="flow-2">× 환율</span>
+      </div>
+      <div class="step">
+        <span class="n">STEP 3</span>
+        <span class="t">입고원가</span>
+        <span class="d" id="flow-3">+ 부대비용</span>
+      </div>
+      <div class="step terminal">
+        <span class="n">STEP 4</span>
+        <span class="t">판매단가</span>
+        <span class="d" id="flow-4">+ 이윤</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>품목별 산출</h2>
+        <span class="sub" id="tbl-note">이윤율 칸을 비워두면 기본값이 적용됩니다</span>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th class="l">품목</th>
+              <th class="l">통화</th>
+              <th>외화 단가</th>
+              <th>수량</th>
+              <th>원화 환산</th>
+              <th>입고원가 /개</th>
+              <th>이윤율</th>
+              <th>판매단가 /개</th>
+              <th>개당 마진</th>
+              <th>판매 합계</th>
+              <th aria-label="행 삭제"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+          <tfoot>
+            <tr>
+              <td class="l" colspan="4">합계</td>
+              <td id="ft-krw">–</td>
+              <td id="ft-cost">–</td>
+              <td></td>
+              <td id="ft-price">–</td>
+              <td id="ft-margin">–</td>
+              <td id="ft-sales">–</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div class="card-foot">
+        <button class="btn btn-primary" type="button" id="btn-add">＋ 품목 추가</button>
+        <button class="btn" type="button" id="btn-copy">표 복사 (엑셀 붙여넣기)</button>
+        <span class="toast" id="toast">복사했습니다</span>
+      </div>
+    </section>
+
+    <section class="notes">
+      <h2>초안 기준 · 확인이 필요한 항목</h2>
+      <ul>
+        <li><b>이윤 30%의 정의.</b> <code>원가 가산</code>은 입고원가 &times; 1.30, <code>판매가 마진</code>은 입고원가 &divide; 0.70 입니다. 입고원가 10,000원이면 각각 13,000원 / 14,286원으로, 실제 마진율은 30% vs 23.1%로 갈립니다. 사내에서 쓰는 쪽으로 고정해 주세요.</li>
+        <li><b>부대비용 8%의 산정 기준.</b> 지금은 물품대(원화 환산액)에 일괄 8%를 곱합니다. 관세는 HS코드별로, 운임은 중량·부피 기준이라 품목별 편차가 크면 통관비·운임을 실비로 분리하는 편이 정확합니다.</li>
+        <li><b>환율 적용 시점.</b> 매입일 환율 / 통관 과세환율 / 결제일 환율 중 무엇을 기준으로 잡을지 정해야 재무 대사가 맞습니다.</li>
+        <li><b>표시 금액은 모두 부가세 별도</b>이며, 태성정밀 공급가 기준입니다.</li>
+        <li><b>다음 단계 후보</b> — 품목별 부대비용률 개별 지정, 재고/로트 단위 관리, 견적서 출력, ERP·엑셀 매입 데이터 연동.</li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORE = "flowtech-pricing-v1";
+
+  var SAMPLE = [
+    { name:"SUS304 환봉 ø25",        cur:"CNY", unit:42.5,  qty:120, profit:"" },
+    { name:"SUS316L 파이프 1/2\"",   cur:"CNY", unit:78.0,  qty:60,  profit:"" },
+    { name:"황동봉 C3604 ø20",       cur:"CNY", unit:36.8,  qty:200, profit:"" },
+    { name:"알루미늄 빌렛 6061-T6",  cur:"USD", unit:9.4,   qty:150, profit:"" },
+    { name:"유압 피팅 어댑터 PT1/4", cur:"USD", unit:3.15,  qty:800, profit:"35" },
+    { name:"O-링 NBR P-24 (100EA)",  cur:"CNY", unit:11.2,  qty:40,  profit:"" }
+  ];
+
+  var state = {
+    fx:{ USD:1380, CNY:190, KRW:1 },
+    overhead:8,
+    profit:30,
+    mode:"markup",     // markup | margin
+    rounding:10,
+    rows:[]
+  };
+
+  var el = function(id){ return document.getElementById(id); };
+  var nf0 = new Intl.NumberFormat("ko-KR",{maximumFractionDigits:0});
+  var nf2 = new Intl.NumberFormat("ko-KR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  var won = function(n){ return isFinite(n) ? nf0.format(Math.round(n)) : "–"; };
+
+  /* ---------- persistence ---------- */
+  function save(){
+    try{ localStorage.setItem(STORE, JSON.stringify(state)); }catch(e){}
+  }
+  function load(){
+    try{
+      var raw = localStorage.getItem(STORE);
+      if(!raw) return false;
+      var d = JSON.parse(raw);
+      if(!d || !Array.isArray(d.rows)) return false;
+      state.fx.USD = Number(d.fx && d.fx.USD) || state.fx.USD;
+      state.fx.CNY = Number(d.fx && d.fx.CNY) || state.fx.CNY;
+      state.overhead = Number(d.overhead);
+      state.profit = Number(d.profit);
+      state.mode = d.mode === "margin" ? "margin" : "markup";
+      state.rounding = Number(d.rounding) || 10;
+      state.rows = d.rows.map(normalizeRow);
+      if(!isFinite(state.overhead)) state.overhead = 8;
+      if(!isFinite(state.profit)) state.profit = 30;
+      return true;
+    }catch(e){ return false; }
+  }
+  function normalizeRow(r){
+    return {
+      name: String(r && r.name || ""),
+      cur: (r && (r.cur === "USD" || r.cur === "CNY" || r.cur === "KRW")) ? r.cur : "USD",
+      unit: Number(r && r.unit) || 0,
+      qty: Number(r && r.qty) || 0,
+      profit: (r && r.profit !== undefined && r.profit !== null) ? String(r.profit) : ""
+    };
+  }
+
+  /* ---------- math ---------- */
+  function roundUnit(v){
+    var u = state.rounding;
+    if(!isFinite(v)) return 0;
+    if(u <= 1) return Math.round(v);
+    return Math.ceil(v / u) * u;
+  }
+  function compute(row){
+    var rate = state.fx[row.cur] || 0;
+    var krw = row.unit * rate;                       // 원화 환산 단가
+    var oh = krw * (state.overhead / 100);           // 부대비용
+    var cost = krw + oh;                             // 입고원가
+    var p = row.profit === "" ? state.profit : Number(row.profit);
+    if(!isFinite(p)) p = state.profit;
+    var raw;
+    if(state.mode === "margin"){
+      raw = p >= 100 ? Infinity : cost / (1 - p / 100);
+    }else{
+      raw = cost * (1 + p / 100);
+    }
+    var price = roundUnit(raw);
+    var margin = price - cost;
+    return {
+      rate:rate, krw:krw, oh:oh, cost:cost, price:price, margin:margin,
+      profitPct:p,
+      marginRate: price > 0 ? (margin / price) * 100 : 0,
+      lineCost: cost * row.qty,
+      lineSales: price * row.qty,
+      lineMargin: margin * row.qty,
+      lineKrw: krw * row.qty
+    };
+  }
+
+  /* ---------- render ---------- */
+  function rowHTML(i, row){
+    return ''
+      + '<tr data-i="' + i + '">'
+      + '<td class="l"><input type="text" class="w-name" data-f="name" value="' + escapeAttr(row.name) + '" placeholder="품명 / 규격"></td>'
+      + '<td class="l"><select class="w-cur" data-f="cur">'
+        + opt("USD", row.cur) + opt("CNY", row.cur) + opt("KRW", row.cur)
+      + '</select></td>'
+      + '<td><input type="number" class="w-num" data-f="unit" step="0.01" min="0" value="' + row.unit + '"></td>'
+      + '<td><input type="number" class="w-qty" data-f="qty" step="1" min="0" value="' + row.qty + '"></td>'
+      + '<td class="calc" data-c="krw"></td>'
+      + '<td class="calc" data-c="cost"></td>'
+      + '<td><input type="number" class="w-rate" data-f="profit" step="0.5" min="0" value="' + escapeAttr(row.profit) + '" placeholder="' + state.profit + '"></td>'
+      + '<td class="calc price" data-c="price"></td>'
+      + '<td class="calc margin" data-c="margin"></td>'
+      + '<td class="calc" data-c="sales"></td>'
+      + '<td><button class="row-del" type="button" title="행 삭제" aria-label="행 삭제">✕</button></td>'
+      + '</tr>';
+  }
+  function opt(v, sel){ return '<option value="' + v + '"' + (v === sel ? ' selected' : '') + '>' + v + '</option>'; }
+  function escapeAttr(s){ return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
+
+  function renderRows(){
+    var html = "";
+    for(var i = 0; i < state.rows.length; i++) html += rowHTML(i, state.rows[i]);
+    el("tbody").innerHTML = html;
+    recalcAll();
+  }
+
+  function paintRow(tr, row){
+    var c = compute(row);
+    var q = function(sel){ return tr.querySelector('[data-c="' + sel + '"]'); };
+
+    q("krw").innerHTML = won(c.krw) + '<span class="sub">@ ' + nf0.format(c.rate) + '원</span>';
+    q("cost").innerHTML = won(c.cost) + '<span class="sub">부대 +' + won(c.oh) + '</span>';
+
+    var total = c.price > 0 ? c.price : 1;
+    q("price").innerHTML = won(c.price)
+      + '<span class="sub">이윤 ' + (isFinite(c.profitPct) ? c.profitPct : 0) + '% 적용</span>'
+      + '<span class="bar" title="원화환산 / 부대비용 / 마진">'
+        + '<i class="b1" style="width:' + pct(c.krw, total) + '%"></i>'
+        + '<i class="b2" style="width:' + pct(c.oh, total) + '%"></i>'
+        + '<i class="b3" style="width:' + pct(Math.max(c.margin,0), total) + '%"></i>'
+      + '</span>';
+
+    var mc = q("margin");
+    mc.className = "calc margin" + (c.margin <= 0 ? " negative" : (c.marginRate < 15 ? " low" : ""));
+    mc.innerHTML = won(c.margin) + '<span class="sub">마진율 ' + nf2.format(c.marginRate) + '%</span>';
+
+    q("sales").innerHTML = won(c.lineSales) + '<span class="sub">원가 ' + won(c.lineCost) + '</span>';
+    return c;
+  }
+  function pct(part, total){
+    var v = total > 0 ? (part / total) * 100 : 0;
+    return Math.max(0, Math.min(100, v)).toFixed(2);
+  }
+
+  function recalcAll(){
+    var trs = el("tbody").querySelectorAll("tr");
+    var sum = { krw:0, cost:0, sales:0, margin:0, price:0 };
+    var curs = {};
+    for(var i = 0; i < trs.length; i++){
+      var row = state.rows[i];
+      var c = paintRow(trs[i], row);
+      sum.krw += c.lineKrw; sum.cost += c.lineCost;
+      sum.sales += c.lineSales; sum.margin += c.lineMargin;
+      sum.price += c.price;
+      curs[row.cur] = true;
+    }
+    el("ft-krw").textContent = won(sum.krw);
+    el("ft-cost").textContent = won(sum.cost);
+    el("ft-price").textContent = "–";
+    el("ft-margin").textContent = won(sum.margin);
+    el("ft-sales").textContent = won(sum.sales);
+
+    el("kpi-cost").innerHTML = won(sum.cost) + '<small>원</small>';
+    el("kpi-sales").innerHTML = won(sum.sales) + '<small>원</small>';
+    el("kpi-margin").innerHTML = won(sum.margin) + '<small>원</small>';
+    var mr = sum.sales > 0 ? (sum.margin / sum.sales) * 100 : 0;
+    el("kpi-margin-rate").textContent = "판매가 대비 " + nf2.format(mr) + "% · 원가 대비 "
+      + nf2.format(sum.cost > 0 ? (sum.margin / sum.cost) * 100 : 0) + "%";
+    el("kpi-items").innerHTML = state.rows.length + '<small>건</small>';
+    el("kpi-currency").textContent = Object.keys(curs).join(" · ") || "–";
+    save();
+  }
+
+  function renderSettings(){
+    el("fx-usd").value = state.fx.USD;
+    el("fx-cny").value = state.fx.CNY;
+    el("overhead").value = state.overhead;
+    el("profit").value = state.profit;
+    el("rounding").value = String(state.rounding);
+    var markup = state.mode === "markup";
+    el("mode-markup").setAttribute("aria-pressed", markup ? "true" : "false");
+    el("mode-margin").setAttribute("aria-pressed", markup ? "false" : "true");
+    el("mode-hint").textContent = markup
+      ? "입고원가에 " + state.profit + "%를 더합니다 (원가 × " + (1 + state.profit/100).toFixed(2) + ")."
+      : "판매가의 " + state.profit + "%가 마진이 되도록 역산합니다 (원가 ÷ " + ((100 - state.profit)/100).toFixed(2) + ").";
+    el("stamp-mode").textContent = (markup ? "원가가산 " : "판매가마진 ") + state.profit + "%";
+
+    var mult = markup
+      ? "× " + (1 + state.profit/100).toFixed(2)
+      : "÷ " + ((100 - state.profit)/100).toFixed(2);
+    el("formula").innerHTML =
+        '외화단가 <b>×</b> 환율<br>'
+      + '&nbsp;&nbsp;<b>= 원화 환산가</b><br>'
+      + '원화 환산가 <b>× ' + (1 + state.overhead/100).toFixed(3) + '</b><br>'
+      + '&nbsp;&nbsp;<b>= 입고원가</b> (부대 ' + state.overhead + '%)<br>'
+      + '입고원가 <b>' + mult + '</b><br>'
+      + '&nbsp;&nbsp;<b>= 판매단가</b> → ' + (state.rounding > 1 ? nf0.format(state.rounding) + "원 올림" : "1원 반올림");
+
+    el("flow-1").textContent = "USD " + nf0.format(state.fx.USD) + " · CNY " + nf0.format(state.fx.CNY);
+    el("flow-2").textContent = "× 매입일 환율";
+    el("flow-3").textContent = "+ 부대비용 " + state.overhead + "%";
+    el("flow-4").textContent = (markup ? "+ 이윤 " : "마진 ") + state.profit + "%";
+    el("tbl-note").textContent = "이윤율 칸을 비워두면 기본 " + state.profit + "% 적용";
+  }
+
+  /* ---------- events ---------- */
+  function bindSetting(id, apply){
+    el(id).addEventListener("input", function(){
+      apply(this.value);
+      renderSettings();
+      refreshPlaceholders();
+      recalcAll();
+    });
+  }
+  function refreshPlaceholders(){
+    var inputs = el("tbody").querySelectorAll('[data-f="profit"]');
+    for(var i = 0; i < inputs.length; i++) inputs[i].placeholder = state.profit;
+  }
+
+  bindSetting("fx-usd", function(v){ state.fx.USD = Number(v) || 0; });
+  bindSetting("fx-cny", function(v){ state.fx.CNY = Number(v) || 0; });
+  bindSetting("overhead", function(v){ state.overhead = v === "" ? 0 : Number(v); });
+  bindSetting("profit", function(v){ state.profit = v === "" ? 0 : Number(v); });
+  el("rounding").addEventListener("change", function(){
+    state.rounding = Number(this.value) || 1;
+    renderSettings(); recalcAll();
+  });
+  el("mode-markup").addEventListener("click", function(){ state.mode = "markup"; renderSettings(); recalcAll(); });
+  el("mode-margin").addEventListener("click", function(){ state.mode = "margin"; renderSettings(); recalcAll(); });
+
+  el("tbody").addEventListener("input", function(e){
+    var f = e.target.getAttribute && e.target.getAttribute("data-f");
+    if(!f) return;
+    var tr = e.target.closest("tr");
+    var i = Number(tr.getAttribute("data-i"));
+    var row = state.rows[i];
+    if(!row) return;
+    if(f === "name") row.name = e.target.value;
+    else if(f === "profit") row.profit = e.target.value;
+    else if(f === "cur") row.cur = e.target.value;
+    else row[f] = Number(e.target.value) || 0;
+    recalcAll();
+  });
+  el("tbody").addEventListener("change", function(e){
+    if(e.target.getAttribute && e.target.getAttribute("data-f") === "cur"){
+      var tr = e.target.closest("tr");
+      state.rows[Number(tr.getAttribute("data-i"))].cur = e.target.value;
+      recalcAll();
+    }
+  });
+  el("tbody").addEventListener("click", function(e){
+    if(!e.target.classList.contains("row-del")) return;
+    var tr = e.target.closest("tr");
+    state.rows.splice(Number(tr.getAttribute("data-i")), 1);
+    renderRows();
+  });
+
+  el("btn-add").addEventListener("click", function(){
+    state.rows.push({ name:"", cur:"USD", unit:0, qty:1, profit:"" });
+    renderRows();
+    var inputs = el("tbody").querySelectorAll('tr:last-child [data-f="name"]');
+    if(inputs.length) inputs[0].focus();
+  });
+
+  el("btn-reset").addEventListener("click", function(){
+    state.rows = SAMPLE.map(normalizeRow);
+    renderRows();
+  });
+
+  el("btn-copy").addEventListener("click", function(){
+    var head = ["품목","통화","외화단가","수량","원화환산","입고원가","이윤율(%)","판매단가","개당마진","판매합계"];
+    var lines = [head.join("\t")];
+    state.rows.forEach(function(r){
+      var c = compute(r);
+      lines.push([
+        r.name, r.cur, r.unit, r.qty,
+        Math.round(c.krw), Math.round(c.cost), c.profitPct,
+        Math.round(c.price), Math.round(c.margin), Math.round(c.lineSales)
+      ].join("\t"));
+    });
+    var text = lines.join("\n");
+    var done = function(){
+      var t = el("toast");
+      t.classList.add("show");
+      setTimeout(function(){ t.classList.remove("show"); }, 1800);
+    };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done, fallback);
+    }else fallback();
+    function fallback(){
+      var ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try{ document.execCommand("copy"); done(); }catch(err){}
+      document.body.removeChild(ta);
+    }
+  });
+
+  /* ---------- boot ---------- */
+  if(!load()) state.rows = SAMPLE.map(normalizeRow);
+  el("stamp-date").textContent = new Intl.DateTimeFormat("ko-KR",{dateStyle:"medium"}).format(new Date()) + " 기준";
+  renderSettings();
+  renderRows();
+})();
+</script>
