@@ -144,6 +144,7 @@
     font-family:"IBM Plex Sans KR",sans-serif;font-size:12px;cursor:pointer;
   }
   .seg button + button{border-left:1px solid var(--line)}
+  .card-head .seg button{flex:0 0 auto;padding:7px 13px;white-space:nowrap}
   .seg button[aria-pressed="true"]{background:var(--accent);color:#fff;font-weight:600}
   .rail .divider{height:1px;background:var(--line-soft)}
 
@@ -338,6 +339,60 @@
     padding:18px 10px;text-align:center;font-size:11.5px;color:var(--ink-3);
   }
 
+  /* ---------- trend ---------- */
+  .trend-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+  .trend-panel{
+    margin:0;padding:16px;min-width:0;position:relative;
+    border-right:1px solid var(--line-soft);
+    display:flex;flex-direction:column;gap:10px;
+  }
+  .trend-panel:last-child{border-right:0}
+  @media (max-width:760px){
+    .trend-panel{border-right:0;border-bottom:1px solid var(--line-soft)}
+    .trend-panel:last-child{border-bottom:0}
+  }
+  .trend-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .trend-title{font-size:13px;font-weight:600}
+  .trend-title span{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-3);letter-spacing:.08em;margin-left:6px}
+  .trend-now{
+    font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+    font-size:19px;font-weight:600;letter-spacing:-.02em;
+  }
+  .delta{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;font-variant-numeric:tabular-nums;
+    border:1px solid var(--line);border-radius:2px;padding:2px 6px;margin-left:7px;white-space:nowrap;
+  }
+  .delta.up{color:var(--warn);border-color:var(--warn)}
+  .delta.down{color:var(--pos);border-color:var(--pos)}
+  .delta.flat{color:var(--ink-3)}
+  .trend-sub{font-size:11.5px;color:var(--ink-2)}
+  .plot{position:relative}
+  .plot svg{display:block;width:100%;height:auto;overflow:visible}
+  .plot .grid-line{stroke:var(--line-soft);stroke-width:1}
+  .plot .axis-text{fill:var(--ink-3);font-family:"IBM Plex Mono",monospace;font-size:9.5px}
+  .plot .series-line{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+  .plot .series-area{fill:var(--accent);opacity:.09}
+  .plot .end-dot{fill:var(--accent);stroke:var(--surface);stroke-width:2}
+  .plot .use-dot{fill:none;stroke:var(--brass);stroke-width:2}
+  .plot .use-text{fill:var(--brass);font-family:"IBM Plex Mono",monospace;font-size:9px}
+  .plot .hair{stroke:var(--ink-3);stroke-width:1;stroke-dasharray:3 3}
+  .plot .hover-dot{fill:var(--accent);stroke:var(--surface);stroke-width:2}
+  .plot .hit{fill:transparent;cursor:crosshair}
+  /* SVG elements ignore the [hidden] UA rule - toggle visibility by class */
+  .plot .is-off{visibility:hidden}
+  .tip{
+    position:absolute;pointer-events:none;z-index:2;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:6px 9px;white-space:nowrap;
+    font-family:"IBM Plex Mono",monospace;font-size:11px;font-variant-numeric:tabular-nums;
+    color:var(--ink);transform:translate(-50%,-100%);
+  }
+  .tip b{display:block;color:var(--ink-3);font-size:9.5px;letter-spacing:.06em;font-weight:500}
+  .trend-empty{
+    padding:34px 16px;text-align:center;font-size:12px;color:var(--ink-3);
+    border:1px dashed var(--line);border-radius:var(--radius);
+  }
+
   @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -522,6 +577,18 @@
 
     <section class="card">
       <div class="card-head">
+        <h2>환율 추이</h2>
+        <div class="seg" role="group" aria-label="표시 기간" style="width:auto">
+          <button type="button" class="range-btn" data-n="6">6개월</button>
+          <button type="button" class="range-btn" data-n="12">12개월</button>
+          <button type="button" class="range-btn" data-n="0">전체</button>
+        </div>
+      </div>
+      <div id="trend-body"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
         <h2>월평균 환율 관리</h2>
         <span class="sub">서울외국환중개 월평균 매매기준율</span>
       </div>
@@ -590,6 +657,7 @@
   var state = {
     fx:{ USD:1380, CNY:190, KRW:1 },
     fxSource:"prev",   // prev | curr | manual
+    trendRange:12,     // months shown in the trend charts, 0 = all
     monthly:{},        // { "2026-08": {USD:1382.45, CNY:192.36} }
     overhead:8,
     profit:30,
@@ -625,6 +693,7 @@
       state.rounding = Number(d.rounding) || 10;
       state.fxSource = (d.fxSource === "curr" || d.fxSource === "manual") ? d.fxSource : "prev";
       state.monthly = normalizeMonthly(d.monthly);
+      state.trendRange = [0, 6, 12].indexOf(Number(d.trendRange)) >= 0 ? Number(d.trendRange) : 12;
       state.rows = d.rows.map(normalizeRow);
       if(!isFinite(state.overhead)) state.overhead = 8;
       if(!isFinite(state.profit)) state.profit = 30;
@@ -872,8 +941,195 @@
     afterFxChange();
   }
 
+  /* ---------- trend charts ---------- */
+  // USD/KRW and CNY/KRW live on different scales, so they get one panel each -
+  // never two y-axes on one plot.
+  var CURRENCIES = [
+    { code:"USD", label:"USD / 원", note:"미국 달러" },
+    { code:"CNY", label:"CNY / 원", note:"중국 위안" }
+  ];
+
+  function trendSeries(code){
+    var keys = Object.keys(state.monthly).sort();
+    var out = [];
+    keys.forEach(function(k){
+      var v = state.monthly[k][code];
+      if(v > 0) out.push({ key:k, v:v });
+    });
+    if(state.trendRange > 0 && out.length > state.trendRange) out = out.slice(-state.trendRange);
+    return out;
+  }
+
+  function buildTrendShell(){
+    var host = el("trend-body");
+    host.innerHTML = '<div class="trend-grid">' + CURRENCIES.map(function(c){
+      return '<figure class="trend-panel" data-cur="' + c.code + '">'
+        + '<figcaption class="trend-head">'
+        +   '<span class="trend-title">' + c.label + '<span>' + c.note + '</span></span>'
+        +   '<span class="trend-now" data-r="now"></span>'
+        + '</figcaption>'
+        + '<div class="trend-sub" data-r="sub"></div>'
+        + '<div class="plot" data-r="plot"></div>'
+        + '</figure>';
+    }).join("") + '</div>';
+  }
+
+  function fmtRate(v){ return nf2.format(v); }
+
+  function renderTrend(){
+    var applied = state.fxSource === "manual" ? null : targetYm();
+    CURRENCIES.forEach(function(c){
+      var fig = el("trend-body").querySelector('[data-cur="' + c.code + '"]');
+      if(!fig) return;
+      var data = trendSeries(c.code);
+      var now = fig.querySelector('[data-r="now"]');
+      var sub = fig.querySelector('[data-r="sub"]');
+      var plot = fig.querySelector('[data-r="plot"]');
+
+      if(data.length < 2){
+        now.textContent = data.length ? fmtRate(data[0].v) : "–";
+        sub.textContent = "";
+        plot.innerHTML = '<div class="trend-empty">두 달 이상 저장하면 추이가 그려집니다.</div>';
+        return;
+      }
+
+      var last = data[data.length - 1], prev = data[data.length - 2];
+      var d = ((last.v - prev.v) / prev.v) * 100;
+      var dir = Math.abs(d) < 0.005 ? "flat" : (d > 0 ? "up" : "down");
+      var arrow = dir === "up" ? "▲" : (dir === "down" ? "▼" : "―");
+      now.innerHTML = fmtRate(last.v)
+        + '<span class="delta ' + dir + '">' + arrow + " " + nf2.format(Math.abs(d)) + '%</span>';
+
+      var sum = 0;
+      data.forEach(function(p){ sum += p.v; });
+      var avg = sum / data.length;
+      var vsAvg = ((last.v - avg) / avg) * 100;
+      sub.textContent = data.length + "개월 평균 " + fmtRate(avg) + " 대비 "
+        + (vsAvg >= 0 ? "+" : "") + nf2.format(vsAvg) + "% · " + ymLabel(last.key) + " 기준 (환율 상승 = 원가 상승)";
+
+      var geo = plotGeom(data, plot.clientWidth || 380);
+      plot.innerHTML = trendSvg(data, geo, applied) + '<div class="tip is-off"></div>';
+      wireHover(plot, data, geo);
+    });
+  }
+
+  function plotGeom(data, width){
+    var h = 148, padL = 58, padR = 18, padT = 12, padB = 20;
+    var w = Math.max(260, width);
+    var iw = w - padL - padR, ih = h - padT - padB;
+
+    var lo = Infinity, hi = -Infinity;
+    data.forEach(function(p){ lo = Math.min(lo, p.v); hi = Math.max(hi, p.v); });
+    if(hi === lo){ hi = lo * 1.01; lo = lo * 0.99; }
+    var pad = (hi - lo) * 0.18;
+    lo -= pad; hi += pad;
+
+    return {
+      w:w, h:h, padL:padL, padR:padR, padT:padT, iw:iw, ih:ih, lo:lo, hi:hi,
+      xOf: function(i){ return padL + (data.length === 1 ? iw / 2 : (iw * i) / (data.length - 1)); },
+      yOf: function(v){ return padT + ih - ((v - lo) / (hi - lo)) * ih; }
+    };
+  }
+
+  function trendSvg(data, geo, applied){
+    var w = geo.w, h = geo.h, padL = geo.padL, padR = geo.padR, padT = geo.padT;
+    var iw = geo.iw, ih = geo.ih, lo = geo.lo, hi = geo.hi;
+    var xOf = geo.xOf, yOf = geo.yOf;
+
+    var g = "";
+    [hi, (hi + lo) / 2, lo].forEach(function(v){
+      var y = yOf(v);
+      g += '<line class="grid-line" x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (w - padR) + '" y2="' + y.toFixed(1) + '"></line>'
+        + '<text class="axis-text" x="' + (padL - 8) + '" y="' + (y + 3.2).toFixed(1) + '" text-anchor="end">' + fmtRate(v) + '</text>';
+    });
+
+    var line = "", area = "";
+    data.forEach(function(p, i){
+      var x = xOf(i).toFixed(1), y = yOf(p.v).toFixed(1);
+      line += (i ? " L" : "M") + x + " " + y;
+    });
+    area = line + " L" + xOf(data.length - 1).toFixed(1) + " " + (padT + ih)
+         + " L" + xOf(0).toFixed(1) + " " + (padT + ih) + " Z";
+
+    var xs = "";
+    var ticks = data.length <= 4 ? data.map(function(_, i){ return i; })
+                                 : [0, Math.floor((data.length - 1) / 2), data.length - 1];
+    ticks.forEach(function(i){
+      var anchor = i === 0 ? "start" : (i === data.length - 1 ? "end" : "middle");
+      xs += '<text class="axis-text" x="' + xOf(i).toFixed(1) + '" y="' + (h - 4) + '" text-anchor="' + anchor + '">'
+          + data[i].key.replace("-", ".") + '</text>';
+    });
+
+    var lastI = data.length - 1;
+    var marks = '<circle class="end-dot" cx="' + xOf(lastI).toFixed(1) + '" cy="' + yOf(data[lastI].v).toFixed(1) + '" r="4.5"></circle>';
+    if(applied){
+      var ai = -1;
+      data.forEach(function(p, i){ if(p.key === applied) ai = i; });
+      if(ai >= 0 && ai !== lastI){
+        marks += '<circle class="use-dot" cx="' + xOf(ai).toFixed(1) + '" cy="' + yOf(data[ai].v).toFixed(1) + '" r="5"></circle>';
+      }
+      if(ai >= 0){
+        marks += '<text class="use-text" x="' + xOf(ai).toFixed(1) + '" y="' + (yOf(data[ai].v) - 10).toFixed(1) + '" text-anchor="middle">적용</text>';
+      }
+    }
+
+    return '<svg viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="월별 평균환율 추이">'
+      + g
+      + '<path class="series-area" d="' + area + '"></path>'
+      + '<path class="series-line" d="' + line + '"></path>'
+      + xs + marks
+      + '<line class="hair is-off" x1="0" y1="' + padT + '" x2="0" y2="' + (padT + ih) + '"></line>'
+      + '<circle class="hover-dot is-off" cx="0" cy="0" r="4.5"></circle>'
+      + '<rect class="hit" x="' + padL + '" y="' + padT + '" width="' + iw + '" height="' + ih + '"></rect>'
+      + '</svg>';
+  }
+
+  function wireHover(plot, data, geo){
+    var svg = plot.querySelector("svg");
+    var hair = plot.querySelector(".hair");
+    var dot = plot.querySelector(".hover-dot");
+    var tip = plot.querySelector(".tip");
+    var hit = plot.querySelector(".hit");
+    if(!svg || !hit) return;
+
+    function show(e){
+      var box = svg.getBoundingClientRect();
+      var scale = box.width / geo.w;
+      var x = (e.clientX - box.left) / scale;
+      var i = data.length === 1 ? 0
+        : Math.round(((x - geo.padL) / geo.iw) * (data.length - 1));
+      i = Math.max(0, Math.min(data.length - 1, i));
+      var cx = geo.xOf(i), cy = geo.yOf(data[i].v);
+
+      hair.setAttribute("x1", cx); hair.setAttribute("x2", cx);
+      dot.setAttribute("cx", cx); dot.setAttribute("cy", cy);
+      hair.classList.remove("is-off");
+      dot.classList.remove("is-off");
+
+      var delta = i > 0 ? ((data[i].v - data[i - 1].v) / data[i - 1].v) * 100 : null;
+      tip.innerHTML = "<b>" + data[i].key + "</b>" + fmtRate(data[i].v) + "원"
+        + (delta === null ? "" : "  " + (delta >= 0 ? "▲" : "▼") + nf2.format(Math.abs(delta)) + "%");
+      tip.classList.remove("is-off");
+      tip.style.left = (cx * scale) + "px";
+      tip.style.top = (cy * scale - 10) + "px";
+    }
+    function hide(){
+      hair.classList.add("is-off");
+      dot.classList.add("is-off");
+      tip.classList.add("is-off");
+    }
+
+    hit.addEventListener("mousemove", show);
+    hit.addEventListener("mouseleave", hide);
+    svg.addEventListener("touchmove", function(e){
+      if(e.touches && e.touches.length) show(e.touches[0]);
+    }, { passive:true });
+    svg.addEventListener("touchend", hide);
+  }
+
   function afterFxChange(){
     renderMonthlyList();
+    renderTrend();
     renderSettings();
     recalcAll();
   }
@@ -1095,6 +1351,26 @@
     afterFxChange();
   });
 
+  Array.prototype.forEach.call(document.querySelectorAll(".range-btn"), function(b){
+    b.addEventListener("click", function(){
+      state.trendRange = Number(b.getAttribute("data-n"));
+      syncRangeButtons();
+      renderTrend();
+      save();
+    });
+  });
+  function syncRangeButtons(){
+    Array.prototype.forEach.call(document.querySelectorAll(".range-btn"), function(b){
+      b.setAttribute("aria-pressed", Number(b.getAttribute("data-n")) === state.trendRange ? "true" : "false");
+    });
+  }
+
+  var resizeTimer = null;
+  window.addEventListener("resize", function(){
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(renderTrend, 160);
+  });
+
   el("mode-markup").addEventListener("click", function(){ state.mode = "markup"; renderSettings(); recalcAll(); });
   el("mode-margin").addEventListener("click", function(){ state.mode = "margin"; renderSettings(); recalcAll(); });
 
@@ -1172,7 +1448,10 @@
   el("paste-year").value = new Date().getFullYear();
   el("new-month").value = prevYm();
   renderMonthlyList();
+  buildTrendShell();
+  syncRangeButtons();
   renderSettings();
   renderRows();
+  renderTrend();
 })();
 </script>
