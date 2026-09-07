@@ -102,7 +102,7 @@
 
   .shell{
     display:grid;
-    grid-template-columns:288px minmax(0,1fr);
+    grid-template-columns:264px minmax(0,1fr);
     gap:0;
     align-items:start;
   }
@@ -114,10 +114,10 @@
     background:var(--surface);
     padding:22px 22px 40px;
     position:sticky;top:0;
-    max-height:100vh;overflow-y:auto;
+    min-height:100vh;max-height:100vh;overflow-y:auto;
     display:flex;flex-direction:column;gap:22px;
   }
-  @media (max-width:980px){ .rail{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line)} }
+  @media (max-width:980px){ .rail{position:static;min-height:0;max-height:none;border-right:0;border-bottom:1px solid var(--line)} }
   .rail h2{
     margin:0 0 2px;font-size:11px;font-family:"IBM Plex Mono",monospace;
     letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:500;
@@ -216,17 +216,17 @@
   .card-head .sub{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-3)}
 
   .table-scroll{overflow-x:auto}
-  table{border-collapse:collapse;width:100%;min-width:1020px}
+  table{border-collapse:collapse;width:100%;min-width:1080px}
   thead th{
     position:sticky;top:0;z-index:1;
     background:var(--surface-2);
     font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:500;
     letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);
-    text-align:right;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;
+    text-align:right;padding:9px 8px;border-bottom:1px solid var(--line);white-space:nowrap;
   }
   thead th.l{text-align:left}
   tbody td{
-    padding:8px 10px;border-bottom:1px solid var(--line-soft);text-align:right;vertical-align:middle;
+    padding:8px 8px;border-bottom:1px solid var(--line-soft);text-align:right;vertical-align:middle;
   }
   tbody td.l{text-align:left}
   tbody tr:hover{background:var(--surface-2)}
@@ -237,11 +237,12 @@
   td.margin{color:var(--pos)}
   td.margin.low{color:var(--warn)}
   td.margin.negative{color:var(--neg)}
-  .w-name{min-width:190px}
-  .w-cur{width:88px}
-  .w-num{width:104px}
-  .w-qty{width:82px}
-  .w-rate{width:86px}
+  tbody input.w-name{min-width:150px;width:100%}
+  /* these must out-specify the generic input[type="number"] width rule */
+  tbody select.w-cur{width:74px}
+  tbody input.w-num{width:98px}
+  tbody input.w-qty{width:84px}
+  tbody input.w-rate{width:74px}
 
   .bar{display:flex;height:4px;border-radius:2px;overflow:hidden;margin-top:5px;background:var(--line-soft)}
   .bar i{display:block;height:100%}
@@ -281,6 +282,62 @@
     border:1px solid var(--line-soft);border-radius:2px;padding:1px 4px;
   }
 
+  a{color:var(--accent)}
+  a:hover{color:var(--accent-ink)}
+
+  /* ---------- fx source ---------- */
+  .fx-status{
+    display:flex;align-items:flex-start;gap:7px;
+    border:1px solid var(--line);border-left:2px solid var(--accent);
+    border-radius:var(--radius);background:var(--surface-2);
+    padding:8px 10px;font-size:11.5px;line-height:1.45;color:var(--ink-2);
+  }
+  .fx-status.warn{border-left-color:var(--warn)}
+  .fx-status b{display:block;color:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600}
+  .fx-status.warn b{color:var(--warn)}
+  input[readonly]{background:transparent;color:var(--ink-2);border-style:dashed}
+
+  .fx-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  @media (max-width:900px){ .fx-body{grid-template-columns:1fr} }
+  .fx-paste,.fx-list{padding:16px;display:flex;flex-direction:column;gap:9px;min-width:0}
+  .fx-paste{border-right:1px solid var(--line-soft)}
+  @media (max-width:900px){ .fx-paste{border-right:0;border-bottom:1px solid var(--line-soft)} }
+  .fx-body .step-label{
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink-3);
+  }
+  .fx-body .hint{font-size:11.5px;color:var(--ink-2);margin:0;line-height:1.5}
+  textarea{
+    width:100%;min-height:104px;resize:vertical;
+    padding:9px 10px;background:var(--surface-2);color:var(--ink);
+    border:1px solid var(--line);border-radius:var(--radius);
+    font-family:"IBM Plex Mono",monospace;font-size:12px;line-height:1.6;
+  }
+  textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .inline-field{
+    display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);white-space:nowrap;
+  }
+  .inline-field input{width:82px}
+  .btn-row select{width:auto;min-width:150px}
+
+  .preview{border:1px solid var(--line-soft);border-radius:var(--radius);overflow:hidden}
+  .preview table{min-width:0;width:100%}
+  .preview thead th{font-size:10px;padding:6px 8px;position:static}
+  .preview tbody td{padding:5px 8px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-variant-numeric:tabular-nums}
+  .preview tbody td.pick-usd{color:var(--accent);font-weight:600}
+  .preview tbody td.pick-cny{color:var(--brass);font-weight:600}
+  .parse-msg{font-size:11.5px;color:var(--ink-2)}
+  .parse-msg.bad{color:var(--neg)}
+  .parse-msg.ok{color:var(--pos)}
+
+  table.mini{min-width:0}
+  table.mini tbody td{font-family:"IBM Plex Mono",monospace;font-size:12px;font-variant-numeric:tabular-nums}
+  table.mini tbody tr.active{background:var(--accent-soft)}
+  table.mini tbody tr.active td:first-child::after{content:" ◀ 적용";font-size:9.5px;color:var(--accent);letter-spacing:.05em}
+  .fx-list .empty{
+    padding:18px 10px;text-align:center;font-size:11.5px;color:var(--ink-3);
+  }
+
   @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -301,14 +358,25 @@
     <section>
       <h2>적용 환율</h2>
       <div class="field">
+        <label for="fx-source">기준</label>
+        <select id="fx-source">
+          <option value="prev">전월 평균환율 (자동)</option>
+          <option value="curr">당월 평균환율</option>
+          <option value="manual">직접 입력</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="fx-status" id="fx-status"></div>
+      </div>
+      <div class="field">
         <label for="fx-usd">USD / 원</label>
-        <input type="number" id="fx-usd" step="0.1" min="0" value="1380">
+        <input type="number" id="fx-usd" step="0.01" min="0" value="1380">
       </div>
       <div class="field">
         <label for="fx-cny">CNY(위안) / 원</label>
-        <input type="number" id="fx-cny" step="0.1" min="0" value="190">
+        <input type="number" id="fx-cny" step="0.01" min="0" value="190">
       </div>
-      <p class="hint" style="margin:8px 0 0">매입일 기준 전신환매도율 또는 실제 결제 환율로 교체해 쓰세요.</p>
+      <p class="hint" style="margin:8px 0 0">자동 기준은 아래 <b>월평균 환율 관리</b>에 저장된 값을 씁니다.</p>
     </section>
 
     <div class="divider"></div>
@@ -452,12 +520,51 @@
       </div>
     </section>
 
+    <section class="card">
+      <div class="card-head">
+        <h2>월평균 환율 관리</h2>
+        <span class="sub">서울외국환중개 월평균 매매기준율</span>
+      </div>
+      <div class="fx-body">
+        <div class="fx-paste">
+          <span class="step-label">STEP 1 · 표 붙여넣기</span>
+          <p class="hint">서울외국환중개 <a href="http://www.smbs.biz/ExRate/MonAvgStdExRate.jsp" target="_blank" rel="noopener noreferrer">월평균 매매기준율</a> 페이지에서 표를 드래그해 복사한 뒤 그대로 붙여넣고 [분석]을 누르세요. 엑셀에서 복사한 표도 됩니다.</p>
+          <textarea id="paste-box" spellcheck="false" placeholder="2026.08&#9;1,382.45&#9;932.10&#9;1,556.20&#9;192.36&#10;2026.07&#9;1,371.02&#9;928.44&#9;1,548.77&#9;190.88"></textarea>
+          <div class="btn-row">
+            <label class="inline-field">월만 있을 때 연도 <input type="number" id="paste-year" min="2000" max="2100" step="1"></label>
+            <button class="btn btn-primary" type="button" id="btn-parse">분석</button>
+            <button class="btn" type="button" id="btn-paste-clear">지우기</button>
+          </div>
+          <div id="parse-result"></div>
+        </div>
+        <div class="fx-list">
+          <span class="step-label">STEP 2 · 저장된 월평균</span>
+          <p class="hint">오늘 날짜 기준으로 해당 월 값이 자동 적용됩니다. 직접 고치거나 한 줄씩 추가해도 됩니다.</p>
+          <div class="table-scroll">
+            <table class="mini">
+              <thead>
+                <tr><th class="l">연월</th><th>USD</th><th>CNY</th><th aria-label="삭제"></th></tr>
+              </thead>
+              <tbody id="fx-tbody"></tbody>
+            </table>
+          </div>
+          <div class="btn-row">
+            <input type="month" id="new-month" style="width:auto">
+            <input type="number" id="new-usd" placeholder="USD" step="0.01" min="0" style="width:96px">
+            <input type="number" id="new-cny" placeholder="CNY" step="0.01" min="0" style="width:96px">
+            <button class="btn" type="button" id="btn-fx-add">추가</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="notes">
       <h2>초안 기준 · 확인이 필요한 항목</h2>
       <ul>
         <li><b>이윤 30%의 정의.</b> <code>원가 가산</code>은 입고원가 &times; 1.30, <code>판매가 마진</code>은 입고원가 &divide; 0.70 입니다. 입고원가 10,000원이면 각각 13,000원 / 14,286원으로, 실제 마진율은 30% vs 23.1%로 갈립니다. 사내에서 쓰는 쪽으로 고정해 주세요.</li>
         <li><b>부대비용 8%의 산정 기준.</b> 지금은 물품대(원화 환산액)에 일괄 8%를 곱합니다. 관세는 HS코드별로, 운임은 중량·부피 기준이라 품목별 편차가 크면 통관비·운임을 실비로 분리하는 편이 정확합니다.</li>
-        <li><b>환율 적용 시점.</b> 매입일 환율 / 통관 과세환율 / 결제일 환율 중 무엇을 기준으로 잡을지 정해야 재무 대사가 맞습니다.</li>
+        <li><b>환율 적용 시점.</b> 기본값은 <code>전월 평균환율</code>입니다 — 9월에 열면 8월 평균이 자동으로 잡힙니다. 매입일 환율 / 통관 과세환율 / 결제일 환율로 대사해야 한다면 기준을 <code>직접 입력</code>으로 바꿔 쓰세요.</li>
+        <li><b>월평균 환율은 자동으로 받아오지 않습니다.</b> 브라우저 보안 정책상 외부 사이트를 직접 읽을 수 없어, 매달 한 번 서울외국환중개 표를 붙여넣는 방식입니다. 저장된 값은 이 PC 브라우저에 남습니다.</li>
         <li><b>표시 금액은 모두 부가세 별도</b>이며, 태성정밀 공급가 기준입니다.</li>
         <li><b>다음 단계 후보</b> — 품목별 부대비용률 개별 지정, 재고/로트 단위 관리, 견적서 출력, ERP·엑셀 매입 데이터 연동.</li>
       </ul>
@@ -482,6 +589,8 @@
 
   var state = {
     fx:{ USD:1380, CNY:190, KRW:1 },
+    fxSource:"prev",   // prev | curr | manual
+    monthly:{},        // { "2026-08": {USD:1382.45, CNY:192.36} }
     overhead:8,
     profit:30,
     mode:"markup",     // markup | margin
@@ -493,6 +602,10 @@
   var nf0 = new Intl.NumberFormat("ko-KR",{maximumFractionDigits:0});
   var nf2 = new Intl.NumberFormat("ko-KR",{minimumFractionDigits:2,maximumFractionDigits:2});
   var won = function(n){ return isFinite(n) ? nf0.format(Math.round(n)) : "–"; };
+  function setValue(id, v){
+    var input = el(id);
+    if(document.activeElement !== input) input.value = v;
+  }
 
   /* ---------- persistence ---------- */
   function save(){
@@ -510,6 +623,8 @@
       state.profit = Number(d.profit);
       state.mode = d.mode === "margin" ? "margin" : "markup";
       state.rounding = Number(d.rounding) || 10;
+      state.fxSource = (d.fxSource === "curr" || d.fxSource === "manual") ? d.fxSource : "prev";
+      state.monthly = normalizeMonthly(d.monthly);
       state.rows = d.rows.map(normalizeRow);
       if(!isFinite(state.overhead)) state.overhead = 8;
       if(!isFinite(state.profit)) state.profit = 30;
@@ -524,6 +639,243 @@
       qty: Number(r && r.qty) || 0,
       profit: (r && r.profit !== undefined && r.profit !== null) ? String(r.profit) : ""
     };
+  }
+
+  /* ---------- monthly average FX ---------- */
+  function pad2(n){ return (n < 10 ? "0" : "") + n; }
+  function ymOf(d){ return d.getFullYear() + "-" + pad2(d.getMonth() + 1); }
+  function ymLabel(k){ var a = k.split("-"); return a[0] + "년 " + Number(a[1]) + "월"; }
+  function prevYm(){
+    var d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1);
+    return ymOf(d);
+  }
+  function targetYm(){ return state.fxSource === "curr" ? ymOf(new Date()) : prevYm(); }
+
+  function normalizeMonthly(m){
+    var out = {};
+    if(!m || typeof m !== "object") return out;
+    Object.keys(m).forEach(function(k){
+      if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(k)) return;
+      var v = m[k] || {};
+      var u = Number(v.USD), c = Number(v.CNY);
+      out[k] = { USD: isFinite(u) && u > 0 ? u : null, CNY: isFinite(c) && c > 0 ? c : null };
+    });
+    return out;
+  }
+
+  // Pulls the target month's averages into the active rate when on an auto source.
+  function syncFx(){
+    if(state.fxSource === "manual") return { auto:false };
+    var k = targetYm(), r = state.monthly[k];
+    var hit = { auto:true, key:k, usd:false, cny:false };
+    if(r){
+      if(r.USD){ state.fx.USD = r.USD; hit.usd = true; }
+      if(r.CNY){ state.fx.CNY = r.CNY; hit.cny = true; }
+    }
+    hit.ok = hit.usd || hit.cny;
+    return hit;
+  }
+
+  function renderFxStatus(){
+    var st = syncFx();
+    var box = el("fx-status");
+    var lock = false, text;
+    if(!st.auto){
+      box.className = "fx-status";
+      text = "<b>직접 입력</b>아래 두 칸의 값을 그대로 씁니다.";
+    }else if(st.ok){
+      lock = true;
+      box.className = "fx-status";
+      var miss = (!st.usd ? " USD 없음" : "") + (!st.cny ? " CNY 없음" : "");
+      text = "<b>" + ymLabel(st.key) + " 평균 적용 중</b>서울외국환중개 월평균 매매기준율"
+           + (miss ? " ·" + miss + " (직접 입력값 사용)" : "");
+    }else{
+      box.className = "fx-status warn";
+      text = "<b>" + ymLabel(st.key) + " 데이터 없음</b>아래 월평균 환율 관리에 값을 넣기 전까지 직접 입력값으로 계산합니다.";
+    }
+    box.innerHTML = "<span>" + text + "</span>";
+    ["fx-usd","fx-cny"].forEach(function(id){
+      var input = el(id);
+      input.readOnly = lock;
+      input.title = lock ? "자동 적용 중입니다. 수정하려면 기준을 '직접 입력'으로 바꾸세요." : "";
+    });
+    return st;
+  }
+
+  function renderMonthlyList(){
+    var keys = Object.keys(state.monthly).sort().reverse();
+    var active = state.fxSource === "manual" ? null : targetYm();
+    var tb = el("fx-tbody");
+    if(!keys.length){
+      tb.innerHTML = '<tr><td class="empty" colspan="4">저장된 월평균이 없습니다. 왼쪽에 표를 붙여넣거나 아래에서 직접 추가하세요.</td></tr>';
+      return;
+    }
+    var html = "";
+    keys.forEach(function(k){
+      var r = state.monthly[k];
+      html += '<tr data-k="' + k + '"' + (k === active ? ' class="active"' : '') + '>'
+        + '<td class="l">' + k + '</td>'
+        + '<td>' + (r.USD ? nf2.format(r.USD) : "–") + '</td>'
+        + '<td>' + (r.CNY ? nf2.format(r.CNY) : "–") + '</td>'
+        + '<td><button class="row-del" type="button" title="삭제" aria-label="' + k + ' 삭제">✕</button></td>'
+        + '</tr>';
+    });
+    tb.innerHTML = html;
+  }
+
+  /* ---------- paste parser ---------- */
+  var parsed = null;   // { rows:[{key, nums:[]}], cols:n, usdCol, cnyCol }
+
+  function monthKeyOf(line, fallbackYear){
+    var m = line.match(/(20\d{2})\s*[.\-\/년]\s*(1[0-2]|0?[1-9])(?!\d)/);
+    if(m) return { key: m[1] + "-" + pad2(Number(m[2])), token: m[0] };
+    var m2 = line.match(/^\D{0,4}(1[0-2]|0?[1-9])\s*월/);
+    if(m2 && fallbackYear) return { key: fallbackYear + "-" + pad2(Number(m2[1])), token: m2[0] };
+    return null;
+  }
+  function numsOf(str){
+    return (str.match(/[\d,]*\d(?:\.\d+)?/g) || [])
+      .map(function(t){ return parseFloat(t.replace(/,/g, "")); })
+      .filter(function(v){ return isFinite(v) && v >= 0.5 && v <= 100000; });
+  }
+  function widthOf(rows){
+    var w = 0;
+    rows.forEach(function(r){ w = Math.max(w, r.nums.length); });
+    return w;
+  }
+
+  // One row per line - a table copied from the browser or Excel.
+  function parseByLine(lines, year){
+    var rows = [], seen = {};
+    for(var i = 0; i < lines.length; i++){
+      var line = lines[i].trim();
+      if(!line) continue;
+      var hit = monthKeyOf(line, year);
+      if(!hit || seen[hit.key]) continue;
+      var nums = numsOf(line.replace(hit.token, " "));
+      if(!nums.length) continue;
+      seen[hit.key] = true;
+      rows.push({ key:hit.key, nums:nums });
+    }
+    return rows;
+  }
+  // One cell per line - some copies flatten the table vertically.
+  function parseByBlock(lines, year){
+    var rows = [], cur = null, seen = {};
+    for(var i = 0; i < lines.length; i++){
+      var line = lines[i].trim();
+      if(!line) continue;
+      var hit = monthKeyOf(line, year);
+      if(hit){
+        cur = seen[hit.key] ? null : { key:hit.key, nums:[] };
+        if(cur){ seen[hit.key] = true; rows.push(cur); }
+        line = line.replace(hit.token, " ");
+      }
+      if(cur) cur.nums = cur.nums.concat(numsOf(line));
+    }
+    return rows.filter(function(r){ return r.nums.length; });
+  }
+
+  function parsePaste(text, fallbackYear){
+    var lines = String(text).replace(/\r/g, "").split("\n");
+    var byLine = parseByLine(lines, fallbackYear);
+    if(byLine.length && widthOf(byLine) >= 2) return byLine;
+    var byBlock = parseByBlock(lines, fallbackYear);
+    return widthOf(byBlock) > widthOf(byLine) ? byBlock : byLine;
+  }
+
+  function medianOf(list){
+    var a = list.slice().sort(function(x, y){ return x - y; });
+    if(!a.length) return NaN;
+    var h = Math.floor(a.length / 2);
+    return a.length % 2 ? a[h] : (a[h - 1] + a[h]) / 2;
+  }
+  function columnMedians(rows){
+    var width = widthOf(rows);
+    var meds = [];
+    for(var j = 0; j < width; j++){
+      var vals = [];
+      rows.forEach(function(r){ if(isFinite(r.nums[j])) vals.push(r.nums[j]); });
+      meds.push(medianOf(vals));
+    }
+    return meds;
+  }
+  // USD/KRW sits near 1,100-1,700; CNY/KRW near 120-350. JPY(100) and EUR
+  // overlap the USD band, so the guess is only a default - the user confirms.
+  function guessColumns(meds){
+    var usd = -1, cny = -1;
+    for(var j = 0; j < meds.length; j++){
+      if(usd < 0 && meds[j] >= 1000 && meds[j] <= 1800) usd = j;
+      if(cny < 0 && meds[j] >= 110 && meds[j] <= 400) cny = j;
+    }
+    return { usd:usd, cny:cny };
+  }
+
+  function renderParseResult(){
+    var box = el("parse-result");
+    if(!parsed){ box.innerHTML = ""; return; }
+    if(!parsed.rows.length){
+      box.innerHTML = '<p class="parse-msg bad">연월을 찾지 못했습니다. 「2026.08」 또는 「8월」 형태가 각 줄에 있어야 합니다. 아래에서 직접 추가하셔도 됩니다.</p>';
+      return;
+    }
+    var meds = parsed.meds;
+    var optsFor = function(sel){
+      var o = '<option value="-1">사용 안 함</option>';
+      for(var j = 0; j < meds.length; j++){
+        o += '<option value="' + j + '"' + (j === sel ? ' selected' : '') + '>'
+          + (j + 1) + '번째 값 (평균 ' + (isFinite(meds[j]) ? nf2.format(meds[j]) : "–") + ')</option>';
+      }
+      return o;
+    };
+    var head = '<tr><th class="l">연월</th>';
+    for(var j = 0; j < meds.length; j++) head += '<th>' + (j + 1) + '</th>';
+    head += '</tr>';
+    var body = "";
+    parsed.rows.forEach(function(r){
+      body += '<tr><td class="l">' + r.key + '</td>';
+      for(var j = 0; j < meds.length; j++){
+        var cls = j === parsed.usdCol ? " class=\"pick-usd\"" : (j === parsed.cnyCol ? " class=\"pick-cny\"" : "");
+        body += '<td' + cls + '>' + (isFinite(r.nums[j]) ? nf2.format(r.nums[j]) : "–") + '</td>';
+      }
+      body += '</tr>';
+    });
+    box.innerHTML =
+        '<p class="parse-msg ok">' + parsed.rows.length + '개 월을 읽었습니다. 어느 열이 USD와 CNY인지 확인해 주세요.</p>'
+      + '<div class="preview table-scroll"><table><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>'
+      + '<div class="btn-row" style="margin-top:9px">'
+      +   '<label class="inline-field">USD <select id="sel-usd">' + optsFor(parsed.usdCol) + '</select></label>'
+      +   '<label class="inline-field">CNY <select id="sel-cny">' + optsFor(parsed.cnyCol) + '</select></label>'
+      +   '<button class="btn btn-primary" type="button" id="btn-apply-parse">저장</button>'
+      + '</div>';
+
+    el("sel-usd").addEventListener("change", function(){ parsed.usdCol = Number(this.value); renderParseResult(); });
+    el("sel-cny").addEventListener("change", function(){ parsed.cnyCol = Number(this.value); renderParseResult(); });
+    el("btn-apply-parse").addEventListener("click", applyParsed);
+  }
+
+  function applyParsed(){
+    if(!parsed || !parsed.rows.length) return;
+    var n = 0;
+    parsed.rows.forEach(function(r){
+      var u = parsed.usdCol >= 0 ? r.nums[parsed.usdCol] : null;
+      var c = parsed.cnyCol >= 0 ? r.nums[parsed.cnyCol] : null;
+      if(!isFinite(u) && !isFinite(c)) return;
+      var cur = state.monthly[r.key] || { USD:null, CNY:null };
+      if(isFinite(u) && u > 0) cur.USD = u;
+      if(isFinite(c) && c > 0) cur.CNY = c;
+      state.monthly[r.key] = cur;
+      n++;
+    });
+    parsed = null;
+    el("paste-box").value = "";
+    el("parse-result").innerHTML = '<p class="parse-msg ok">' + n + '개 월을 저장했습니다.</p>';
+    afterFxChange();
+  }
+
+  function afterFxChange(){
+    renderMonthlyList();
+    renderSettings();
+    recalcAll();
   }
 
   /* ---------- math ---------- */
@@ -646,8 +998,10 @@
   }
 
   function renderSettings(){
-    el("fx-usd").value = state.fx.USD;
-    el("fx-cny").value = state.fx.CNY;
+    el("fx-source").value = state.fxSource;
+    var fxst = renderFxStatus();
+    setValue("fx-usd", state.fx.USD);
+    setValue("fx-cny", state.fx.CNY);
     el("overhead").value = state.overhead;
     el("profit").value = state.profit;
     el("rounding").value = String(state.rounding);
@@ -671,7 +1025,7 @@
       + '&nbsp;&nbsp;<b>= 판매단가</b> → ' + (state.rounding > 1 ? nf0.format(state.rounding) + "원 올림" : "1원 반올림");
 
     el("flow-1").textContent = "USD " + nf0.format(state.fx.USD) + " · CNY " + nf0.format(state.fx.CNY);
-    el("flow-2").textContent = "× 매입일 환율";
+    el("flow-2").textContent = fxst.auto && fxst.ok ? "× " + ymLabel(fxst.key) + " 평균" : "× 직접 입력 환율";
     el("flow-3").textContent = "+ 부대비용 " + state.overhead + "%";
     el("flow-4").textContent = (markup ? "+ 이윤 " : "마진 ") + state.profit + "%";
     el("tbl-note").textContent = "이윤율 칸을 비워두면 기본 " + state.profit + "% 적용";
@@ -699,6 +1053,48 @@
     state.rounding = Number(this.value) || 1;
     renderSettings(); recalcAll();
   });
+  el("fx-source").addEventListener("change", function(){
+    state.fxSource = this.value;
+    afterFxChange();
+  });
+
+  el("btn-parse").addEventListener("click", function(){
+    var year = Number(el("paste-year").value) || new Date().getFullYear();
+    var rows = parsePaste(el("paste-box").value, year);
+    var meds = columnMedians(rows);
+    var g = guessColumns(meds);
+    parsed = { rows:rows, meds:meds, usdCol:g.usd, cnyCol:g.cny };
+    renderParseResult();
+  });
+  el("btn-paste-clear").addEventListener("click", function(){
+    el("paste-box").value = "";
+    parsed = null;
+    el("parse-result").innerHTML = "";
+  });
+
+  el("btn-fx-add").addEventListener("click", function(){
+    var k = el("new-month").value;
+    if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(k)){
+      el("new-month").focus();
+      return;
+    }
+    var u = Number(el("new-usd").value), c = Number(el("new-cny").value);
+    var cur = state.monthly[k] || { USD:null, CNY:null };
+    if(isFinite(u) && u > 0) cur.USD = u;
+    if(isFinite(c) && c > 0) cur.CNY = c;
+    if(!cur.USD && !cur.CNY) return;
+    state.monthly[k] = cur;
+    el("new-usd").value = ""; el("new-cny").value = "";
+    afterFxChange();
+  });
+
+  el("fx-tbody").addEventListener("click", function(e){
+    if(!e.target.classList.contains("row-del")) return;
+    var tr = e.target.closest("tr");
+    delete state.monthly[tr.getAttribute("data-k")];
+    afterFxChange();
+  });
+
   el("mode-markup").addEventListener("click", function(){ state.mode = "markup"; renderSettings(); recalcAll(); });
   el("mode-margin").addEventListener("click", function(){ state.mode = "margin"; renderSettings(); recalcAll(); });
 
@@ -773,6 +1169,9 @@
   /* ---------- boot ---------- */
   if(!load()) state.rows = SAMPLE.map(normalizeRow);
   el("stamp-date").textContent = new Intl.DateTimeFormat("ko-KR",{dateStyle:"medium"}).format(new Date()) + " 기준";
+  el("paste-year").value = new Date().getFullYear();
+  el("new-month").value = prevYm();
+  renderMonthlyList();
   renderSettings();
   renderRows();
 })();
