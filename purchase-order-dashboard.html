@@ -4200,11 +4200,10 @@ function renderApprList(){
   if(items.length===0){
     liveSection = `<div class="poc-empty">PI를 받았거나(해외) 발주금액이 입력된(국내) 건 중, 아직 선금이 나가지 않은 건이 없습니다.</div>`;
   }else{
-    const table = buildApprItemTable(items, {selectable:true});
+    const table = buildApprItemTable(items, {selectable:false});
     liveSection = `
-      <div class="appr-actions no-print">
+      <div class="appr-actions no-print" style="justify-content:flex-end;">
         <button class="btn brass" id="apprLivePrintBtn">🖨 인쇄/PDF</button>
-        <button class="btn ghost" id="apprLiveCompleteBtn" style="border-color:var(--ok); color:var(--ok); margin-left:auto;">✓ 선택한 공급사 완료 처리</button>
       </div>
       <div class="appr-doc-title">구매 상세목록</div>
       <div class="appr-meta-row" style="justify-content:center;">
@@ -4217,7 +4216,7 @@ function renderApprList(){
   }
 
   el.innerHTML = `
-    <div class="cal-hint no-print">PI를 받아 단가가 확정된 건(해외)과 발주금액이 입력된 건(국내)이 자동으로 이 목록에 모입니다. 공급사별 체크박스로 이번에 결재 올릴 곳만 골라 "완료 처리"하세요 (체크 해제한 공급사는 목록에 남아있다가 다음에 처리할 수 있어요).</div>
+    <div class="cal-hint no-print">PI를 받아 단가가 확정된 건(해외)과 발주금액이 입력된 건(국내)이 자동으로 이 목록에 모입니다. 인쇄/PDF로 결재용 서류를 뽑아 올리세요. 선금 지급일이나 "입고 후 지급"이 체크된 건은 이 목록에서 자동으로 사라집니다.</div>
     ${liveSection}
 
     <div class="no-print" style="margin-top:32px;">
@@ -4242,15 +4241,6 @@ function renderApprList(){
 
   if(items.length>0){
     document.getElementById('apprLivePrintBtn').addEventListener('click', ()=> window.print());
-    document.getElementById('apprLiveCompleteBtn').addEventListener('click', ()=>{
-      const checkedSuppliers = new Set(
-        [...document.querySelectorAll('.appr-supplier-check:checked')].map(cb=>cb.dataset.supplier)
-      );
-      if(checkedSuppliers.size===0){ toast('완료 처리할 공급사를 하나 이상 선택해주세요'); return; }
-      const selPool = pool.filter(({ref})=> checkedSuppliers.has(ref.supplier || '공급사 미지정'));
-      const selItems = items.filter(i=> checkedSuppliers.has(i.supplier || '공급사 미지정'));
-      finalizeApprBatch(selPool, selItems);
-    });
   }
   el.querySelectorAll('.appr-batch-table tr[data-id]').forEach(tr=>{
     tr.addEventListener('click', ()=>{
