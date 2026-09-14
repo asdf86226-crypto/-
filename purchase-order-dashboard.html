@@ -3036,6 +3036,7 @@ function openPoPanel(id){
     lbl.classList.toggle('checked', cb.checked);
   });
   updateComputedPreview();
+  updateBalanceInputsLock();     // 저장된 depositPct가 100이면 잔금 입력칸을 잠근다
   updateFieldsetFillState();
   syncShareDisplays();
   if(id) highlightRows([id]); else clearRowHighlights();
@@ -3080,10 +3081,31 @@ function refreshDepositShare(){
   poForm.elements['depositShared'].value = (hasDate || hasPlanned || isDeferred) ? 'O' : '';
 }
 function refreshBalanceShare(){
+  const pct = parseFloat(poForm.elements['depositPct'].value)||0;
   const hasDate = !!poForm.elements['balanceDate'].value;
   const hasPlanned = !!poForm.elements['balancePlannedDate'].value;
   const isDeferred = poForm.elements['balanceDeferred'].checked;
-  poForm.elements['balanceShared'].value = (hasDate || hasPlanned || isDeferred) ? 'O' : '';
+  // 선금 100%이면 잔금 발생 자체가 없으므로 자동으로 '공유완료'로 처리
+  poForm.elements['balanceShared'].value = (pct >= 100 || hasDate || hasPlanned || isDeferred) ? 'O' : '';
+}
+// 선금 100%일 때 잔금 관련 입력을 잠그고 남은 값을 비운다 (아니면 잠금 해제)
+function updateBalanceInputsLock(){
+  const pct = parseFloat(poForm.elements['depositPct'].value)||0;
+  const isFull = pct >= 100;
+  ['balancePlannedDate','balanceDate','balanceDeferred'].forEach(name=>{
+    const el = poForm.elements[name];
+    if(!el) return;
+    if(isFull){
+      if(el.type === 'checkbox') el.checked = false;
+      else el.value = '';
+      el.disabled = true;
+      el.title = '선금 100% 지급 건은 잔금이 없어 입력할 수 없습니다';
+    } else {
+      el.disabled = false;
+      el.removeAttribute('title');
+    }
+  });
+  refreshBalanceShare();
 }
 // 선금지급(예정)일도 상태·공유 표시에 직접 영향을 주므로 PI수령일과 마찬가지로 자동 반영 (지우면 같이 지워짐)
 // PI번호를 입력했는데 이 항목엔 선금지급(예정)일이 비어있고 같은 PI를 쓰는 다른 건엔 있다면, 그 값을 가져와 채운다.
@@ -3310,6 +3332,8 @@ poForm.addEventListener('input', (e)=>{
   // 실제 지급일/입고일이 입력되면 다음 단계로 진행(상태 계산에 반영), 예정일만 입력돼도 매니저 공유는 완료로 표시
   if(['depositDate','depositPlannedDate','depositPct','depositDeferred'].includes(e.target.name)) refreshDepositShare();
   if(['balanceDate','balancePlannedDate','balanceDeferred'].includes(e.target.name)) refreshBalanceShare();
+  // 선금 100%면 잔금 필드 잠금·공유 자동 처리
+  if(e.target.name==='depositPct') updateBalanceInputsLock();
   if(e.target.name==='warehouseDate'){
     poForm.elements['warehouseShared'].value = e.target.value ? 'O' : '';
   }
@@ -3869,9 +3893,32 @@ function openDomPanel(id){
     });
   }
   updateDomComputedPreview();
+  updateDomBalanceInputsLock();
   syncDomShareDisplays();
   if(id) highlightRows([id]); else clearRowHighlights();
   domOverlay.classList.add('active');
+}
+// 국내 — 선금 100%면 잔금 관련 입력 잠금 + 자동 공유 처리
+function updateDomBalanceInputsLock(){
+  const pct = parseFloat(domForm.elements['depositPct'].value)||0;
+  const isFull = pct >= 100;
+  ['balancePlannedDate','balanceDate','balanceDeferred'].forEach(name=>{
+    const el = domForm.elements[name];
+    if(!el) return;
+    if(isFull){
+      if(el.type === 'checkbox') el.checked = false;
+      else el.value = '';
+      el.disabled = true;
+      el.title = '선금 100% 지급 건은 잔금이 없어 입력할 수 없습니다';
+    } else {
+      el.disabled = false;
+      el.removeAttribute('title');
+    }
+  });
+  // 잔금 공유 상태도 함께 재계산 (100%일 때 자동으로 공유완료)
+  const hasDate = !!domForm.elements['balanceDate'].value;
+  const isDeferred = domForm.elements['balanceDeferred'].checked;
+  domForm.elements['balanceShared'].value = (isFull || hasDate || isDeferred) ? 'O' : '';
 }
 function closeDomPanel(){
   domOverlay.classList.remove('active');
@@ -3896,6 +3943,7 @@ domForm.addEventListener('input', (e)=>{
     updateDomComputedPreview();
   }
   if(e.target.name==='poAmount' || e.target.name==='depositPct' || e.target.name==='actualAmount') updateDomComputedPreview();
+  if(e.target.name==='depositPct') updateDomBalanceInputsLock();
   if(e.target.name==='depositDate' || e.target.name==='depositPlannedDate' || e.target.name==='depositDeferred'){
     const hasDate = !!domForm.elements['depositDate'].value;
     const hasPlanned = !!domForm.elements['depositPlannedDate'].value;
