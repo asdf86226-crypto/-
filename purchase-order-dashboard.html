@@ -1430,7 +1430,6 @@ function reqFetch(url){
 }
 // 구매요청 → 해외발주(po) 레코드로 변환
 function reqToPo(r){
-  const teamTag = r.team ? '[' + r.team + '] ' : '';
   return {
     id: 'po_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
     srcId: String(r.id||''),                     // 중복 방지용 원본 구매요청 ID
@@ -1440,7 +1439,7 @@ function reqToPo(r){
     dueDate: r.dueDate || '',
     reqDate: r.createdAt || '',
     requester: r.requester || '',
-    note: (teamTag + (r.note||'')).trim(),
+    note: (r.note||'').trim(),                    // 요청팀 태그([품질]/[개발]/[자재] 등)는 붙이지 않음
     supplier:'', currency:'', currencyPi:'', currencyCi:'',
     piNo:'', piDate:'', piAmount:'', piDocUrl:'',
     ciNo:'', ciDate:'', ciAmount:'', ciQty:'', ciDocUrl:'',
