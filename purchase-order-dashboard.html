@@ -527,6 +527,14 @@
   .storage-banner b{font-weight:700;}
   .storage-banner .btn{padding:6px 12px; font-size:12px;}
 
+  /* ---------- Top toolbar (always visible: 구매요청·백업·복원) ---------- */
+  .topbar-tools{
+    display:flex; justify-content:flex-end; align-items:center; gap:6px;
+    margin-bottom:14px; flex-wrap:wrap;
+  }
+  .topbar-tools .btn{padding:7px 12px; font-size:12.5px;}
+  body.viewer .topbar-tools{display:none !important;}
+
   /* ---------- Share / read-only viewer mode ---------- */
   .view-banner{
     display:flex; align-items:center; gap:10px; flex-wrap:wrap;
@@ -588,12 +596,13 @@
 
   <div class="storage-banner" id="storageBanner">
     <span>⚠ 이 화면은 자동저장이 연결되지 않아, <b>새로고침하면 입력한 내용이 사라집니다.</b> 작업 후에는 꼭 '저장하기'로 백업하세요.</span>
-    <div style="display:flex; gap:6px; flex-shrink:0;">
-      <button class="btn ghost" id="btnPullReq" title="팀에서 올린 구매요청을 국내발주로 가져옵니다">📥 구매요청 가져오기</button>
-      <button class="btn ghost" id="btnExport">⬇ 저장하기</button>
-      <button class="btn ghost" id="btnImport">⬆ 불러오기</button>
-      <input type="file" id="fileImport" accept="application/json" style="display:none;">
-    </div>
+  </div>
+
+  <div class="topbar-tools" id="topbarTools">
+    <button class="btn ghost" id="btnPullReq" title="팀에서 올린 구매요청을 국내발주로 가져옵니다">📥 구매요청 가져오기</button>
+    <button class="btn ghost" id="btnExport" title="현재 데이터를 JSON 파일로 백업합니다 (다른 PC/브라우저로 옮길 때 사용)">⬇ 저장하기 (JSON 백업)</button>
+    <button class="btn ghost" id="btnImport" title="JSON 백업을 불러옵니다 (다른 곳에서 만든 데이터를 이 브라우저에 넣을 때)">⬆ 불러오기 (JSON 복원)</button>
+    <input type="file" id="fileImport" accept="application/json" style="display:none;">
   </div>
 
   <!-- ===================== DASHBOARD ===================== -->
