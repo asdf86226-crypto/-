@@ -965,6 +965,10 @@
             </div>
             <div class="fgroup"><label>생산완료 예정일</label><input type="date" name="prodDueDate"></div>
           </div>
+          <div class="frow">
+            <div class="fgroup"><label>생산완료일 <span style="font-weight:400; color:var(--ink-soft); text-transform:none;">(실제 생산 끝난 날)</span></label><input type="date" name="prodDoneDate"></div>
+            <div class="fgroup"></div>
+          </div>
           <div class="fgroup"><label>PI 문서 링크 <span style="font-weight:400; color:var(--ink-soft); text-transform:none;">(구글드라이브)</span></label><input type="url" name="piDocUrl" placeholder="https://drive.google.com/..."></div>
         </fieldset>
 
@@ -1490,7 +1494,7 @@ function reqToPo(r){
     blDocUrl:'', plDocUrl:'', coDocUrl:'',
     depositPct:'', depositPlannedDate:'', depositDate:'',
     balancePlannedDate:'', balanceDate:'',
-    prodDueDate:'', shipPlannedDate:'', shipDate:'', etaPlanned:'', etaDate:'',
+    prodDueDate:'', prodDoneDate:'', shipPlannedDate:'', shipDate:'', etaPlanned:'', etaDate:'',
     warehousePlanned:'', warehouseDate:'', qcDate:'', erpDate:'',
     customsCost:'', changeLog:'',
     depositShared:'', balanceShared:'', warehouseShared:'',
@@ -1648,8 +1652,12 @@ function sharedStatusOf(p){
   if(p.warehouseDate) return ['공장입고','st-in'];
   if(p.etaDate)       return ['항구도착','st-port'];
   if(p.shipDate)      return ['선적완료','st-ship'];
-  if(p.ciDate)        return ['생산완료','st-made'];
-  if(p.piDate)        return ['생산중','st-prod'];
+  // 생산완료: 명시적으로 입력한 "생산완료일(prodDoneDate)"이 있어야 완료로 본다.
+  // (CI를 미리 받을 수 있으므로 CI 수령일만으로는 생산이 끝났다고 단정하지 않음)
+  // 예외: 예정일(prodDueDate)조차 없고 CI만 있으면 실무상 생산이 끝났다고 간주 (구 데이터 호환).
+  if(p.prodDoneDate)                     return ['생산완료','st-made'];
+  if(p.ciDate && !p.prodDueDate)         return ['생산완료','st-made'];
+  if(p.piDate)                            return ['생산중','st-prod'];
   return ['발주준비','st-prep'];
 }
 function sharedDateCell(actual, planned){
@@ -1685,7 +1693,7 @@ function buildSharedProgressHtml(){
       + '<td class="mono qty">'+((p.ciQty && parseFloat(p.ciQty)!==parseFloat(p.qty)) ? ('<span class="qty-old">'+fmtQty(p.qty)+'</span> → <b class="qty-new">'+fmtQty(p.ciQty)+'</b>') : fmtQty(p.ciQty||p.qty))+'</td>'
       + '<td class="mono">'+sharedEsc(p.dueDate||'-')+'</td>'
       + '<td><span class="st '+st[1]+'">'+st[0]+'</span></td>'
-      + '<td class="mono">'+sharedDateCell(p.ciDate, p.prodDueDate)+'</td>'
+      + '<td class="mono">'+sharedDateCell(p.prodDoneDate || (!p.prodDueDate ? p.ciDate : ''), p.prodDueDate)+'</td>'
       + '<td class="mono">'+sharedDateCell(p.shipDate, p.shipPlannedDate)+'</td>'
       + '<td class="mono">'+sharedDateCell(p.etaDate, p.etaPlanned)+'</td>'
       + '<td class="mono">'+sharedDateCell(p.warehouseDate, p.warehousePlanned)+'</td>'
