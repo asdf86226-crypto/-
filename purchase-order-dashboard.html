@@ -3214,6 +3214,7 @@ async function autoSyncSupplier(){
 // CI를 받은 뒤부터는 "같은 CI번호"가 실제 같은 화물 단위 — 이 항목들은 CI번호가 같은 건들끼리 자동 동기화
 const CI_SYNC_FIELDS = [
   {key:'ciDate',             label:'CI수령일'},
+  {key:'prodDoneDate',       label:'생산완료일'},
   {key:'shipPlannedDate',    label:'선적 예정일'},
   {key:'shipDate',           label:'선적일'},
   {key:'etaPlanned',         label:'항구도착예정일'},
