@@ -2018,6 +2018,9 @@ function computeAmounts(po){
 function isDepositDone(po){ return !!po.depositDate || !!po.depositDeferred; }
 function isDepositShared(po){ return po.depositShared==='O'; }
 function isBalanceDone(po){ return !!po.balanceDate || !!po.balanceDeferred; }
+// 선금이 100%면 잔금 자체가 없으므로 지급·공유 알림 모두에서 이미 처리된 것으로 본다.
+function isDepositFull(po){ return (parseFloat(po && po.depositPct)||0) >= 100; }
+function isBalanceShared(po){ return po && (po.balanceShared === 'O' || isDepositFull(po)); }
 
 // 발주목록 선금/잔금 열에 붙는 지급 상태 태그
 // kind: 'deposit' | 'balance'
@@ -2216,7 +2219,8 @@ function renderDashboard(){
     if(!p.piDate) return 0;
     if(!isDepositDone(p) || !isDepositShared(p)) return 1;
     if(!p.ciDate) return 2;
-    if(!p.balanceDate || p.balanceShared!=="O") return 3;
+    // 선금 100%면 잔금 미지급 알림 대상에서 자동 제외 (지급할 잔금 자체가 없음)
+    if(!isDepositFull(p) && (!p.balanceDate || !isBalanceShared(p))) return 3;
     if(p.warehouseDate && p.warehouseShared!=="O") return 5;
     return 4;
   }
@@ -2335,8 +2339,8 @@ function renderPoTable(){
     const stageLabel = stageLabelText(p, stageIdx, false);
     let unsharedNote = '';
     if(stageLabel === 'PI수령' && !isDepositShared(p)) unsharedNote = ' · 미공유';
-    else if(stageLabel === 'CI수령' && p.balanceShared !== 'O') unsharedNote = ' · 미공유';
-    else if(stageLabel === '선적완료' && (p.balanceShared !== 'O' || p.warehouseShared !== 'O')) unsharedNote = ' · 미공유';
+    else if(stageLabel === 'CI수령' && !isBalanceShared(p)) unsharedNote = ' · 미공유';
+    else if(stageLabel === '선적완료' && (!isBalanceShared(p) || p.warehouseShared !== 'O')) unsharedNote = ' · 미공유';
     const piGroupSize = getPiGroup(p.piNo, null).filter(x=>!x.duplicatedFrom).length; // 복제본은 건수에 포함하지 않음 (같은 라인의 분할입고일 뿐)
     const piMismatches = piGroupSize>1 ? checkPiGroupMismatch(p.piNo) : [];
     const piTag = piGroupSize>1
