@@ -1344,6 +1344,18 @@ async function loadData(){
     return;
   }
 
+  // 호스트가 제공하는 window.storage가 없으면 브라우저 localStorage로 자동 저장 (같은 브라우저 안에서 유지됨)
+  // 이 폴백 덕분에 새로고침하거나 대시보드 HTML 파일을 새 버전으로 교체해도 발주 데이터가 그대로 남는다.
+  if(!(window.storage && typeof window.storage.get === 'function')){
+    try{
+      if(typeof localStorage !== 'undefined'){
+        window.storage = {
+          get: async (k)=>{ const v = localStorage.getItem('po_dash:'+k); return (v!==null) ? {value:v} : null; },
+          set: async (k,v)=>{ localStorage.setItem('po_dash:'+k, v); },
+        };
+      }
+    }catch(e){ /* localStorage 접근 실패 (프라이빗 모드 등) → in-memory 모드 유지 */ }
+  }
   hasStorage = !!(window.storage && typeof window.storage.get === 'function');
 
   if(hasStorage){
