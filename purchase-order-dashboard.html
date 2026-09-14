@@ -965,10 +965,6 @@
             </div>
             <div class="fgroup"><label>생산완료 예정일</label><input type="date" name="prodDueDate"></div>
           </div>
-          <div class="frow">
-            <div class="fgroup"><label>생산완료일 <span style="font-weight:400; color:var(--ink-soft); text-transform:none;">(실제 생산 끝난 날)</span></label><input type="date" name="prodDoneDate"></div>
-            <div class="fgroup"></div>
-          </div>
           <div class="fgroup"><label>PI 문서 링크 <span style="font-weight:400; color:var(--ink-soft); text-transform:none;">(구글드라이브)</span></label><input type="url" name="piDocUrl" placeholder="https://drive.google.com/..."></div>
         </fieldset>
 
@@ -977,6 +973,10 @@
           <div class="frow">
             <div class="fgroup"><label>CI번호</label><input type="text" name="ciNo" class="field-key"></div>
             <div class="fgroup"><label>CI수령일</label><input type="date" name="ciDate"></div>
+          </div>
+          <div class="frow">
+            <div class="fgroup"><label>생산완료일 <span style="font-weight:400; color:var(--ink-soft); text-transform:none;">(실제 생산 끝난 날 — CI를 미리 받은 경우 여기 비워두세요)</span></label><input type="date" name="prodDoneDate"></div>
+            <div class="fgroup"></div>
           </div>
           <div class="frow">
             <div class="fgroup"><label style="color:#dc2626; font-weight:800;">CI 수량<span style="display:block; font-weight:800; color:#dc2626; text-transform:none; font-size:11px; margin-top:2px;">불량/재고 등으로 바뀐 경우만</span></label><input type="number" name="ciQty" min="0" placeholder="예: 750"></div>
