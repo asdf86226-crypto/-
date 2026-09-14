@@ -825,12 +825,22 @@
   <div class="view" id="view-monthcost">
     <div class="view-header"><span class="vlabel">월별 예상 비용</span></div>
     <div class="cal-hint">각 발주의 납기요청일 기준으로 월별 예상 지출 합계를 보여줍니다. 해외는 CI금액(없으면 PI금액)을 환율로 환산, 국내는 실제입고금액(없으면 발주금액) 기준입니다. <b>선금·잔금 지급일이 입력되지 않은(=아직 지급 전) 금액만 예상비용으로 합산</b>되며, 지급일이 입력된 금액은 합계에서 빠지고 아래 <b>"선금 지급내역"·"잔금 지급내역"</b>에 <b>CI번호 기준</b>으로 묶여 표시됩니다(CI 미발행이면 PI 기준, 국내발주는 건별). 종결(ERP입력완료)된 건은 월별 합계에서 제외되며, 그중 <b>아직 지급되지 않은 금액이 남은 건은 맨 아래 "ERP입력 완료 · 미지급"</b>에 따로 모아 보여줍니다.</div>
+
+    <div class="view-header" style="margin-top:8px;"><span class="vlabel">해외 발주 · 월별 예상 비용</span></div>
     <div class="mc-grand-row">
-      <span class="mc-grand-label">진행중인 전체 예상 비용 합계</span>
-      <span class="mc-grand-total" id="monthCostGrandTotal">₩0</span>
+      <span class="mc-grand-label">해외 · 진행중 예상 비용 합계</span>
+      <span class="mc-grand-total" id="monthCostGrandTotalOverseas">₩0</span>
     </div>
-    <div class="mc-list" id="monthCostList"></div>
-    <div class="empty-state" id="monthCostEmpty" style="display:none;">납기요청일이 있는 진행중인 발주가 없습니다.</div>
+    <div class="mc-list" id="monthCostListOverseas"></div>
+    <div class="empty-state" id="monthCostEmptyOverseas" style="display:none;">진행중인 해외 발주가 없습니다.</div>
+
+    <div class="view-header" style="margin-top:32px;"><span class="vlabel">국내 발주 · 월별 예상 비용</span></div>
+    <div class="mc-grand-row">
+      <span class="mc-grand-label">국내 · 진행중 예상 비용 합계</span>
+      <span class="mc-grand-total" id="monthCostGrandTotalDomestic">₩0</span>
+    </div>
+    <div class="mc-list" id="monthCostListDomestic"></div>
+    <div class="empty-state" id="monthCostEmptyDomestic" style="display:none;">진행중인 국내 발주가 없습니다.</div>
 
     <!-- ERP입력 완료됐지만 아직 지급되지 않은 건 -->
     <div id="mcClosedUnpaidWrap" style="display:none; margin-top:26px;">
@@ -2655,21 +2665,29 @@ const monthCostOverlay = document.getElementById('monthCostOverlay');
 let monthCostGroupsCache = {};
 function renderMonthCost(){
   const list = getActiveMonthCostList();
+  // 해외/국내를 완전히 분리해 각각 별도 목록으로 렌더한다. detail cache의 key는 "source:YYYY-MM".
+  monthCostGroupsCache = {};
+  renderMonthCostSection('overseas', list.filter(x=>x.source==='overseas'),
+    'monthCostListOverseas', 'monthCostEmptyOverseas', 'monthCostGrandTotalOverseas');
+  renderMonthCostSection('domestic', list.filter(x=>x.source==='domestic'),
+    'monthCostListDomestic', 'monthCostEmptyDomestic', 'monthCostGrandTotalDomestic');
+  renderClosedUnpaid();
+}
+function renderMonthCostSection(source, items, listElId, emptyElId, grandElId){
   const groups = {};
-  list.forEach(item=>{
+  items.forEach(item=>{
     const month = (item.dueDate||'').slice(0,7); // YYYY-MM
     if(!month) return;
-    if(!groups[month]) groups[month] = {items:[], krw:0, overseasKrw:0, domesticKrw:0};
+    if(!groups[month]) groups[month] = {items:[], krw:0};
     groups[month].items.push(item);
     groups[month].krw += item.amountKrw;
-    if(item.source==='overseas') groups[month].overseasKrw += item.amountKrw;
-    else groups[month].domesticKrw += item.amountKrw;
   });
-  monthCostGroupsCache = groups;
+  // detail 패널이 참조하는 캐시. 월끼리 겹치지 않게 source 접두어를 붙여둔다.
+  Object.entries(groups).forEach(([m,g])=>{ monthCostGroupsCache[source+':'+m] = g; });
   const months = Object.keys(groups).sort();
   const todayMonth = isoDate(new Date()).slice(0,7);
-  const listEl = document.getElementById('monthCostList');
-  const emptyEl = document.getElementById('monthCostEmpty');
+  const listEl = document.getElementById(listElId);
+  const emptyEl = document.getElementById(emptyElId);
   if(months.length===0){
     listEl.innerHTML = '';
     emptyEl.style.display = 'block';
@@ -2695,14 +2713,11 @@ function renderMonthCost(){
           `).join('')}
         </div>`;
       }).join('');
-      return `<div class="mc-row" data-month="${m}">
+      return `<div class="mc-row" data-month="${source+':'+m}">
         <div class="mc-row-top">
           <div class="mc-month ${isPast?'past':''}">${y}년 ${parseInt(mm,10)}월${isPast?'<span class="mc-overdue">지남</span>':''}</div>
           <div class="mc-count">${g.items.length}건</div>
-          <div class="mc-breakdown">
-            <span>해외 ${fmtKrw(g.overseasKrw)}</span>
-            <span>국내 ${fmtKrw(g.domesticKrw)}</span>
-          </div>
+          <div class="mc-breakdown"><span>&nbsp;</span></div>
           <div class="mc-total">${fmtKrw(g.krw)}</div>
         </div>
         ${paidHtml}
@@ -2713,8 +2728,7 @@ function renderMonthCost(){
     });
   }
   const grandTotal = months.reduce((sum,m)=> sum+groups[m].krw, 0);
-  document.getElementById('monthCostGrandTotal').textContent = fmtKrw(grandTotal);
-  renderClosedUnpaid();
+  document.getElementById(grandElId).textContent = fmtKrw(grandTotal);
 }
 // ERP입력 완료 · 미지급 건 렌더
 function renderClosedUnpaid(){
@@ -2774,11 +2788,14 @@ function renderClosedUnpaid(){
     });
   });
 }
-function openMonthCostDetail(month){
-  const group = monthCostGroupsCache[month];
+function openMonthCostDetail(key){
+  const group = monthCostGroupsCache[key];
   if(!group) return;
+  // key: "overseas:YYYY-MM" 또는 "domestic:YYYY-MM"
+  const [source, month] = key.split(':');
   const [y, mm] = month.split('-');
-  document.getElementById('monthCostPanelTitle').textContent = `${y}년 ${parseInt(mm,10)}월 · ${group.items.length}건`;
+  const sourceLabel = source==='overseas' ? '해외' : '국내';
+  document.getElementById('monthCostPanelTitle').textContent = `${sourceLabel} · ${y}년 ${parseInt(mm,10)}월 · ${group.items.length}건`;
   const listEl = document.getElementById('monthCostPanelList');
   const sorted = [...group.items].sort((a,b)=>(a.dueDate||'').localeCompare(b.dueDate||''));
   listEl.innerHTML = sorted.map(it=>{
