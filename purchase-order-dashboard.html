@@ -1681,6 +1681,15 @@ function sharedStatusOf(p){
   if(p.piDate)                            return ['생산중','st-prod'];
   return ['발주준비','st-prep'];
 }
+// 국내발주: 통관/선적/CI 개념이 없어 상태 단계가 짧다.
+//   발주준비(요청만 있음) → 발주진행(선금 지급/예정, 또는 발주금액 확정) → 입고완료(입고일 있음) → 검수완료(품질검수일 있음)
+function sharedDomStatusOf(p){
+  if(p.qcDate)                                  return ['검수완료','st-in'];
+  if(p.warehouseDate)                           return ['입고완료','st-made'];
+  if(p.depositDate || p.depositDeferred || p.depositPlannedDate) return ['발주진행','st-ship'];
+  if(p.poAmount)                                return ['발주진행','st-ship'];
+  return ['발주준비','st-prep'];
+}
 function sharedDateCell(actual, planned){
   if(actual)  return '<b>'+sharedEsc(actual)+'</b>';
   if(planned) return '<span class="plan">'+sharedEsc(planned)+' 예정</span>';
@@ -1733,10 +1742,51 @@ function buildSharedProgressHtml(){
     const head = '<tr class="grp" data-sup="'+sharedEsc(sup)+'"><td colspan="10">'+sharedEsc(sup)+' <span class="grp-n">'+items.length+'건</span></td></tr>';
     return head + items.map(itemRow).join('');
   }).join('');
-  const chip = function(label,key,color){ return '<span class="sum-chip"><i style="background:'+color+'"></i>'+label+' <b>'+(counts[key]||0)+'</b></span>'; };
+
+  // ─── 국내발주 섹션 (컬럼 수가 다르므로 별도 표) ───────────────────────
+  const domRowsSrc = (typeof domesticPos !== 'undefined' ? domesticPos : []).slice().sort(function(a,b){
+    const da=a.dueDate||'9999', db=b.dueDate||'9999';
+    if(da!==db) return da.localeCompare(db);
+    return (a.itemName||'').localeCompare(b.itemName||'');
+  });
+  const domCounts = {'st-prep':0,'st-ship':0,'st-made':0,'st-in':0};
+  function domItemRow(p){
+    const st = sharedDomStatusOf(p); domCounts[st[1]] = (domCounts[st[1]]||0)+1;
+    const search = [p.itemName,p.itemCode,p.supplier].join(' ').toLowerCase();
+    const badges = (p.isFirstBatch?'<span class="tg tg-first">초도</span>':'')
+                 + (p.isSample?'<span class="tg tg-sample">샘플</span>':'')
+                 + (p.isUrgent?'<span class="tg tg-urgent">긴급</span>':'');
+    const qtyDisp = (p.actualQty && parseFloat(p.actualQty)!==parseFloat(p.qty))
+        ? ('<span class="qty-old">'+fmtQty(p.qty)+'</span> → <b class="qty-new">'+fmtQty(p.actualQty)+'</b>')
+        : fmtQty(p.actualQty||p.qty);
+    return '<tr class="item" data-sup="'+sharedEsc(p.supplier||'(공급사 미지정)')+'" data-s="'+sharedEsc(search)+'">'
+      + '<td class="nm">'+sharedEsc(p.itemName||'-')+badges+'</td>'
+      + '<td class="mono">'+sharedEsc(p.itemCode||'-')+'</td>'
+      + '<td>'+sharedEsc(p.supplier||'-')+'</td>'
+      + '<td class="mono qty">'+qtyDisp+'</td>'
+      + '<td class="mono">'+sharedEsc(p.dueDate||'-')+'</td>'
+      + '<td><span class="st '+st[1]+'">'+st[0]+'</span></td>'
+      + '<td class="mono">'+sharedDateCell(p.warehouseDate, p.warehousePlanned)+'</td>'
+      + '</tr>';
+  }
+  const domGroups = {}; const domOrder = [];
+  domRowsSrc.forEach(function(p){ const k=p.supplier||'(공급사 미지정)'; if(!domGroups[k]){domGroups[k]=[];domOrder.push(k);} domGroups[k].push(p); });
+  domOrder.sort(function(a,b){ return a.localeCompare(b); });
+  const domRowsHtml = domOrder.map(function(sup){
+    const items = domGroups[sup].slice().sort(function(a,b){
+      const da=a.dueDate||'', db=b.dueDate||'';
+      if(da!==db) return db.localeCompare(da);
+      return (a.itemName||'').localeCompare(b.itemName||'');
+    });
+    const head = '<tr class="grp" data-sup="'+sharedEsc(sup)+'"><td colspan="7">'+sharedEsc(sup)+' <span class="grp-n">'+items.length+'건</span></td></tr>';
+    return head + items.map(domItemRow).join('');
+  }).join('');
+  const chip = function(label,key,color,cnts){ return '<span class="sum-chip"><i style="background:'+color+'"></i>'+label+' <b>'+((cnts||counts)[key]||0)+'</b></span>'; };
   const summary = chip('생산중','st-prod','#d97706')+chip('생산완료','st-made','#0d9488')
                 + chip('선적완료','st-ship','#0284c7')+chip('항구도착','st-port','#2563eb')
                 + chip('공장입고','st-in','#16a34a')+chip('발주준비','st-prep','#94a3b8');
+  const domSummary = chip('발주진행','st-ship','#0284c7',domCounts)+chip('입고완료','st-made','#0d9488',domCounts)
+                   + chip('검수완료','st-in','#16a34a',domCounts)+chip('발주준비','st-prep','#94a3b8',domCounts);
   const pad = function(n){ return String(n).padStart(2,'0'); };
   const stampStr = stamp.getFullYear()+'-'+pad(stamp.getMonth()+1)+'-'+pad(stamp.getDate())
                  + ' ' + pad(stamp.getHours())+':'+pad(stamp.getMinutes());
@@ -1778,28 +1828,49 @@ function buildSharedProgressHtml(){
     + '.doc-pi{background:#3b6ea5;}.doc-ci{background:#2f8f7a;}.doc-pl{background:#c77b2f;}'
     + '.empty{padding:60px 20px;text-align:center;color:#4c5a62;}'
     + '.foot{margin-top:16px;font-size:11.5px;color:#8a97a0;text-align:center;}'
+    + '.sec-title{font-size:14px;font-weight:800;color:#16233d;margin:26px 0 8px;letter-spacing:.3px;border-left:4px solid #3f7d8c;padding-left:10px;}'
+    + '.sec-title:first-of-type{margin-top:6px;}'
     + '@media print{.search{display:none;}.top{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}';
+  // 검색: 해외/국내 두 표 모두 필터. 각 표는 자체 tbody id·자체 그룹 헤더를 갖는다.
   const SCRIPT = '(function(){var q=document.getElementById("q");'
-    + 'var items=[].slice.call(document.querySelectorAll("#tb tr.item"));'
-    + 'var heads=[].slice.call(document.querySelectorAll("#tb tr.grp"));'
-    + 'function apply(){var v=(q.value||"").toLowerCase().trim();var n=0;var vis={};'
-    + 'items.forEach(function(r){var m=!v||r.getAttribute("data-s").indexOf(v)>=0;r.style.display=m?"":"none";if(m){n++;vis[r.getAttribute("data-sup")]=true;}});'
-    + 'heads.forEach(function(h){h.style.display=(!v||vis[h.getAttribute("data-sup")])?"":"none";});'
-    + 'var c=document.getElementById("cnt");if(c)c.textContent=n;}'
+    + 'function bind(tbId){'
+    +   'var items=[].slice.call(document.querySelectorAll("#"+tbId+" tr.item"));'
+    +   'var heads=[].slice.call(document.querySelectorAll("#"+tbId+" tr.grp"));'
+    +   'return function(v){var n=0;var vis={};'
+    +     'items.forEach(function(r){var m=!v||r.getAttribute("data-s").indexOf(v)>=0;r.style.display=m?"":"none";if(m){n++;vis[r.getAttribute("data-sup")]=true;}});'
+    +     'heads.forEach(function(h){h.style.display=(!v||vis[h.getAttribute("data-sup")])?"":"none";});'
+    +     'return n;};'
+    + '}'
+    + 'var applyOverseas=bind("tb"), applyDomestic=bind("tbDom");'
+    + 'function apply(){var v=(q.value||"").toLowerCase().trim();'
+    +   'var n=applyOverseas(v)+applyDomestic(v);'
+    +   'var c=document.getElementById("cnt");if(c)c.textContent=n;}'
     + 'q.addEventListener("input",apply);apply();})();';
   return '<!DOCTYPE html>\n<html lang="ko"><head><meta charset="UTF-8">'
     + '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
     + '<title>발주 진행현황</title><style>'+CSS+'</style></head><body>'
     + '<div class="top"><h1>발주 진행현황</h1><div class="meta">공유용 · 생산/선적/통관 진행상태 · 기준시점 '+stampStr+'</div></div>'
     + '<div class="wrap">'
-    + '<div class="note">각 발주 건의 <b>진행 상태(생산중 → 생산완료 → 선적완료 → 항구도착 → 공장입고)</b>를 업체별로 표시합니다. 날짜는 실제 완료일이며, 아직 진행 전인 항목은 <span class="plan">예정일</span>로 표시됩니다. 금액·결제·첨부문서 등 내부 정보는 포함되지 않습니다.</div>'
-    + '<div class="bar"><div class="sum">'+summary+'</div>'
-    + '<input id="q" class="search" type="text" placeholder="품명 / 품목코드 / 공급사 검색" autocomplete="off"></div>'
-    + '<div class="tbl-wrap"><table><thead><tr>'
-    + '<th>품명</th><th>품목코드</th><th>공급사</th><th>수량</th><th>납기요청일</th><th>진행상태</th>'
-    + '<th>생산완료</th><th>선적</th><th>항구도착</th><th>공장입고</th>'
-    + '</tr></thead><tbody id="tb">'+rowsHtml+'</tbody></table></div>'+emptyHtml
-    + '<div class="foot">표시 <span id="cnt">'+rowsSrc.length+'</span>건 · 이 페이지는 공유 시점의 스냅샷입니다.</div>'
+    + '<div class="note">각 발주 건의 진행 상태를 업체별로 표시합니다. 날짜는 실제 완료일이며, 아직 진행 전인 항목은 <span class="plan">예정일</span>로 표시됩니다. 금액·결제·첨부문서 등 내부 정보는 포함되지 않습니다.</div>'
+    + '<div class="bar">'
+    + '<input id="q" class="search" type="text" placeholder="품명 / 품목코드 / 공급사 검색" autocomplete="off" style="margin-left:0;"></div>'
+    // ─── 해외 섹션 ───
+    + '<div class="sec-title">해외 발주 · 생산 → 선적 → 통관 → 공장입고</div>'
+    + '<div class="bar"><div class="sum">'+summary+'</div></div>'
+    + (rowsSrc.length ? '<div class="tbl-wrap"><table><thead><tr>'
+        + '<th>품명</th><th>품목코드</th><th>공급사</th><th>수량</th><th>납기요청일</th><th>진행상태</th>'
+        + '<th>생산완료</th><th>선적</th><th>항구도착</th><th>공장입고</th>'
+        + '</tr></thead><tbody id="tb">'+rowsHtml+'</tbody></table></div>'
+      : '<div class="empty">해외 발주 건이 없습니다.</div><tbody id="tb"></tbody>')
+    // ─── 국내 섹션 ───
+    + '<div class="sec-title">국내 발주 · 발주 → 입고 → 검수</div>'
+    + '<div class="bar"><div class="sum">'+domSummary+'</div></div>'
+    + (domRowsSrc.length ? '<div class="tbl-wrap"><table><thead><tr>'
+        + '<th>품명</th><th>품목코드</th><th>공급사</th><th>수량</th><th>납기요청일</th><th>진행상태</th>'
+        + '<th>입고일</th>'
+        + '</tr></thead><tbody id="tbDom">'+domRowsHtml+'</tbody></table></div>'
+      : '<div class="empty">국내 발주 건이 없습니다.</div><tbody id="tbDom"></tbody>')
+    + '<div class="foot">표시 <span id="cnt">'+(rowsSrc.length+domRowsSrc.length)+'</span>건 (해외 '+rowsSrc.length+' · 국내 '+domRowsSrc.length+') · 이 페이지는 공유 시점의 스냅샷입니다.</div>'
     + '</div><script>'+SCRIPT+'<\/script></body></html>';
 }
 function exportSharedView(){
