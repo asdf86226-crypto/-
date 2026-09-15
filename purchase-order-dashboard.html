@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>발주현황 대시보드</title>
+<!-- 결재 탭의 "엑셀 다운로드"에서만 사용. 인터넷이 연결돼 있을 때만 로드된다. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.20.3/xlsx.full.min.js" async></script>
 <style>
   :root{
     --navy:#16233d;
@@ -4298,6 +4300,7 @@ function renderApprList(){
     const table = buildApprItemTable(items, {selectable:false});
     liveSection = `
       <div class="appr-actions no-print" style="justify-content:flex-end;">
+        <button class="btn ghost" id="apprLiveXlsxBtn" title="공급사별로 시트를 나눠 xlsx로 저장 — 첨부한 발주양식 그대로">⬇ 엑셀 다운로드 (기안용)</button>
         <button class="btn brass" id="apprLivePrintBtn">🖨 인쇄/PDF</button>
       </div>
       <div class="appr-doc-title">구매 상세목록</div>
@@ -4336,6 +4339,7 @@ function renderApprList(){
 
   if(items.length>0){
     document.getElementById('apprLivePrintBtn').addEventListener('click', ()=> window.print());
+    document.getElementById('apprLiveXlsxBtn').addEventListener('click', ()=> exportApprovalXlsx(items));
   }
   el.querySelectorAll('.appr-batch-table tr[data-id]').forEach(tr=>{
     tr.addEventListener('click', ()=>{
@@ -4346,6 +4350,130 @@ function renderApprList(){
   });
 }
 
+// 결재 탭 → 공급사별 xlsx 생성. 첨부 발주양식 레이아웃 그대로.
+// 시트당 한 공급사(+ 통화). 통화가 섞이면 통화별로 시트를 나눈다.
+// 컬럼: 번호 | 이미지 | 품번 | 카테고리 | 발주량 | 단가 | 금액 | (합계행에서 합계 계산)
+async function exportApprovalXlsx(items){
+  if(!window.XLSX){
+    toast('엑셀 라이브러리 로드 중이거나 인터넷 연결이 필요합니다. 잠시 후 다시 시도하세요.');
+    return;
+  }
+  if(!items || items.length===0){ toast('내보낼 항목이 없습니다'); return; }
+  const XLSX = window.XLSX;
+  // 통화 라벨: USD/CNY→RMB/KRW → 시트 단위 표기
+  const unitOf = cur => cur==='CNY' ? 'RMB' : (cur==='KRW' ? 'KRW' : 'USD');
+  // 시트별 그룹: 공급사 + 통화 조합
+  const groups = {}; const order = [];
+  items.forEach(it=>{
+    const sup = (it.supplier || '공급사 미지정').trim();
+    const unit = unitOf(it.currency);
+    const key = sup + '||' + unit;
+    if(!groups[key]){ groups[key] = {sup, unit, items:[]}; order.push(key); }
+    groups[key].items.push(it);
+  });
+  // 시트명은 31자 이하 · 특수문자 금지
+  const sanitizeSheetName = (name)=>{
+    let s = String(name).replace(/[\\\/\?\*\[\]\:]/g, ' ').trim();
+    if(s.length > 28) s = s.slice(0,28) + '…';
+    return s || 'Sheet';
+  };
+  const usedNames = new Set();
+  const wb = XLSX.utils.book_new();
+  const today = isoDate(new Date());
+
+  order.forEach(key=>{
+    const g = groups[key];
+    let baseName = sanitizeSheetName(g.sup + '(' + g.unit + ')');
+    let name = baseName, k = 2;
+    while(usedNames.has(name)){ name = baseName.slice(0,28) + '(' + (k++) + ')'; }
+    usedNames.add(name);
+
+    // AoA 방식으로 셀 배치 (첨부 양식 좌표에 맞춘 배치)
+    // A는 여백. 실제 데이터는 B..H
+    const rows = [];
+    // Row 1: (빈 줄)
+    rows.push([]);
+    // Row 2: B "발주량" 제목  (첨부 양식 그대로)
+    rows.push([null, '발주량']);
+    // Row 3: H "단위 : X"
+    rows.push([null, null, null, null, null, null, null, '단위 : ' + g.unit]);
+    // Row 4: 헤더
+    rows.push([null, '번호','이미지','품번','카테고리','발주량','단가','금액']);
+    // Rows 5..N: item 데이터
+    g.items.forEach((it, idx)=>{
+      const qty = parseFloat(it.qty) || 0;
+      const amt = parseFloat(it.amount) || 0;      // 해외: piAmount, 국내: poAmount (poolToItems 참조)
+      const unit_price = qty>0 && amt>0 ? +(amt/qty).toFixed(4) : (it.currency==='KRW' ? amt : 0);
+      rows.push([null, idx+1, null, it.itemCode||'', it.itemName||'', qty, unit_price, null /* H는 수식 */]);
+    });
+    // 합계 행
+    const firstDataRow = 5;
+    const lastDataRow = 4 + g.items.length;
+    const totalRow = lastDataRow + 1;
+    rows.push([null, '합계', null, null, null, null, null, null]);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    // H열 금액 수식 + 합계 수식 (SheetJS는 셀 f 프로퍼티로 수식 지정)
+    for(let r=firstDataRow; r<=lastDataRow; r++){
+      ws['H'+r] = { t:'n', f:`F${r}*G${r}` };
+    }
+    ws['F'+totalRow] = { t:'n', f:`SUM(F${firstDataRow}:F${lastDataRow})` };
+    ws['H'+totalRow] = { t:'n', f:`SUM(H${firstDataRow}:H${lastDataRow})` };
+
+    // 셀 서식 (금액 · 수량 · 헤더 등)
+    const setFmt = (addr, fmt)=>{ if(ws[addr]){ ws[addr].z = fmt; } };
+    const setAlignBold = (addr, opts)=>{
+      if(!ws[addr]) ws[addr] = { t:'s', v:'' };
+      ws[addr].s = Object.assign({
+        alignment:{ horizontal:'center', vertical:'center' },
+        font:{ name:'맑은 고딕', sz:10 },
+      }, opts||{});
+    };
+    // 제목 · 단위 · 헤더 스타일
+    if(ws['B2']){ ws['B2'].s = { font:{ name:'맑은 고딕', sz:14, bold:true } }; }
+    if(ws['H3']){ ws['H3'].s = { font:{ name:'맑은 고딕', sz:10 }, alignment:{ horizontal:'right' } }; }
+    ['B4','C4','D4','E4','F4','G4','H4'].forEach(a=> setAlignBold(a, { font:{ name:'맑은 고딕', sz:11, bold:true }, fill:{ fgColor:{rgb:'FFEEEEEE'}, patternType:'solid' } }));
+    // 데이터 행: 수량 정수, 단가·금액 소수 둘째자리
+    for(let r=firstDataRow; r<=lastDataRow; r++){
+      setFmt('B'+r, '0');
+      setFmt('F'+r, '#,##0');
+      setFmt('G'+r, '#,##0.00');
+      setFmt('H'+r, '#,##0.00');
+    }
+    // 합계 행
+    if(ws['B'+totalRow]){ ws['B'+totalRow].s = { font:{name:'맑은 고딕', sz:11, bold:true}, alignment:{horizontal:'center', vertical:'center'}, fill:{fgColor:{rgb:'FFEEEEEE'}, patternType:'solid'} }; }
+    setFmt('F'+totalRow, '#,##0');
+    setFmt('H'+totalRow, '#,##0.00');
+
+    // 열 폭 (첨부 양식 참고)
+    ws['!cols'] = [
+      {wch:2},   // A: 여백
+      {wch:6.5}, // B: 번호
+      {wch:13},  // C: 이미지
+      {wch:14},  // D: 품번
+      {wch:24},  // E: 카테고리(품명)
+      {wch:12},  // F: 발주량
+      {wch:11},  // G: 단가
+      {wch:14},  // H: 금액
+    ];
+    // 행 높이 — 이미지 자리(데이터 행) 크게
+    ws['!rows'] = [];
+    ws['!rows'][1] = {hpt:21};   // Row 2: 제목
+    ws['!rows'][3] = {hpt:27.6}; // Row 4: 헤더
+    for(let r=firstDataRow-1; r<lastDataRow; r++){ ws['!rows'][r] = {hpt:48.6}; } // 데이터
+    ws['!rows'][totalRow-1] = {hpt:27.6}; // 합계
+    // 합계 라벨 병합: B..E
+    ws['!merges'] = [ { s:{r:totalRow-1, c:1}, e:{r:totalRow-1, c:4} } ];
+
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  });
+
+  const stamp = today.replace(/-/g,'');
+  const filename = `구매상세목록_기안용_${stamp}.xlsx`;
+  XLSX.writeFile(wb, filename);
+  toast(order.length + '개 시트로 엑셀을 내려받았습니다');
+}
 async function finalizeApprBatch(pool, items){
   if(!confirm(`선택한 ${items.length}건을 결재 기록으로 저장할까요? 저장 후에는 이 건들이 목록에서 빠지고, 체크 해제했던 건들은 그대로 남아있습니다.`)) return;
   const batch = {
