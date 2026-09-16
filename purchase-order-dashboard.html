@@ -225,45 +225,19 @@
   .cal-legend .li{display:flex; align-items:center; gap:5px;}
   .cal-legend .dot{width:9px; height:9px; border-radius:50%; flex-shrink:0;}
 
-  /* ---------- Calendar (simple: dot + count per day, click for list) ---------- */
-  .cal-toolbar{display:flex; align-items:center; gap:12px; margin-bottom:14px;}
-  .cal-month{font-family:var(--sans); font-weight:800; font-size:16px; color:var(--ink); min-width:120px; text-align:center;}
   .cal-hint{font-size:12px; color:var(--ink-soft); margin-bottom:14px; font-weight:600;}
-  .cal-wrap{border:1px solid var(--console-line); border-radius:10px; overflow:hidden; background:var(--paper-2);}
-  .cal-dow-row{display:grid; grid-template-columns:repeat(7,1fr); background:var(--navy);}
-  .cal-dow{color:#f3efe4; text-align:center; padding:8px 0; font-size:12px; font-weight:700;}
-  .cal-week{display:grid; grid-template-columns:repeat(7,1fr); border-top:1px solid var(--console-line);}
-  .cal-daycell{
-    border-right:1px solid var(--console-line); padding:8px; background:var(--paper-2); min-height:64px;
-    display:flex; flex-direction:column; align-items:center; gap:6px;
-  }
-  .cal-daycell:last-child{border-right:none;}
-  .cal-daycell.out{background:#f2f0ea;}
-  .cal-daycell.out .cal-daynum{color:#b7b2a3;}
-  .cal-daycell.today{outline:2px solid var(--console-accent); outline-offset:-2px; z-index:1;}
-  .cal-daynum{font-family:var(--sans); font-weight:700; font-size:13px; color:var(--ink-soft);}
-  .cal-daycell.today .cal-daynum{color:var(--console-accent);}
-  .cal-daycell.has-events{cursor:pointer;}
-  .cal-daycell.has-events:hover{background:#eef4f3;}
-  .cal-count-badge{
-    display:flex; align-items:center; gap:5px; background:var(--console-accent); color:#fff;
-    border-radius:20px; padding:3px 10px; font-size:12px; font-weight:700;
-  }
-  .cal-count-badge.overdue{background:var(--warn);}
-  .cal-count-badge .dot{width:6px; height:6px; border-radius:50%; background:#fff;}
-  #dayPanelList .day-item .ddays, #monthCostPanelList .day-item .ddays{font-size:11px; font-weight:800; padding:2px 8px; border-radius:20px; flex-shrink:0;}
-  #dayPanelList .day-item .ddays.overdue, #monthCostPanelList .day-item .ddays.overdue{background:#fbe4da; color:var(--warn);}
-  #dayPanelList .day-item .ddays.today, #monthCostPanelList .day-item .ddays.today{background:#dcebe7; color:var(--console-accent);}
-  #dayPanelList .day-item .ddays.upcoming, #monthCostPanelList .day-item .ddays.upcoming{background:#eef2f4; color:var(--ink-soft);}
-  #dayPanelList .day-item, #monthCostPanelList .day-item{
+  #monthCostPanelList .day-item .ddays{font-size:11px; font-weight:800; padding:2px 8px; border-radius:20px; flex-shrink:0;}
+  #monthCostPanelList .day-item .ddays.overdue{background:#fbe4da; color:var(--warn);}
+  #monthCostPanelList .day-item .ddays.today{background:#dcebe7; color:var(--console-accent);}
+  #monthCostPanelList .day-item .ddays.upcoming{background:#eef2f4; color:var(--ink-soft);}
+  #monthCostPanelList .day-item{
     display:flex; justify-content:space-between; align-items:center; gap:10px; padding:11px 12px;
     border:1px solid var(--line); border-radius:8px; margin-bottom:8px; cursor:pointer;
   }
-  #dayPanelList .day-item:hover, #monthCostPanelList .day-item:hover{background:#f7f9f8; border-color:var(--console-accent);}
-  #dayPanelList .day-item .info, #monthCostPanelList .day-item .info{display:flex; flex-direction:column; gap:2px;}
-  #dayPanelList .day-item .name, #monthCostPanelList .day-item .name{font-weight:700; font-size:13.5px; color:var(--ink);}
-  #dayPanelList .day-item .sub, #monthCostPanelList .day-item .sub{font-size:11.5px; color:var(--ink-soft);}
-  #dayPanelList .day-empty{padding:30px; text-align:center; color:var(--ink-soft); font-size:13px;}
+  #monthCostPanelList .day-item:hover{background:#f7f9f8; border-color:var(--console-accent);}
+  #monthCostPanelList .day-item .info{display:flex; flex-direction:column; gap:2px;}
+  #monthCostPanelList .day-item .name{font-weight:700; font-size:13.5px; color:var(--ink);}
+  #monthCostPanelList .day-item .sub{font-size:11.5px; color:var(--ink-soft);}
 
   /* ---------- Monthly Cost Forecast ---------- */
   .mc-grand-row{
@@ -591,7 +565,6 @@
     <div class="tab" data-view="domestic">국내발주건</div>
     <div class="tab" data-view="poc">발주서</div>
     <div class="tab" data-view="appr">결재</div>
-    <div class="tab" data-view="cal">캘린더</div>
     <div class="tab" data-view="monthcost">월별비용</div>
     <div class="tab" data-view="supp">거래처</div>
     <div class="tab" data-view="dhl">DHL계정</div>
@@ -775,35 +748,6 @@
   <div class="view" id="view-appr">
     <div class="view-header"><span class="vlabel">결재</span></div>
     <div id="apprContent"></div>
-  </div>
-
-  <!-- ===================== CALENDAR ===================== -->
-  <div class="view" id="view-cal">
-    <div class="view-header"><span class="vlabel">발주 캘린더</span></div>
-    <div class="cal-toolbar">
-      <button class="btn ghost" id="calPrev">‹ 이전달</button>
-      <div class="cal-month" id="calMonthLabel">2026년 7월</div>
-      <button class="btn ghost" id="calNext">다음달 ›</button>
-      <button class="btn ghost" id="calToday" style="margin-left:auto;">오늘</button>
-    </div>
-    <div class="cal-hint">각 발주의 납기요청일에 점과 건수가 표시됩니다. 날짜를 클릭하면 그날 목록을 볼 수 있어요. (종결된 건은 표시하지 않습니다)</div>
-    <div class="cal-wrap">
-      <div class="cal-dow-row" id="calDowRow"></div>
-      <div id="calWeeks"></div>
-    </div>
-  </div>
-
-  <!-- ===================== CALENDAR DAY DETAIL PANEL ===================== -->
-  <div class="overlay" id="dayOverlay">
-    <div class="panel" style="width:min(440px,94vw);">
-      <div class="panel-head">
-        <h2 id="dayPanelTitle">2026-07-22</h2>
-        <button class="panel-close" id="dayPanelClose">&times;</button>
-      </div>
-      <div class="panel-body">
-        <div id="dayPanelList"></div>
-      </div>
-    </div>
   </div>
 
   <!-- ===================== PI GROUP DETAIL PANEL ===================== -->
@@ -2202,7 +2146,6 @@ function render(){
   renderDashboard();
   renderPoTable();
   renderDomTable();
-  renderCalendar();
   renderMonthCost();
   renderSuppliers();
   renderSupplierSelect();
@@ -2541,9 +2484,6 @@ function renderSuppliers(){
   });
 }
 
-/* ---------------- Calendar (simple) ---------------- */
-let calState = (()=>{ const d = new Date(); return {year:d.getFullYear(), month:d.getMonth()}; })();
-
 function isoDate(d){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
@@ -2558,99 +2498,6 @@ function addBusinessDays(dateStr, days){
   }
   return isoDate(d);
 }
-// 캘린더에는 각 발주의 납기요청일 하나만 표시 (종결/ERP입력완료 건은 제외)
-function getActiveDueList(){
-  return pos.filter(po => computeStageIndex(po) !== 9 && po.dueDate);
-}
-
-function renderCalendar(){
-  const {year, month} = calState;
-  document.getElementById('calMonthLabel').textContent = `${year}년 ${month+1}월`;
-
-  const dow = ['일','월','화','수','목','금','토'];
-  document.getElementById('calDowRow').innerHTML = dow.map(d=>`<div class="cal-dow">${d}</div>`).join('');
-
-  // 6주 x 7일 실제 날짜 계산
-  const firstOfMonth = new Date(year, month, 1);
-  const gridStart = new Date(firstOfMonth);
-  gridStart.setDate(gridStart.getDate() - firstOfMonth.getDay());
-  const todayStr = isoDate(new Date());
-
-  const weeks = [];
-  let cursor = new Date(gridStart);
-  for(let w=0; w<6; w++){
-    const week = [];
-    for(let d=0; d<7; d++){
-      const dt = new Date(cursor);
-      week.push({dateStr: isoDate(dt), day: dt.getDate(), out: dt.getMonth()!==month});
-      cursor.setDate(cursor.getDate()+1);
-    }
-    weeks.push(week);
-  }
-
-  const dueList = getActiveDueList();
-  const weeksEl = document.getElementById('calWeeks');
-  weeksEl.innerHTML = '';
-
-  weeks.forEach(week=>{
-    const weekEl = document.createElement('div');
-    weekEl.className = 'cal-week';
-    week.forEach(c=>{
-      const count = dueList.filter(p => p.dueDate === c.dateStr).length;
-      const isOverdue = count>0 && c.dateStr < todayStr;
-      const cell = document.createElement('div');
-      cell.className = `cal-daycell ${c.out?'out':''} ${c.dateStr===todayStr?'today':''} ${count>0?'has-events':''}`;
-      cell.innerHTML = `<div class="cal-daynum">${c.day}</div>` +
-        (count>0 ? `<div class="cal-count-badge ${isOverdue?'overdue':''}"><span class="dot"></span>${count}건 · ${ddayLabel(c.dateStr).short}</div>` : '');
-      if(count>0){
-        cell.addEventListener('click', ()=> openDayPanel(c.dateStr));
-      }
-      weekEl.appendChild(cell);
-    });
-    weeksEl.appendChild(weekEl);
-  });
-}
-
-/* ---------------- Calendar day-detail panel ---------------- */
-const dayOverlay = document.getElementById('dayOverlay');
-function ddayLabel(dueDateStr){
-  const today = new Date(); today.setHours(0,0,0,0);
-  const due = new Date(dueDateStr + 'T00:00:00');
-  const diffDays = Math.round((today - due) / 86400000); // 오늘 - 납기일 (양수면 지남)
-  if(diffDays > 0) return {text:`+${diffDays}일 지남`, short:`+${diffDays}일`, cls:'overdue'};
-  if(diffDays === 0) return {text:'오늘 마감', short:'D-DAY', cls:'today'};
-  return {text:`D${diffDays}`, short:`D${diffDays}`, cls:'upcoming'}; // diffDays는 음수라 자동으로 D-N 형태
-}
-function openDayPanel(dateStr){
-  document.getElementById('dayPanelTitle').textContent = dateStr + ' 납기요청';
-  const dueList = getActiveDueList().filter(p => p.dueDate === dateStr);
-  const listEl = document.getElementById('dayPanelList');
-  if(dueList.length === 0){
-    listEl.innerHTML = `<div class="day-empty">이 날짜에 납기요청일인 발주가 없습니다.</div>`;
-  }else{
-    const dd = ddayLabel(dateStr);
-    listEl.innerHTML = dueList.map(p=>{
-      const stageIdx = computeStageIndex(p);
-      return `<div class="day-item" data-id="${p.id}">
-        <div class="info">
-          <span class="name">${p.itemName || '(품명 미입력)'}</span>
-          <span class="sub">${p.supplier||'-'} · 요청일 ${p.reqDate||'-'}</span>
-        </div>
-        <span class="ddays ${dd.cls}">${dd.text}</span>
-        <span class="badge" style="background:${STAGE_COLORS[stageIdx]}">${stageLabelText(p, stageIdx, false)}</span>
-      </div>`;
-    }).join('');
-    listEl.querySelectorAll('.day-item').forEach(el=>{
-      el.addEventListener('click', ()=>{
-        dayOverlay.classList.remove('active');
-        poPanelReturnToPiGroup = null;
-        openPoPanel(el.dataset.id);
-      });
-    });
-  }
-  dayOverlay.classList.add('active');
-}
-document.getElementById('dayPanelClose').addEventListener('click', ()=> dayOverlay.classList.remove('active'));
 
 /* ---------------- 월별 예상 비용 ---------------- */
 // 해외: CI금액이 있으면 CI금액, 없으면 PI금액을 환율로 환산. 국내: 실제입고금액이 있으면 그 금액, 없으면 발주금액(원화)
@@ -3058,19 +2905,6 @@ memoTextarea.addEventListener('input', ()=>{
   renderMemoPreview();
   clearTimeout(memoSaveTimer);
   memoSaveTimer = setTimeout(()=>{ saveMemoNote(); }, 400);
-});
-
-document.getElementById('calPrev').addEventListener('click', ()=>{
-  calState.month--; if(calState.month<0){ calState.month=11; calState.year--; }
-  renderCalendar();
-});
-document.getElementById('calNext').addEventListener('click', ()=>{
-  calState.month++; if(calState.month>11){ calState.month=0; calState.year++; }
-  renderCalendar();
-});
-document.getElementById('calToday').addEventListener('click', ()=>{
-  const d = new Date(); calState = {year:d.getFullYear(), month:d.getMonth()};
-  renderCalendar();
 });
 
 /* ---------------- PO Panel ---------------- */
