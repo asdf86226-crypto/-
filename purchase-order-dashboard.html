@@ -3776,11 +3776,11 @@ function renderPocResult(){
       </tr>`;
     }).join('');
     const footer = hasDom
-      ? `<tfoot><tr><td colspan="5" style="text-align:right; font-weight:700; background:#f7f9f8;">국내 총 매입가</td>
+      ? `<tfoot><tr><td colspan="5" style="text-align:right; font-weight:700; background:#f7f9f8;">국내 총 매입가 <span style="font-weight:600; color:var(--ink-soft); font-size:11px;">(부가세 별도)</span></td>
            <td style="text-align:right; font-weight:800; background:#f7f9f8; font-family:var(--sans); color:var(--console-accent);">${fmtKrw(domTotal)}</td>
            <td colspan="2" style="background:#f7f9f8;"></td></tr></tfoot>` : '';
     return `<div class="poc-group">
-      <div class="poc-group-head"><span>${supName}</span><span class="sub">${items.length}건${hasDom?' · 총 매입가 '+fmtKrw(domTotal):''}</span></div>
+      <div class="poc-group-head"><span>${supName}</span><span class="sub">${items.length}건${hasDom?' · 총 매입가 '+fmtKrw(domTotal)+' (부가세 별도)':''}</span></div>
       <table class="poc-table"><colgroup>${cols}</colgroup><thead>${head}</thead><tbody>${rows}</tbody>${footer}</table>
     </div>`;
   }).join('');
@@ -3822,12 +3822,12 @@ function renderPocResult(){
       </tr>`;
     }).join('');
     const footer = hasDom
-      ? `<tfoot><tr><td colspan="5" style="text-align:right; font-weight:700; background:#f7f9f8;">총 매입가</td>
+      ? `<tfoot><tr><td colspan="5" style="text-align:right; font-weight:700; background:#f7f9f8;">총 매입가 <span style="font-weight:600; font-size:11px;">(부가세 별도)</span></td>
            <td style="text-align:right; font-weight:800; background:#f7f9f8; font-family:var(--sans);">${fmtKrw(domTotal)}</td>
            <td colspan="2" style="background:#f7f9f8;"></td></tr></tfoot>` : '';
     // 헤더 문구: 국내는 한글 "수신: <업체>", 해외는 영문 "To: <업체>"
     const supHead = hasDom
-      ? `<span>수신 : ${supName === '공급사 미지정' ? '공급사 미지정' : supName} 귀하</span><span class="sub">${items.length}건${hasDom?' · 총 매입가 '+fmtKrw(domTotal):''}</span>`
+      ? `<span>수신 : ${supName === '공급사 미지정' ? '공급사 미지정' : supName} 귀하</span><span class="sub">${items.length}건${hasDom?' · 총 매입가 '+fmtKrw(domTotal)+' (부가세 별도)':''}</span>`
       : `<span>To : ${supName === '공급사 미지정' ? 'Supplier unassigned' : supName}</span><span class="sub">${items.length} item${items.length>1?'s':''}</span>`;
     return `<div class="poc-group">
       ${letterhead}
