@@ -3752,11 +3752,11 @@ function renderPocResult(){
     const hasDom = items.some(p=>p._isDom);
     const domTotal = hasDom ? items.filter(p=>p._isDom).reduce((s,p)=> s + domLineAmount(p), 0) : 0;
     const cols = hasDom
-      ? '<col style="width:9%"><col style="width:22%"><col style="width:11%"><col style="width:6%"><col style="width:11%"><col style="width:12%"><col style="width:11%"><col style="width:18%">'
-      : '<col style="width:11%"><col style="width:24%"><col style="width:13%"><col style="width:8%"><col style="width:13%"><col style="width:31%">';
+      ? '<col style="width:9%"><col style="width:11%"><col style="width:22%"><col style="width:6%"><col style="width:11%"><col style="width:12%"><col style="width:11%"><col style="width:18%">'
+      : '<col style="width:11%"><col style="width:13%"><col style="width:24%"><col style="width:8%"><col style="width:13%"><col style="width:31%">';
     const head = hasDom
-      ? '<tr><th>요청일</th><th>품명</th><th>품목코드</th><th>수량</th><th style="text-align:right;">단가(KRW)</th><th style="text-align:right;">매입가(KRW)</th><th>납기요청일</th><th>특이사항</th></tr>'
-      : '<tr><th>요청일</th><th>품명</th><th>품목코드</th><th>수량</th><th>납기요청일</th><th>특이사항</th></tr>';
+      ? '<tr><th>요청일</th><th>품목코드</th><th>품명</th><th>수량</th><th style="text-align:right;">단가(KRW)</th><th style="text-align:right;">매입가(KRW)</th><th>납기요청일</th><th>특이사항</th></tr>'
+      : '<tr><th>요청일</th><th>품목코드</th><th>품명</th><th>수량</th><th>납기요청일</th><th>특이사항</th></tr>';
     const rows = items.map(p=>{
       const badges = (p.isFirstBatch?'<span class="item-badge">초도</span>':'')+(p.isSample?'<span class="item-badge sample">샘플</span>':'')+(p.isUrgent?'<span class="item-badge urgent">긴급</span>':'');
       const priceCells = hasDom
@@ -3767,8 +3767,8 @@ function renderPocResult(){
         : '';
       return `<tr>
         <td>${todayStr}</td>
-        <td>${p.itemName||'-'}${badges}</td>
         <td>${p.itemCode||'-'}</td>
+        <td>${p.itemName||'-'}${badges}</td>
         <td>${fmtQty(p.qty)}</td>
         ${priceCells}
         <td>${p.dueDate||'-'}</td>
@@ -3795,11 +3795,11 @@ function renderPocResult(){
     const domTotal = hasDom ? items.filter(p=>p._isDom).reduce((s,p)=> s + domLineAmount(p), 0) : 0;
     const letterhead = pocLetterheadHtml(hasDom ? domKey : 'flowtech_en', todayStr);
     const cols = hasDom
-      ? '<col style="width:9%"><col style="width:22%"><col style="width:11%"><col style="width:6%"><col style="width:11%"><col style="width:12%"><col style="width:11%"><col style="width:18%">'
-      : '<col style="width:11%"><col style="width:24%"><col style="width:13%"><col style="width:8%"><col style="width:13%"><col style="width:31%">';
+      ? '<col style="width:9%"><col style="width:11%"><col style="width:22%"><col style="width:6%"><col style="width:11%"><col style="width:12%"><col style="width:11%"><col style="width:18%">'
+      : '<col style="width:11%"><col style="width:13%"><col style="width:24%"><col style="width:8%"><col style="width:13%"><col style="width:31%">';
     const head = hasDom
-      ? '<tr><th>요청일</th><th>품명</th><th>품목코드</th><th>수량</th><th style="text-align:right;">단가(KRW)</th><th style="text-align:right;">매입가(KRW)</th><th>납기요청일</th><th>비고</th></tr>'
-      : '<tr><th>Date</th><th>Item Name</th><th>Item Code</th><th>Qty</th><th>Requested Delivery</th><th>Remarks</th></tr>';
+      ? '<tr><th>요청일</th><th>품목코드</th><th>품명</th><th>수량</th><th style="text-align:right;">단가(KRW)</th><th style="text-align:right;">매입가(KRW)</th><th>납기요청일</th><th>비고</th></tr>'
+      : '<tr><th>Date</th><th>Item Code</th><th>Item Name</th><th>Qty</th><th>Requested Delivery</th><th>Remarks</th></tr>';
     const rows = items.map(p=>{
       // 국내 그룹은 한글, 해외 그룹은 영문 배지
       const badges = hasDom
@@ -3813,8 +3813,8 @@ function renderPocResult(){
         : '';
       return `<tr>
         <td>${todayStr}</td>
-        <td>${p.itemName||'-'}${badges}</td>
         <td>${p.itemCode||'-'}</td>
+        <td>${p.itemName||'-'}${badges}</td>
         <td>${fmtQty(p.qty)}</td>
         ${priceCells}
         <td>${p.dueDate||'-'}</td>
