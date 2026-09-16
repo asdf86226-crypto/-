@@ -829,10 +829,17 @@
   <div class="view" id="view-supp">
     <div class="view-header"><span class="vlabel">거래처 마스터</span></div>
     <div class="toolbar">
-      <div style="font-size:13px;color:var(--ink-soft); font-weight:600;">해외 제조사 담당자 · 결제조건 · 특이사항 (카드를 클릭하면 수정할 수 있어요)</div>
+      <div style="font-size:13px;color:var(--ink-soft); font-weight:600;">담당자 · 결제조건 · 특이사항 (카드를 클릭하면 수정할 수 있어요)</div>
       <button class="btn brass" id="btnNewSupp">+ 거래처 추가</button>
     </div>
-    <div class="supp-grid" id="suppGrid"></div>
+
+    <div class="view-header" style="margin-top:8px;"><span class="vlabel">해외 거래처 <span id="suppOverseasCount" style="font-weight:600; color:var(--ink-soft); font-size:12px; margin-left:6px;">(0)</span></span></div>
+    <div class="supp-grid" id="suppGridOverseas"></div>
+    <div class="empty-state" id="suppEmptyOverseas" style="display:none;">등록된 해외 거래처가 없습니다.</div>
+
+    <div class="view-header" style="margin-top:24px;"><span class="vlabel">국내 거래처 <span id="suppDomesticCount" style="font-weight:600; color:var(--ink-soft); font-size:12px; margin-left:6px;">(0)</span></span></div>
+    <div class="supp-grid" id="suppGridDomestic"></div>
+    <div class="empty-state" id="suppEmptyDomestic" style="display:none;">등록된 국내 거래처가 없습니다.</div>
   </div>
 
   <!-- ===================== DHL ACCOUNT ===================== -->
@@ -2468,8 +2475,11 @@ function renderDomSupplierSelect(){
 }
 
 function renderSuppliers(){
-  const grid = document.getElementById('suppGrid');
-  grid.innerHTML = suppliers.map(s=>`
+  // 기존 데이터(type 미지정)는 해외로 취급 — 새 국내발주 도입 전에 만들어진 카드가 그렇다.
+  const overseas = suppliers.filter(s => s.type !== 'domestic');
+  const domestic = suppliers.filter(s => s.type === 'domestic');
+
+  const cardHtml = s => `
     <div class="supp-card" data-id="${s.id}" style="cursor:pointer;">
       <h3>${s.name} <span class="item-badge" style="background:${s.type==='domestic'?'#2563eb':'#0d9488'};">${s.type==='domestic'?'국내':'해외'}</span> <span style="font-size:11px; color:var(--console-accent); font-weight:600;">✎ 수정</span></h3>
       <div class="loc">${s.location||''}</div>
@@ -2478,9 +2488,22 @@ function renderSuppliers(){
       <div class="row"><b>결제</b>${s.payMethod||'-'} ${s.payTerms? '/ '+s.payTerms:''}</div>
       ${s.note? `<div class="note">${s.note}</div>` : ''}
     </div>
-  `).join('');
-  grid.querySelectorAll('.supp-card').forEach(card=>{
-    card.addEventListener('click', ()=> openSuppPanel(card.dataset.id));
+  `;
+
+  const gridOv = document.getElementById('suppGridOverseas');
+  const gridDom = document.getElementById('suppGridDomestic');
+  gridOv.innerHTML = overseas.map(cardHtml).join('');
+  gridDom.innerHTML = domestic.map(cardHtml).join('');
+
+  document.getElementById('suppOverseasCount').textContent = `(${overseas.length})`;
+  document.getElementById('suppDomesticCount').textContent = `(${domestic.length})`;
+  document.getElementById('suppEmptyOverseas').style.display = overseas.length ? 'none' : '';
+  document.getElementById('suppEmptyDomestic').style.display = domestic.length ? 'none' : '';
+
+  [gridOv, gridDom].forEach(grid => {
+    grid.querySelectorAll('.supp-card').forEach(card=>{
+      card.addEventListener('click', ()=> openSuppPanel(card.dataset.id));
+    });
   });
 }
 
