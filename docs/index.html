@@ -82,6 +82,14 @@
     width:34px; height:34px; border-radius:7px; display:grid; place-items:center; font-size:15px;
   }
   .icon-btn:hover{background:rgba(255,255,255,.12); color:#fff}
+  .sync-btn{
+    display:inline-flex; align-items:center; gap:6px; height:34px; padding:0 13px; border-radius:7px;
+    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.18); color:#cfe0e4;
+    font-weight:700; font-size:12.5px; white-space:nowrap;
+  }
+  .sync-btn:hover{background:rgba(255,255,255,.14); color:#fff}
+  .sync-btn:disabled{opacity:.55; cursor:default}
+  .stamp .sync-at{color:var(--faint); font-weight:600; margin-left:8px}
 
   /* ---------- 현황판(콘솔) ---------- */
   .console{
@@ -397,7 +405,7 @@
     </div>
     <button class="guide-btn" id="guideBtn" title="사용설명서 열기">📖 사용설명서</button>
     <button class="conn local" id="connBtn" title="공유 연결 설정"><span class="dot"></span><span id="connLabel">로컬 저장</span></button>
-    <button class="icon-btn" id="refreshBtn" title="새로고침" style="display:none">⟳</button>
+    <button class="sync-btn" id="refreshBtn" title="구글 시트에서 최신 내용을 다시 불러옵니다" style="display:none">⟳ 새로고침</button>
     <button class="icon-btn" id="themeBtn" title="테마 전환">◑</button>
   </div>
 </header>
@@ -612,7 +620,7 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
       </div>
 
       <h3><span class="n">4</span>올린 뒤 확인하기</h3>
-      <p>오른쪽 목록에 <b>모든 팀의 요청이 함께</b> 표시됩니다. 다른 사람이 올린 내용도 10초 안팎이면 자동으로 나타납니다.</p>
+      <p>오른쪽 목록에 <b>모든 팀의 요청이 함께</b> 표시됩니다. 내가 올린 건 바로 나타나고, <b>다른 사람이 올린 내용을 보려면 오른쪽 위 <code>⟳ 새로고침</code></b>을 눌러주세요. 현황판 오른쪽에 <b>몇 시 기준</b>인지 표시됩니다.</p>
       <p>• <b>내 팀만 보기</b> — 목록 위 팀 이름(개발·자재·생산·품질)을 누르면 그 팀만 걸러 봅니다. <b>전체</b>를 누르면 다시 모두 보입니다.<br>
          • <b>찾기·정렬</b> — 검색창에 품목코드나 품명을 넣으면 바로 찾고, 표 제목을 누르면 그 기준으로 정렬됩니다.<br>
          • <b>엑셀로 받기</b> — 목록 아래 <b>⬇ CSV 내보내기</b>를 누르면 지금 보이는 목록을 파일로 받습니다.</p>
@@ -643,7 +651,7 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
       <details><summary>같은 품목을 또 올렸어요.</summary>
         <div class="ans">중복된 줄 하나를 <code>✕</code>로 지워주세요. 그대로 두면 담당자가 두 건으로 볼 수 있습니다.</div></details>
       <details><summary>올렸는데 목록에 안 보여요.</summary>
-        <div class="ans">잠시 뒤 자동으로 나타납니다. 그래도 안 보이면 오른쪽 위 <b>새로고침(⟳)</b>을 눌러보세요.
+        <div class="ans">내가 올린 건 바로 보입니다. 안 보이면 오른쪽 위 <b>⟳ 새로고침</b>을 눌러주세요.
           그래도 없다면 연결 표시가 <b>초록색</b>인지 확인하고, 회색이면 담당자에게 알려주세요.</div></details>
       <details><summary>수량을 아직 확정 못 했어요.</summary>
         <div class="ans">예상 수량을 적고 <b>기타사항에 “수량 확정 전”</b>이라고 남겨주세요. 확정되면 지우고 다시 올리시면 됩니다.</div></details>
@@ -1047,7 +1055,11 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     const st=$("#stampDate");
     if(st){
       const d=new Date(), w="일월화수목금토"[d.getDay()];
-      st.textContent=`${d.getFullYear()}. ${String(d.getMonth()+1).padStart(2,"0")}. ${String(d.getDate()).padStart(2,"0")}. (${w})`;
+      const ymd=`${d.getFullYear()}. ${String(d.getMonth()+1).padStart(2,"0")}. ${String(d.getDate()).padStart(2,"0")}. (${w})`;
+      const sync = (store && store.mode==="sheet" && lastSyncAt)
+        ? `<span class="sync-at">· ${String(lastSyncAt.getHours()).padStart(2,"0")}:${String(lastSyncAt.getMinutes()).padStart(2,"0")} 기준</span>`
+        : "";
+      st.innerHTML = ymd + sync;
     }
   }
 
@@ -1122,7 +1134,7 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     // 입력/표는 두 모드 모두 동일하게 동작(연결 시 저장 위치만 공유 시트로 바뀜)
     $("#connBtn").classList.toggle("cloud", isConnected());
   }
-  let syncing=false, failStreak=0;
+  let syncing=false, failStreak=0, lastSyncAt=null;
   // opts.quiet: 자동 동기화처럼 사용자가 시킨 게 아닌 경우 실패를 조용히 넘김
   async function refresh(opts){
     const quiet = opts && opts.quiet;
@@ -1130,7 +1142,7 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     syncing=true;
     try{
       data = await store.list();
-      failStreak=0; setConn(store.mode);
+      failStreak=0; lastSyncAt=new Date(); setConn(store.mode);
     }catch(e){
       failStreak++;
       // 한두 번 늦는 건 흔한 일이라, 연속 실패일 때만 오류로 표시하고
@@ -1142,10 +1154,8 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     }finally{ syncing=false; }
     renderAll();
   }
-  function startPoll(){
-    stopPoll();
-    if(store.mode==="sheet") pollTimer=setInterval(()=>{ if(!document.hidden) refresh({quiet:true}); }, 20000);
-  }
+  // 자동 주기 동기화는 쓰지 않는다.
+  // (요청 추가/삭제 직후와 새로고침 버튼을 눌렀을 때만 불러온다)
   function stopPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
 
   /* ---------- 항목 추가 ---------- */
@@ -1294,7 +1304,19 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
   $("#bannerSetup").onclick=openModal;
   $("#modalClose").onclick=closeModal;
   $("#modalBg").addEventListener("click",e=>{ if(e.target===$("#modalBg")) closeModal(); });
-  $("#refreshBtn").onclick=()=>refresh();
+  $("#refreshBtn").onclick=async ()=>{
+    const b=$("#refreshBtn"); const label=b.textContent;
+    b.disabled=true; b.textContent="⟳ 불러오는 중…";
+    const before=data.length;
+    await refresh();
+    b.disabled=false; b.textContent=label;
+    if(store.mode==="sheet" && failStreak===0){
+      const diff=data.length-before;
+      toast(diff>0 ? `최신 내용을 불러왔습니다 (새 요청 ${diff}건)`
+          : diff<0 ? "최신 내용을 불러왔습니다"
+          : "최신 상태입니다");
+    }
+  };
 
   $("#copyCode").onclick=()=>{
     const t=$("#codeBox").textContent.replace(/^\s*복사\s*/,"");
@@ -1322,7 +1344,7 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     try{ await testExec(exec); }catch(e){ o.className="test-out bad"; o.textContent="✕ "+e.message; return; }
     saveCfg({exec}); applyCfg(); toast("구글 시트에 연결되었습니다");
     $("#disconnectRow").style.display="flex"; $("#shareRow").style.display="flex"; showKakao();
-    await refresh(); startPoll();
+    await refresh();
     const oo=$("#testOut"); oo.className="test-out ok"; oo.textContent="✓ 연결 완료! 이제 팀원에게 공유 링크를 보내세요.";
   };
   $("#copyRedirect").onclick=()=>{
@@ -1354,7 +1376,6 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     saveCfg(null); applyCfg(); stopPoll(); closeModal(); toast("로컬 모드로 전환했습니다");
     await refresh();
   };
-  document.addEventListener("visibilitychange",()=>{ if(!document.hidden && store && store.mode==="sheet") refresh({quiet:true}); });
 
   /* ---------- 초기값 ---------- */
   function readHashCfg(){
@@ -1376,7 +1397,7 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
   if(hashCfg){ saveCfg(hashCfg); history.replaceState(null,"",location.pathname+location.search); }
   else if(!loadCfg() && builtinCfg){ saveCfg(builtinCfg); }
   applyCfg();
-  refresh({quiet:true}); startPoll();
+  refresh({quiet:true});
 })();
 </script>
 </body>
