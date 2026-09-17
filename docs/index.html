@@ -835,7 +835,11 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
       const s=document.createElement("script");
       // 구글 스크립트는 실행을 순차 처리해서, 등록·알림 발송 중이면 조회가 뒤로 밀린다.
       // 넉넉히 기다린 뒤에만 실패로 본다.
-      const timer=setTimeout(()=>{ cleanup(); reject(new Error("응답 시간 초과 — URL/배포 권한을 확인하세요")); }, 30000);
+      // 구글이 우리 형식이 아닌 응답(로그인/권한/오류 페이지 HTML)을 주면
+      // 스크립트가 실행되지 않아 콜백이 오지 않는다 → 시간 초과로 나타난다.
+      const timer=setTimeout(()=>{ cleanup(); reject(new Error(
+        "불러오기 실패 — 웹 앱 주소가 맞는지, 배포 액세스가 '모든 사용자'인지 확인하세요 (이 배지를 눌러 주소 변경)"
+      )); }, 30000);
       function cleanup(){ try{delete window[cb];}catch(e){window[cb]=undefined;} s.remove(); clearTimeout(timer); }
       window[cb]=d=>{ cleanup(); resolve(d); };
       s.onerror=()=>{ cleanup(); reject(new Error("불러오기 실패 — 웹앱 URL과 '모든 사용자' 액세스 설정을 확인하세요")); };
