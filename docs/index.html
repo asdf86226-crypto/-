@@ -229,6 +229,10 @@
   thead th.sorted .arw{opacity:1; color:var(--accent)}
   tbody td{padding:11px 14px; border-bottom:1px solid var(--border); vertical-align:middle}
   tbody tr:hover{background:var(--surface-2)}
+  tbody tr.pending{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+  .saving{display:inline-block; margin-left:6px; font-size:10px; font-weight:700; padding:1px 5px;
+    border-radius:4px; background:var(--accent-soft); color:var(--accent);
+    border:1px solid color-mix(in srgb,var(--accent) 30%,transparent); vertical-align:middle}
   td.code{font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:var(--muted)}
   td.name{font-weight:600}
   td .memo{color:var(--muted); font-size:12px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block}
@@ -1098,8 +1102,8 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     document.querySelector("#table").style.display = data.length ? "":"none";
 
     tb.innerHTML=rows.map(d=>{
-      return `<tr>
-        <td class="num" style="color:var(--muted);white-space:nowrap">${fmtDate(d.createdAt)}</td>
+      return `<tr${d._pending?' class="pending"':''}>
+        <td class="num" style="color:var(--muted);white-space:nowrap">${fmtDate(d.createdAt)}${d._pending?'<span class="saving">저장 중</span>':''}</td>
         <td><span class="chip team-chip" style="--tc:var(${TEAMVAR[d.team]||'--accent'})"><span class="dot" style="background:var(${TEAMVAR[d.team]||'--accent'})"></span>${esc(d.team)}</span></td>
         <td class="code">${esc(d.code)}</td>
         <td class="name">${esc(d.itemName)}${d.requester?`<span class="memo">요청: ${esc(d.requester)}</span>`:""}</td>
@@ -1107,7 +1111,7 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
         <td class="duedate"><span style="white-space:nowrap">${fmtDate(d.dueDate)}</span></td>
         <td><span class="memo" title="${esc(d.note)}">${esc(d.note)||"–"}</span></td>
         <td><div class="rowbtns">
-          <button class="del" data-act="del" data-id="${d.id}" title="삭제">✕</button>
+          ${d._pending?"":`<button class="del" data-act="del" data-id="${d.id}" title="삭제">✕</button>`}
         </div></td>
       </tr>`;
     }).join("");
@@ -1145,7 +1149,7 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     $("#refreshBtn").style.display = on ? "" : "none";
     $("#localBanner").style.display = on ? "none" : "";
   }
-  let syncing=false, failStreak=0, lastSyncAt=null;
+  let syncing=false, failStreak=0, lastSyncAt=null, reconcileTimer=null;
   // opts.quiet: 자동 동기화처럼 사용자가 시킨 게 아닌 경우 실패를 조용히 넘김
   async function refresh(opts){
     const quiet = opts && opts.quiet;
@@ -1178,7 +1182,20 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     }));
     if(!norm.length) return 0;
     try{ await store.add(norm); }catch(e){ toast("추가 실패: "+e.message); return 0; }
-    await refresh(); return norm.length;
+
+    if(store.mode==="sheet"){
+      // 구글 스크립트는 실행을 하나씩 처리한다. 등록 직후에는 카카오 알림 발송까지
+      // 처리하느라 바빠서, 곧바로 목록을 조회하면 실패하기 쉽다.
+      // 그래서 방금 넣은 내용을 화면에 먼저 보여주고, 잠시 뒤 조용히 서버와 맞춘다.
+      const stamp=todayISO(), t=Date.now();
+      norm.forEach((it,i)=>data.push({...it, id:"tmp_"+t+"_"+i, createdAt:stamp, _pending:true}));
+      renderAll();
+      clearTimeout(reconcileTimer);
+      reconcileTimer=setTimeout(()=>refresh({quiet:true}), 5000);
+    }else{
+      await refresh();
+    }
+    return norm.length;
   }
 
   /* ---------- 이벤트: 직접 입력 ---------- */
