@@ -875,7 +875,9 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     async remove(id){ await post_("remove",{id}); },
     async clear(){ await post_("clear",{}); }
   };
-  function applyCfg(){ store = isConnected() ? SheetStore : LocalStore; updateModeUI(); }
+  // 설정이 바뀌면 저장소를 교체하고, 배지·버튼·배너를 곧바로 그 모드에 맞춘다.
+  // (첫 조회가 끝나기 전에도 '로컬 저장'으로 잘못 보이지 않게)
+  function applyCfg(){ store = isConnected() ? SheetStore : LocalStore; setConn(store.mode); }
 
   async function testExec(url){
     if(!url) throw new Error("웹 앱 URL을 입력하세요");
@@ -1123,16 +1125,21 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
   function renderAll(){ renderStats(); renderTabs(); renderTable(); }
 
   /* ---------- 저장소 ↔ 화면 동기화 ---------- */
+  // 연결 배지의 색/문구만 담당한다.
   function setConn(state, msg){
     const b=$("#connBtn"), l=$("#connLabel");
     b.classList.remove("local","cloud","err"); b.title = msg || "공유 연결 설정";
-    if(state==="sheet"){ b.classList.add("cloud"); l.textContent="구글 시트 연결"; $("#localBanner").style.display="none"; $("#refreshBtn").style.display=""; }
-    else if(state==="err"){ b.classList.add("err"); l.textContent="연결 오류"; $("#refreshBtn").style.display=""; }
-    else { b.classList.add("local"); l.textContent="로컬 저장"; $("#localBanner").style.display=""; $("#refreshBtn").style.display="none"; }
+    if(state==="sheet"){ b.classList.add("cloud"); l.textContent="구글 시트 연결"; }
+    else if(state==="err"){ b.classList.add("err"); l.textContent="연결 오류"; }
+    else { b.classList.add("local"); l.textContent="로컬 저장"; }
+    updateModeUI();
   }
   function updateModeUI(){
-    // 입력/표는 두 모드 모두 동일하게 동작(연결 시 저장 위치만 공유 시트로 바뀜)
-    $("#connBtn").classList.toggle("cloud", isConnected());
+    // 새로고침 버튼과 안내 배너는 '조회 성공 여부'가 아니라 '연결 설정'을 따른다.
+    // (조회가 실패했을 때야말로 다시 시도할 버튼이 필요하므로 숨기면 안 됨)
+    const on = isConnected();
+    $("#refreshBtn").style.display = on ? "" : "none";
+    $("#localBanner").style.display = on ? "none" : "";
   }
   let syncing=false, failStreak=0, lastSyncAt=null;
   // opts.quiet: 자동 동기화처럼 사용자가 시킨 게 아닌 경우 실패를 조용히 넘김
