@@ -798,7 +798,7 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
      이 페이지 주소만 열어도 자동으로 연결됩니다.
      주소가 바뀌면(재배포로 URL이 새로 생기면) 이 줄만 고치면 됩니다.
      ──────────────────────────────────────────────────────────────── */
-  const BUILTIN_EXEC = "https://script.google.com/macros/s/AKfycbyj3El9auofAYnNNA1ZqDjwmtikeGiglSpLi5cYlIydfsgyI2BJAbeHNx74ldCmEgLPGA/exec";
+  const BUILTIN_EXEC = "https://script.google.com/macros/s/AKfycby9Gf_Vx_ZXtV1VllYnwKzDrgPwcgWuEGWzWr1PTGbwEQi2SiEB-E-6abvF4gU0e7qJgA/exec";
 
   const KEY="purchase_requests_v1";
   const CFGKEY="purchase_dashboard_share";
@@ -1353,7 +1353,7 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     const exec=$("#cfgExec").value.trim();
     const o=$("#testOut"); o.className="test-out"; o.textContent="연결 중…";
     try{ await testExec(exec); }catch(e){ o.className="test-out bad"; o.textContent="✕ "+e.message; return; }
-    saveCfg({exec}); applyCfg(); toast("구글 시트에 연결되었습니다");
+    saveCfg({exec, manual:true}); applyCfg(); toast("구글 시트에 연결되었습니다");
     $("#disconnectRow").style.display="flex"; $("#shareRow").style.display="flex"; showKakao();
     await refresh();
     const oo=$("#testOut"); oo.className="test-out ok"; oo.textContent="✓ 연결 완료! 이제 팀원에게 공유 링크를 보내세요.";
@@ -1404,9 +1404,21 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
   const hashCfg=readHashCfg();
   // 기본 연결 주소가 파일에 들어 있으면, 긴 공유링크 없이 짧은 주소만으로 바로 연결됨
   const builtinCfg = (typeof BUILTIN_EXEC==="string" && BUILTIN_EXEC.trim()) ? {exec:BUILTIN_EXEC.trim()} : null;
-  cfg = hashCfg || loadCfg() || builtinCfg;
-  if(hashCfg){ saveCfg(hashCfg); history.replaceState(null,"",location.pathname+location.search); }
-  else if(!loadCfg() && builtinCfg){ saveCfg(builtinCfg); }
+  const savedCfg = loadCfg();
+  // 우선순위: 공유링크(#exec) > 설정창에서 직접 넣은 주소 > 파일의 기본 주소 > 저장된 주소
+  // 재배포로 주소가 바뀌면 파일만 고쳐도 모두가 새 주소를 따라가도록, 직접 입력한 게
+  // 아닌 저장값은 파일의 기본 주소로 덮어쓴다(예전 주소가 브라우저에 남아 못 읽는 것 방지).
+  if(hashCfg){
+    cfg = hashCfg; saveCfg(hashCfg);
+    history.replaceState(null,"",location.pathname+location.search);
+  }else if(savedCfg && savedCfg.manual){
+    cfg = savedCfg;
+  }else if(builtinCfg){
+    cfg = builtinCfg;
+    if(!savedCfg || savedCfg.exec!==builtinCfg.exec) saveCfg(builtinCfg);
+  }else{
+    cfg = savedCfg;
+  }
   applyCfg();
   refresh({quiet:true});
 })();
