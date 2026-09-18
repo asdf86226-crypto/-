@@ -292,7 +292,7 @@
   .steps li{position:relative; padding-left:26px; margin-bottom:7px; counter-increment:s}
   .steps li::before{content:counter(s); position:absolute; left:0; top:0; width:18px; height:18px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:11px; font-weight:800; display:grid; place-items:center}
   .steps a{color:var(--accent)}
-  .sql{position:relative; background:var(--surface-2); border:1px solid var(--border); border-radius:9px; padding:11px 12px; font-family:ui-monospace,Menlo,monospace; font-size:11px; line-height:1.6; white-space:pre; overflow-x:auto; margin:0 0 16px; color:var(--ink)}
+  .sql{position:relative; background:var(--surface-2); border:1px solid var(--border); border-radius:9px; padding:11px 12px; font-family:ui-monospace,Menlo,monospace; font-size:11px; line-height:1.6; white-space:pre; overflow:auto; max-height:260px; margin:0 0 16px; color:var(--ink)}
   .sql button{position:absolute; top:8px; right:8px; border:1px solid var(--border); background:var(--surface); color:var(--muted); font-size:11px; padding:3px 8px; border-radius:6px; cursor:pointer}
   .stage{display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:var(--ink); margin:2px 0 9px}
   .stage .n{width:20px; height:20px; border-radius:50%; background:var(--accent); color:var(--accent-ink); font-size:11px; font-weight:800; display:grid; place-items:center; flex:none}
@@ -437,6 +437,27 @@
            font-variant-numeric:tabular-nums; max-height:190px; overflow:auto}
   .erp-log:empty{display:none}
   .erp-log b{color:var(--ink)}
+  .badge-rec{font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:99px;
+             background:var(--accent); color:var(--accent-ink); letter-spacing:.02em}
+  .erp-auto{border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-top:11px; background:var(--surface-2)}
+  .erp-auto .st{display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--ink)}
+  .erp-auto .st .dot{width:8px; height:8px; border-radius:50%; flex:none; background:var(--faint)}
+  .erp-auto.on .st .dot{background:var(--s-done)}
+  .erp-auto.off .st .dot{background:var(--s-new)}
+  .erp-auto .sub{font-size:11.5px; color:var(--muted); margin-top:5px; line-height:1.6}
+  .erp-auto .acts{display:flex; gap:8px; margin-top:11px; flex-wrap:wrap}
+  .erp-auto .acts .linkbtn{padding:6px 10px; font-size:12px; text-decoration:none}
+  .erp-auto pre{margin:9px 0 0; font-size:11px; color:var(--muted); line-height:1.65; white-space:pre-wrap;
+                max-height:120px; overflow:auto; font-family:inherit}
+  .erp-setup{border:1px solid var(--border); border-radius:8px; margin-top:9px; background:var(--surface)}
+  .erp-setup summary{cursor:pointer; padding:10px 14px; font-weight:700; font-size:12.5px; color:var(--ink);
+                     list-style:none; display:flex; gap:8px; align-items:center}
+  .erp-setup summary::-webkit-details-marker{display:none}
+  .erp-setup summary::before{content:"+"; font-family:ui-monospace,Menlo,monospace; color:var(--accent); font-weight:800}
+  .erp-setup[open] summary::before{content:"−"}
+  .erp-setup > *:not(summary){margin-left:14px; margin-right:14px}
+  .erp-setup > *:last-child{margin-bottom:14px}
+  .erp-sep{height:1px; background:var(--border); margin:20px 0 16px}
 
   /* 토스트 */
   #toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px); opacity:0;
@@ -501,13 +522,18 @@ function read_(){ const s=sh_(); const v=s.getDataRange().getValues(); const h=v
     if(c instanceof Date) c=Utilities.formatDate(c,Session.getScriptTimeZone(),'yyyy-MM-dd'); o[k]=c; }); return o; })
     .filter(o=&gt;o.id); }
 function json_(o){ return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
+function jsonp_(cb,o){ const s=JSON.stringify(o);
+  return cb ? ContentService.createTextOutput(cb+'('+s+')').setMimeType(ContentService.MimeType.JAVASCRIPT)
+            : ContentService.createTextOutput(s).setMimeType(ContentService.MimeType.JSON); }
 function html_(m){ return HtmlService.createHtmlOutput('&lt;meta charset="utf-8"&gt;&lt;p style="font:16px sans-serif;padding:24px;line-height:1.6"&gt;'+m+'&lt;/p&gt;'); }
 function doGet(e){ const p=e.parameter||{};
   if(p.code) return kakaoCb_(p.code);
   if(p.kakao_setup) return kakaoStart_(p.key);
-  const out={ok:true,rows:read_()};
-  if(p.callback) return ContentService.createTextOutput(p.callback+'('+JSON.stringify(out)+')').setMimeType(ContentService.MimeType.JAVASCRIPT);
-  return json_(out); }
+  if(p.erp==='meta') return jsonp_(p.callback,{ok:true,ver:P.getProperty('ERP_VER')||'',folder:erpFolderUrl_(),log:P.getProperty('ERP_LOG')||''});
+  if(p.erp==='data'){ const b=erpBlob_();
+    return p.callback ? ContentService.createTextOutput(p.callback+'({"ok":true,"erp":'+(b||'null')+'})').setMimeType(ContentService.MimeType.JAVASCRIPT)
+                      : ContentService.createTextOutput(b||'null').setMimeType(ContentService.MimeType.JSON); }
+  return jsonp_(p.callback,{ok:true,rows:read_()}); }
 function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_();
   const v=s.getDataRange().getValues(), h=v[0], idc=h.indexOf('id');
   if(b.action==='add'){ (b.items||[]).forEach(it=&gt;{ const id=Utilities.getUuid();
@@ -516,6 +542,7 @@ function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_()
     try{ notify_(b.items||[]); }catch(err){} }
   else if(b.action==='remove'){ for(let i=1;i&lt;v.length;i++){ if(v[i][idc]===b.id){ s.deleteRow(i+1); break; } } }
   else if(b.action==='clear'){ if(s.getLastRow()&gt;1) s.deleteRows(2,s.getLastRow()-1); }
+  else if(b.action==='erprun'){ ScriptApp.newTrigger('erpRefreshOnce').timeBased().after(5000).create(); }
   return json_({ok:true}); }
 // ===== 카카오톡 '나에게 보내기' 접수 알림 =====
 function kakaoStart_(key){ if(key) P.setProperty('KAKAO_KEY',key);
@@ -541,7 +568,162 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
   if(text.length&gt;190) text=text.substring(0,188)+'…';
   const tmpl={object_type:'text',text:text,link:{web_url:'https://kakao.com'}};
   UrlFetchApp.fetch('https://kapi.kakao.com/v2/api/talk/memo/default/send',{method:'post',muteHttpExceptions:true,
-    headers:{Authorization:'Bearer '+t.access_token},payload:{template_object:JSON.stringify(tmpl)}}); }</div>
+    headers:{Authorization:'Bearer '+t.access_token},payload:{template_object:JSON.stringify(tmpl)}}); }
+// ===== ERP 재고·판매 자동 갱신 (구글 드라이브 폴더 → 매일 새벽 자동 계산) =====
+const ERPSHEET='erp_blob', ERPCHUNK=40000;
+function ERP설정(){
+  let f=null; const id=P.getProperty('ERP_FOLDER');
+  if(id){ try{ f=DriveApp.getFolderById(id); }catch(e){} }
+  if(!f){ const it=DriveApp.getFoldersByName('구매요청 ERP 자료');
+    f = it.hasNext() ? it.next() : DriveApp.createFolder('구매요청 ERP 자료');
+    P.setProperty('ERP_FOLDER', f.getId()); }
+  ScriptApp.getProjectTriggers().forEach(t=&gt;{ if(t.getHandlerFunction().indexOf('erpRefresh')===0) ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('erpRefresh').timeBased().atHour(4).everyDays(1).create();
+  const m='[준비 끝] ERP 파일을 넣을 폴더 ↓\n'+f.getUrl()
+    +'\n\n이 폴더에 재고현황·판매현황·BOM 파일을 넣어두세요.\n매일 새벽 4시에 자동으로 다시 계산합니다.';
+  Logger.log(m); return m; }
+function erpFolderUrl_(){ const id=P.getProperty('ERP_FOLDER'); if(!id) return '';
+  try{ return DriveApp.getFolderById(id).getUrl(); }catch(e){ return ''; } }
+function erpRefreshOnce(){
+  ScriptApp.getProjectTriggers().forEach(t=&gt;{ if(t.getHandlerFunction()==='erpRefreshOnce') ScriptApp.deleteTrigger(t); });
+  erpRefresh(); }
+function erpRefresh(){
+  const id=P.getProperty('ERP_FOLDER'); if(!id) throw new Error('먼저 ERP설정 을 한 번 실행하세요');
+  const t0=Date.now(), D={stock:{},name:{},kind:{},bom:{},sales:{},months:{}}, log=[];
+  const it=DriveApp.getFolderById(id).getFiles();
+  while(it.hasNext()){ const f=it.next(), nm=f.getName();
+    if(nm.charAt(0)==='~') continue;
+    try{ log.push('· '+nm+' — '+erpFile_(f,D)); }catch(e){ log.push('· '+nm+' ⚠ '+e.message); } }
+  const out=erpCompute_(D); erpSave_(out);
+  const s='ERP 갱신 '+out.updatedAt+' · '+Math.round((Date.now()-t0)/1000)+'초 · 품목 '+out.n+'개 · 판매 '+out.months+'개월\n'+log.join('\n');
+  P.setProperty('ERP_LOG', s.substring(0,8000)); Logger.log(s); return s; }
+function erpRows_(f){
+  const nm=f.getName().toLowerCase();
+  if(/\.(csv|tsv|txt)$/.test(nm)) return Utilities.parseCsv(f.getBlob().getDataAsString('UTF-8').replace(/^﻿/,''));
+  if(!/\.xlsx$/.test(nm)) return null;
+  const r=UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/'+f.getId()+'/copy?supportsAllDrives=true',{
+    method:'post', contentType:'application/json', muteHttpExceptions:true,
+    headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},
+    payload:JSON.stringify({name:'~tmp '+f.getName(), mimeType:'application/vnd.google-apps.spreadsheet'})});
+  const o=JSON.parse(r.getContentText()||'{}');
+  if(!o.id) throw new Error('엑셀 변환 실패 '+r.getResponseCode());
+  try{ return SpreadsheetApp.openById(o.id).getSheets()[0].getDataRange().getDisplayValues(); }
+  finally{ try{ DriveApp.getFileById(o.id).setTrashed(true); }catch(e){} } }
+function erpNorm_(v){
+  if(v instanceof Date) return Utilities.formatDate(v,Session.getScriptTimeZone(),'yyyy-MM-dd');
+  let s=String(v==null?'':v).trim(); if(!s) return '';
+  if(s.charAt(0)==='"'||s.charAt(s.length-1)==='"') s=s.replace(/^"+|"+$/g,'').trim();
+  return s; }
+function erpHdr_(v){ return erpNorm_(v).replace(/\s+/g,''); }
+function erpNum_(v){
+  if(typeof v==='number') return v;
+  let s=erpNorm_(v), g=false;
+  if(s.charAt(0)==='('&amp;&amp;s.charAt(s.length-1)===')'){ g=true; s=s.substring(1,s.length-1); }
+  const n=parseFloat(s.replace(/,/g,'').replace(/[^0-9.\-]/g,''));
+  return isFinite(n) ? (g?-n:n) : 0; }
+function erpYM_(v){
+  if(v instanceof Date) return v.getFullYear()+'-'+('0'+(v.getMonth()+1)).slice(-2);
+  const s=erpNorm_(v), m=s.match(/(\d{4})\D{1,2}(\d{1,2})(?:\D|$)/);
+  if(m) return m[1]+'-'+('0'+m[2]).slice(-2);
+  const n=parseFloat(s);
+  if(n&gt;20000&amp;&amp;n&lt;80000){ const d=new Date(Date.UTC(1899,11,30)+Math.round(n)*86400000);
+    return d.getUTCFullYear()+'-'+('0'+(d.getUTCMonth()+1)).slice(-2); }
+  return ''; }
+function erpHead_(rows,keys){
+  const L=Math.min(rows.length,15);
+  for(let i=0;i&lt;L;i++){ const r=(rows[i]||[]).map(erpHdr_); let ok=true;
+    for(let k=0;k&lt;keys.length;k++) if(r.indexOf(keys[k])&lt;0){ ok=false; break; }
+    if(ok) return i; }
+  return -1; }
+function erpCols_(rows,hi){ const m={};
+  (rows[hi]||[]).forEach((c,i)=&gt;{ const k=erpHdr_(c); if(k&amp;&amp;m[k]==null) m[k]=i; }); return m; }
+function erpCol_(m,names){ for(let i=0;i&lt;names.length;i++) if(m[names[i]]!=null) return m[names[i]]; return null; }
+function erpFile_(f,D){
+  const rows=erpRows_(f); if(!rows||!rows.length) return '읽을 내용 없음';
+  let hi=erpHead_(rows,['생산품목코드','소모품목코드']); if(hi&gt;=0) return erpBom_(rows,hi,D);
+  hi=erpHead_(rows,['품목코드','재고수량']); if(hi&gt;=0) return erpStock_(rows,hi,D);
+  hi=erpHead_(rows,['품목코드','수량']); if(hi&gt;=0) return erpSales_(rows,hi,D);
+  return '형식을 알 수 없어 건너뜀'; }
+function erpBom_(rows,hi,D){
+  const m=erpCols_(rows,hi), cP=m['생산품목코드'], cC=m['소모품목코드'],
+        cPn=m['생산품목명'], cCn=m['소모품목명'], cM=erpCol_(m,['생산수량']), cU=erpCol_(m,['소요량']);
+  let n=0;
+  for(let i=hi+1;i&lt;rows.length;i++){ const r=rows[i]||[];
+    const p=erpNorm_(r[cP]), c=erpNorm_(r[cC]); if(!p||!c) continue;
+    const mk=erpNum_(r[cM])||1, us=erpNum_(r[cU]); if(!us) continue;
+    (D.bom[p]=D.bom[p]||[]).push([c, us/mk]);
+    const pn=cPn!=null?erpNorm_(r[cPn]):'', cn=cCn!=null?erpNorm_(r[cCn]):'';
+    if(pn&amp;&amp;!D.name[p]) D.name[p]=pn;
+    if(cn&amp;&amp;!D.name[c]) D.name[c]=cn;
+    n++; }
+  return 'BOM '+n+'건'; }
+function erpStock_(rows,hi,D){
+  const m=erpCols_(rows,hi), cC=m['품목코드'], cQ=m['재고수량'],
+        cN=erpCol_(m,['품명및규격','품목명[규격]','품목명','품명']), cK=erpCol_(m,['품목구분']);
+  let n=0;
+  for(let i=hi+1;i&lt;rows.length;i++){ const r=rows[i]||[]; const c=erpNorm_(r[cC]);
+    if(!c||c==='합계'||c==='합 계') continue;
+    D.stock[c]=(D.stock[c]||0)+erpNum_(r[cQ]);
+    const nm=cN!=null?erpNorm_(r[cN]):''; if(nm&amp;&amp;!D.name[c]) D.name[c]=nm;
+    const kd=cK!=null?erpNorm_(r[cK]):''; if(kd&amp;&amp;!D.kind[c]) D.kind[c]=kd;
+    n++; }
+  return '재고 '+n+'품목'+(cK==null?' (품목구분 열 없음)':''); }
+function erpSales_(rows,hi,D){
+  const m=erpCols_(rows,hi), cC=m['품목코드'], cQ=m['수량'],
+        cN=erpCol_(m,['품목명','품명']), cD=erpCol_(m,['일자','날짜']);
+  let n=0;
+  for(let i=hi+1;i&lt;rows.length;i++){ const r=rows[i]||[]; const c=erpNorm_(r[cC]);
+    if(!c||c==='합계'||c==='합 계') continue;
+    const q=erpNum_(r[cQ]); if(!q) continue;
+    D.sales[c]=(D.sales[c]||0)+q;
+    const nm=cN!=null?erpNorm_(r[cN]):''; if(nm&amp;&amp;!D.name[c]) D.name[c]=nm;
+    const ym=cD!=null?erpYM_(r[cD]):''; if(ym) D.months[ym]=1;
+    n++; }
+  return '판매 '+n+'건'; }
+function erpCompute_(D){
+  const months=Math.max(1, Object.keys(D.months).length);
+  const ds={}; for(const c in D.sales) ds[c]=D.sales[c]/months;
+  // 원재료·상품에서 멈춘다(원재료 BOM은 합금비가 아니라 모두 1로 들어와 있음)
+  const stop=c=&gt;{ const k=D.kind[c]; return k==='[원재료]'||k==='[상품]'; };
+  const db={}, ct={}, roots=[]; let budget=400000;
+  for(const c in D.sales) if(D.bom[c] &amp;&amp; !stop(c)) roots.push(c);
+  for(let i=0;i&lt;roots.length;i++){
+    const root=roots[i], out={}, seen={};
+    (function walk(code,qty,depth){
+      if(budget&lt;=0||depth&gt;12||seen[code]||stop(code)) return;
+      const kids=D.bom[code]; if(!kids) return;
+      seen[code]=1;
+      for(let j=0;j&lt;kids.length;j++){ if(--budget&lt;=0) break;
+        const ch=kids[j][0], q=qty*kids[j][1];
+        out[ch]=(out[ch]||0)+q; walk(ch,q,depth+1); }
+      delete seen[code];
+    })(root, D.sales[root], 0);
+    for(const c in out){ db[c]=(db[c]||0)+out[c]; (ct[c]=ct[c]||[]).push([root,out[c]]); } }
+  const codes={};
+  [D.stock,ds,db,D.name,D.kind].forEach(o=&gt;{ for(const c in o) codes[c]=1; });
+  const items={}; let n=0;
+  for(const c in codes){
+    const a=ds[c]||0, b=(db[c]||0)/months, d=a+b, it={n:D.name[c]||''};
+    if(D.stock[c]!=null) it.s=Math.round(D.stock[c]*100)/100;
+    if(D.kind[c]) it.k=D.kind[c];
+    if(d&gt;0){ it.d=Math.round(d*10)/10; it.ds=Math.round(a*10)/10; it.db=Math.round(b*10)/10; }
+    const l=ct[c];
+    if(l&amp;&amp;l.length){ l.sort((x,y)=&gt;y[1]-x[1]); it.t=l.slice(0,3).map(x=&gt;D.name[x[0]]||x[0]); }
+    items[c]=it; n++; }
+  return {updatedAt:Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy-MM-dd'), months:months, n:n, items:items}; }
+function erpSave_(o){
+  const ss=SpreadsheetApp.getActiveSpreadsheet();
+  let s=ss.getSheetByName(ERPSHEET); if(!s) s=ss.insertSheet(ERPSHEET);
+  s.clear();
+  const js=JSON.stringify(o), rows=[];
+  for(let i=0;i&lt;js.length;i+=ERPCHUNK) rows.push([js.substr(i,ERPCHUNK)]);
+  if(!rows.length) rows.push(['']);
+  s.getRange(1,1,rows.length,1).setNumberFormat('@').setValues(rows);
+  P.setProperty('ERP_VER', o.updatedAt+'|'+o.n+'|'+js.length); }
+function erpBlob_(){
+  const s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ERPSHEET);
+  if(!s||s.getLastRow()&lt;1) return '';
+  return s.getRange(1,1,s.getLastRow(),1).getValues().map(r=&gt;r[0]).join(''); }</div>
       <div class="stage"><span class="n">2</span>웹앱으로 배포</div>
       <ol class="steps">
         <li>우측 상단 <b>배포 → 새 배포</b> → 유형 <b>웹 앱</b></li>
@@ -685,7 +867,7 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
          둘 다 해당하면 <b>두 값을 더해</b> 보여줍니다.</p>
       <div class="g-note info">
         <span class="ic">i</span>
-        <span><b>이 정보는 구매 담당자가 월 1회 ERP에서 갱신합니다.</b> 화면 아래 <b>ERP 기준 날짜</b>를 확인하세요.
+        <span><b>이 정보는 매일 새벽 ERP 기준으로 자동 갱신됩니다.</b> 화면 아래 <b>ERP 기준 날짜</b>를 확인하세요.
           BOM이 아직 등록되지 않은 품목은 소요량이 비어 있을 수 있습니다 — 그대로 요청하셔도 됩니다.</span>
       </div>
 
@@ -718,7 +900,7 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
         <div class="ans">내가 올린 건 바로 보입니다. 안 보이면 오른쪽 위 <b>⟳ 새로고침</b>을 눌러주세요.
           그래도 없다면 연결 표시가 <b>초록색</b>인지 확인하고, 회색이면 담당자에게 알려주세요.</div></details>
       <details><summary>재고·판매량이 “–” 로 나오거나 아예 안 보여요.</summary>
-        <div class="ans">세 가지 경우입니다. ① <b>ERP 데이터가 아직 안 올라온 경우</b> — 구매 담당자가 갱신하면 보입니다.
+        <div class="ans">세 가지 경우입니다. ① <b>ERP 데이터가 아직 안 올라온 경우</b> — 다음 새벽 갱신 때 보입니다.
           ② <b>ERP에 없는 품목코드</b> — 코드를 다시 확인해 주세요. ③ <b>BOM이 등록되지 않은 자재</b> — 소요량을 계산할 수 없습니다.
           어느 경우든 <b>요청은 그대로 올리시면 됩니다.</b></div></details>
       <details><summary>재고가 “0 (확인필요)” 라고 나와요.</summary>
@@ -744,21 +926,45 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     <div class="mh">
       <div>
         <h2>ERP 데이터 불러오기</h2>
-        <p>ERP에서 내려받은 <b>재고현황 · 판매현황 · BOM</b> 파일을 한꺼번에 올리면 이 브라우저 안에서 바로 계산해
-        품목별 <b>재고 · 월평균 소요량 · 소진 예상</b>을 만들어 둡니다. 파일은 <b>어디에도 전송되지 않습니다.</b></p>
+        <p>ERP에서 내려받은 <b>재고현황 · 판매현황 · BOM</b> 파일로 품목별
+        <b>재고 · 월평균 소요량 · 소진 예상</b>을 계산합니다.
+        <b>A 자동 갱신</b>을 한 번 설정해 두면 그 뒤로는 폴더에 파일만 덮어쓰면 되고,
+        급할 때는 <b>B</b>로 지금 바로 계산할 수도 있습니다.</p>
       </div>
       <button class="x" id="erpClose">×</button>
     </div>
     <div class="mb">
-      <div class="stage"><span class="n">1</span>ERP에서 파일 내보내기</div>
-      <ol class="steps">
-        <li><b>재고현황</b> — <code>품목코드 · 품명 · 품목구분 · 재고수량</code> 열이 포함되도록 내보내기<br>
+      <div class="stage"><span class="n">A</span>자동 갱신 <span class="badge-rec">권장</span></div>
+      <p class="erp-hint">ERP 파일을 <b>구글 드라이브 폴더에 넣어두기만</b> 하면 됩니다.
+        매일 새벽 4시에 구글이 알아서 다시 계산해 <b>팀원 모두의 화면</b>에 반영합니다.</p>
+
+      <div class="erp-auto" id="erpAutoBox"></div>
+
+      <details class="erp-setup" id="erpSetup">
+        <summary>최초 1회 설정 방법 (약 2분)</summary>
+        <ol class="steps">
+          <li>구매요청이 저장되는 <b>구글 시트</b>를 열고 <b>확장 프로그램 → Apps Script</b><br>
+              기존 코드를 <b>모두 지우고</b> 아래 버튼으로 복사한 새 코드를 붙여넣은 뒤 <b>저장(💾)</b></li>
+          <li>편집기 위쪽 함수 목록에서 <code>ERP설정</code>을 고르고 <b>▷ 실행</b><br>
+              <span style="color:var(--faint)">권한 요청이 뜨면 본인 계정으로 승인(고급 → 이동). 아래 실행 로그에 <b>폴더 주소</b>가 나옵니다</span></li>
+          <li><b>배포 → 배포 관리 → ✏ 편집 → 버전: 새 버전 → 배포</b><br>
+              <span style="color:var(--faint)">주소는 그대로라 팀원에게 다시 공유하지 않아도 됩니다</span></li>
+          <li>로그에 나온 <b>구매요청 ERP 자료</b> 폴더에 ERP 파일을 넣기 — 끝!</li>
+        </ol>
+        <button class="btn ghost" id="erpCopyCode" style="margin-top:4px">📋 Apps Script 새 코드 복사</button>
+      </details>
+
+      <div class="erp-sep"></div>
+
+      <div class="stage"><span class="n">B</span>지금 바로 직접 올리기</div>
+      <p class="erp-hint">자동 갱신을 기다리지 않고 <b>이 자리에서 바로</b> 계산합니다.
+        결과는 <b>내 브라우저에만</b> 저장되고 팀원에게는 가지 않습니다.</p>
+      <ol class="steps" style="margin-top:10px">
+        <li><b>재고현황</b> — <code>품목코드 · 품명 · 품목구분 · 재고수량</code> 열 포함<br>
             <span style="color:var(--faint)">플로우텍·태성정밀 각각 따로 올려도 됩니다</span></li>
         <li><b>판매현황내역</b> — 최근 2년치(예: 25년 · 26년)</li>
         <li><b>BOM(소요량)현황</b> — 자재·반제품의 소요량을 역산하는 데 씁니다</li>
       </ol>
-
-      <div class="stage" style="margin-top:16px"><span class="n">2</span>파일 올리기 (여러 개 한꺼번에)</div>
       <label class="dropzone" id="erpZone" for="erpInput">
         <input type="file" id="erpInput" accept=".xlsx,.csv,.tsv,.txt" multiple hidden>
         <div class="dz-ic">🗂️</div>
@@ -769,15 +975,9 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
       <div class="erp-log" id="erpLog"></div>
       <div class="row-btns">
         <button class="btn" id="erpRun" disabled>분석 시작</button>
-        <button class="btn ghost" id="erpDownload" style="display:none">⬇ 팀 공유용 파일 저장</button>
+        <button class="btn ghost" id="erpDownload" style="display:none">⬇ 결과 파일 저장</button>
       </div>
       <button class="linkbtn danger" id="erpClear" style="margin-top:10px; display:none">불러온 ERP 데이터 지우기</button>
-
-      <p class="erp-hint" style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border)">
-        분석 결과는 <b>내 브라우저에만</b> 저장됩니다. 팀원 모두에게 같은 정보를 보이게 하려면
-        <b>팀 공유용 파일 저장</b>으로 받은 <code>erp-data.json</code> 을 담당자에게 전달해
-        대시보드와 같은 폴더에 올려두면 됩니다.
-      </p>
     </div>
   </div>
 </div>
@@ -1162,6 +1362,33 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
       const j=await r.json();
       return (j && j.items && typeof j.items==="object") ? j : null;
     }catch(e){ return null; }   // file:// 로 열었거나 파일이 없으면 무시
+  }
+
+  /* ---------- 자동 갱신: 구글 시트에 저장된 ERP 데이터 ---------- */
+  const ERPVERKEY="erp_dataset_ver";
+  let erpAuto=null;                                    // {ver, folder, log} — 웹앱이 알려준 상태
+  function erpVer(){ try{ return localStorage.getItem(ERPVERKEY)||""; }catch(e){ return ""; } }
+  // 페이지를 열 때마다 400KB를 받아오지 않도록, 먼저 버전만 물어보고 바뀐 경우에만 내려받는다
+  async function syncErpFromSheet(){
+    if(!isConnected()) return false;
+    let meta;
+    try{ meta=await jsonpGet(cfg.exec+"?erp=meta"); }catch(e){ return false; }
+    if(!meta || !meta.ok) return false;
+    erpAuto={ ver:meta.ver||"", folder:meta.folder||"", log:meta.log||"" };
+    if(!erpAuto.ver) return false;                     // 아직 자동 갱신을 설정하지 않음
+    if(erpAuto.ver===erpVer() && erp) return false;    // 이미 최신
+    let got;
+    try{ got=await jsonpGet(cfg.exec+"?erp=data"); }catch(e){ return false; }
+    if(!got || !got.erp || !got.erp.items) return false;
+    erp=got.erp;
+    if(saveErpLocal(erp)){ try{ localStorage.setItem(ERPVERKEY, erpAuto.ver); }catch(e){} }
+    return true;
+  }
+  async function requestErpRefresh(){
+    if(!isConnected()) throw new Error("먼저 구글 시트에 연결해야 합니다");
+    await fetch(cfg.exec,{ method:"POST", mode:"no-cors",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({action:"erprun"}) });
   }
 
   /* ---------- ERP 파일 읽기 ---------- */
@@ -1566,10 +1793,60 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     }
     renderErpList();
   }
+  function renderErpAuto(){
+    const box=$("#erpAutoBox"); if(!box) return;
+    if(!isConnected()){
+      box.className="erp-auto off";
+      box.innerHTML=`<div class="st"><span class="dot"></span>구글 시트 연결이 필요합니다</div>
+        <div class="sub">자동 갱신은 구글 시트에 연결된 상태에서만 동작합니다.
+          오른쪽 위 <b>연결 배지</b>를 눌러 먼저 시트에 연결해 주세요.</div>`;
+      return;
+    }
+    if(!erpAuto || !erpAuto.ver){
+      box.className="erp-auto off";
+      box.innerHTML=`<div class="st"><span class="dot"></span>아직 설정되지 않았습니다</div>
+        <div class="sub">아래 <b>최초 1회 설정 방법</b>을 따라 한 번만 해두면,
+          그 뒤로는 <b>폴더에 파일을 덮어쓰기만</b> 하면 됩니다.</div>`;
+      return;
+    }
+    const v=String(erpAuto.ver).split("|");
+    box.className="erp-auto on";
+    box.innerHTML=`<div class="st"><span class="dot"></span>자동 갱신 중 · 매일 새벽 4시</div>
+      <div class="sub">마지막 갱신 <b>${esc(v[0]||"–")}</b>${v[1]?` · 품목 <b>${(+v[1]).toLocaleString()}개</b>`:""}</div>
+      <div class="acts">
+        ${erpAuto.folder?`<a class="linkbtn" href="${esc(erpAuto.folder)}" target="_blank" rel="noopener">📂 ERP 파일 폴더 열기</a>`:""}
+        <button class="linkbtn" id="erpNow">⟳ 지금 갱신</button>
+      </div>
+      ${erpAuto.log?`<pre>${esc(erpAuto.log)}</pre>`:""}`;
+    const nb=$("#erpNow");
+    if(nb) nb.onclick=async ()=>{
+      nb.disabled=true; nb.textContent="⟳ 갱신 요청 중…";
+      try{
+        await requestErpRefresh();
+        toast("갱신을 시작했습니다 — 1~3분 뒤 자동으로 반영됩니다");
+        setTimeout(pollErpAfterRefresh, 60000);
+      }catch(e){ toast("갱신 요청 실패: "+e.message); }
+      nb.disabled=false; nb.textContent="⟳ 지금 갱신";
+    };
+  }
+  // '지금 갱신' 후 완료를 기다렸다가 화면에 반영 (최대 5분)
+  async function pollErpAfterRefresh(tries){
+    tries=tries||0;
+    const changed=await syncErpFromSheet();
+    renderErpAuto();
+    if(changed){ renderErpPanel(); renderTable(); toast("ERP 데이터가 갱신되었습니다"); return; }
+    if(tries<8) setTimeout(()=>pollErpAfterRefresh(tries+1), 30000);
+  }
   function openErp(){
     $("#erpClear").style.display = erp ? "inline-flex" : "none";
     $("#erpDownload").style.display = erp ? "" : "none";
+    renderErpAuto();
     $("#erpBg").classList.add("show");
+    // 열 때마다 상태를 한 번 확인(자동 갱신이 돌았는지)
+    if(isConnected()) syncErpFromSheet().then(ch=>{
+      renderErpAuto();
+      if(ch){ renderErpPanel(); renderTable(); }
+    });
   }
   function closeErp(){ $("#erpBg").classList.remove("show"); }
 
@@ -1919,6 +2196,18 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     setTimeout(()=>URL.revokeObjectURL(a.href),1000);
     toast("erp-data.json 을 저장했습니다");
   };
+  $("#erpCopyCode").onclick=()=>{
+    const box=$("#codeBox").cloneNode(true);
+    const b=box.querySelector("button"); if(b) b.remove();
+    const code=box.textContent;
+    (navigator.clipboard?navigator.clipboard.writeText(code):Promise.reject())
+      .then(()=>toast("Apps Script 코드를 복사했습니다 — 편집기에 붙여넣고 저장하세요"))
+      .catch(()=>{ const t=document.createElement("textarea");
+        t.value=code; document.body.appendChild(t); t.select();
+        try{ document.execCommand("copy"); toast("Apps Script 코드를 복사했습니다"); }
+        catch(e){ toast("복사에 실패했습니다 — 연결 설정 창의 코드를 직접 복사해 주세요"); }
+        t.remove(); });
+  };
   $("#erpClear").onclick=()=>{
     if(!confirm("불러온 ERP 데이터를 지울까요? 재고·판매량 표시가 사라집니다.")) return;
     try{ localStorage.removeItem(ERPKEY); }catch(e){}
@@ -2052,10 +2341,12 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
   applyCfg();
   refresh({quiet:true});
 
-  // ERP 데이터: 같은 폴더의 erp-data.json(팀 공용) 과 내 브라우저 저장본 중 최신을 쓴다
+  // ERP 데이터 — 저장본을 먼저 보여주고, 뒤이어 최신본이 있으면 갈아끼운다
+  //   ① 내 브라우저 저장본(즉시)  ② 구글 시트의 자동 갱신본  ③ 같은 폴더의 erp-data.json
   (async function(){
     erp=loadErpLocal();
     renderErpPanel();
+    if(await syncErpFromSheet()){ renderErpPanel(); renderTable(); return; }
     const shared=await fetchSharedErp();
     if(shared && (!erp || String(shared.updatedAt||"") > String(erp.updatedAt||""))) erp=shared;
     renderErpPanel(); renderTable();
