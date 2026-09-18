@@ -1917,7 +1917,8 @@ function erpBlob_(){
       box.innerHTML=`<div class="st"><span class="dot"></span>Apps Script 코드가 아직 예전 것입니다</div>
         <div class="sub">아래 <b>최초 1회 설정 방법</b>의 <b>1~3번</b>을 마쳐야 합니다.
           코드를 붙여넣고 저장까지 했더라도, <b>3번 “배포 → 배포 관리 → ✏ 편집 → 버전: 새 버전 → 배포”</b>를
-          하지 않으면 예전 코드가 그대로 돌아갑니다. 가장 흔한 원인이니 먼저 확인해 주세요.</div>`;
+          하지 않으면 예전 코드가 그대로 돌아갑니다. 가장 흔한 원인이니 먼저 확인해 주세요.</div>
+        ${erpProbe()}`;
       return;
     }
     // ② 코드는 올라갔지만 ERP설정 을 아직 실행하지 않음 — 폴더가 없다
@@ -1925,7 +1926,8 @@ function erpBlob_(){
       box.className="erp-auto off";
       box.innerHTML=`<div class="st"><span class="dot"></span>코드는 준비됐습니다 — <b>ERP설정</b> 실행만 남았어요</div>
         <div class="sub">Apps Script 편집기 위쪽 함수 목록에서 <b>ERP설정</b> 을 고르고 <b>▷ 실행</b> 해 주세요.
-          실행 로그에 ERP 파일을 넣을 <b>폴더 주소</b>가 나옵니다.</div>`;
+          실행 로그에 ERP 파일을 넣을 <b>폴더 주소</b>가 나옵니다.</div>
+        ${erpProbe()}`;
       return;
     }
     // ③ 폴더까지 준비됐지만 아직 한 번도 계산하지 않음
@@ -1952,6 +1954,15 @@ function erpBlob_(){
     </div>`;
   }
   function erpLogBox(){ return erpAuto.log?`<pre>${esc(erpAuto.log)}</pre>`:""; }
+  // 어느 코드가 배포됐는지 눈으로 확인할 수 있게
+  function erpProbe(){
+    if(!isConnected()) return "";
+    return `<div class="acts"><a class="linkbtn" href="${esc(cfg.exec)}?erp=meta" target="_blank" rel="noopener"
+      title="새 코드가 배포됐다면 ver·folder 가 들어 있는 응답이 보입니다">🔎 웹 앱 응답 직접 확인</a></div>
+      <div class="sub" style="margin-top:6px"><code>ver</code>·<code>folder</code> 가 보이면 새 코드,
+      <code>rows</code> 만 보이면 예전 코드입니다.
+      <span style="color:var(--faint)">(크롬이 자동 번역하면 <code>rows</code>가 <b>행</b>으로 보일 수 있습니다 — 번역을 끄고 보세요)</span></div>`;
+  }
   function bindErpNow(){
     const nb=$("#erpNow"); if(!nb) return;
     nb.onclick=async ()=>{
