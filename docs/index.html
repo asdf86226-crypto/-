@@ -759,6 +759,15 @@ function erpBlob_(){
       <div class="row-btns" id="shareRow" style="display:none">
         <button class="btn ghost" id="shareBtn" type="button">🔗 팀원 공유용 링크 복사</button>
       </div>
+      <div class="row-btns" id="diagRow" style="display:none">
+        <a class="btn ghost" id="diagBtn" target="_blank" rel="noopener" style="text-decoration:none"
+           title="웹 앱이 실제로 무엇을 돌려주는지 새 창에서 그대로 봅니다">🔎 웹 앱 응답 직접 확인</a>
+      </div>
+      <p class="hint" id="diagHint" style="display:none; margin-top:-8px">
+        <code>{"ok":true,"rows":[…]}</code> 가 보이면 정상입니다.
+        <b>권한 요청·오류 페이지</b>가 보이면 Apps Script 편집기에서 함수를 한 번 실행해
+        <b>권한을 다시 승인</b>한 뒤 <b>새 버전으로 재배포</b>해야 합니다.
+      </p>
       <div class="row-btns" id="disconnectRow" style="display:none">
         <button class="btn ghost" id="disconnectBtn" type="button" style="color:var(--s-late)">연결 해제(로컬 모드로 전환)</button>
       </div>
@@ -1169,20 +1178,37 @@ function erpBlob_(){
   };
 
   // 구글 시트(Apps Script 웹앱): 읽기=JSONP, 쓰기=no-cors POST 로 CORS 우회
+  // 구글 스크립트는 요청을 거의 순차로 처리한다. 동시에 여러 건을 보내면
+  // 뒤엣것이 줄을 서다 시간 초과가 나므로, 우리 쪽에서 한 번에 하나씩만 보낸다.
+  let jsonpChain=Promise.resolve();
   function jsonpGet(url){
+    const run=()=>jsonpOnce(url);
+    const p=jsonpChain.then(run, run);
+    jsonpChain=p.then(()=>{},()=>{});
+    return p;
+  }
+  function jsonpOnce(url){
     return new Promise((resolve,reject)=>{
       const cb="cb_"+Math.random().toString(36).slice(2);
       const s=document.createElement("script");
+      let done=false;
       // 구글 스크립트는 실행을 순차 처리해서, 등록·알림 발송 중이면 조회가 뒤로 밀린다.
-      // 넉넉히 기다린 뒤에만 실패로 본다.
-      // 구글이 우리 형식이 아닌 응답(로그인/권한/오류 페이지 HTML)을 주면
-      // 스크립트가 실행되지 않아 콜백이 오지 않는다 → 시간 초과로 나타난다.
-      const timer=setTimeout(()=>{ cleanup(); reject(new Error(
-        "불러오기 실패 — 웹 앱 주소가 맞는지, 배포 액세스가 '모든 사용자'인지 확인하세요 (이 배지를 눌러 주소 변경)"
+      // 넉넉히 기다린 뒤에만 시간 초과로 본다.
+      const timer=setTimeout(()=>{ if(done) return; cleanup(); reject(new Error(
+        "응답이 너무 늦습니다 — 구글 스크립트가 다른 작업(ERP 갱신 등)을 하는 중일 수 있습니다. "
+        + "잠시 뒤 새로고침을 눌러보세요."
       )); }, 30000);
-      function cleanup(){ try{delete window[cb];}catch(e){window[cb]=undefined;} s.remove(); clearTimeout(timer); }
+      function cleanup(){ done=true; try{delete window[cb];}catch(e){window[cb]=undefined;} s.remove(); clearTimeout(timer); }
       window[cb]=d=>{ cleanup(); resolve(d); };
-      s.onerror=()=>{ cleanup(); reject(new Error("불러오기 실패 — 웹앱 URL과 '모든 사용자' 액세스 설정을 확인하세요")); };
+      // 응답은 왔는데 콜백이 불리지 않았다면, 구글이 데이터가 아니라
+      // 로그인·권한 요청이나 오류 페이지(HTML)를 돌려준 것이다. 30초를 기다릴 필요가 없다.
+      s.onload=()=>{ setTimeout(()=>{ if(done) return; cleanup(); reject(new Error(
+        "웹 앱이 데이터 대신 다른 페이지를 돌려줬습니다 — 대개 권한 승인이 필요한 경우입니다. "
+        + "Apps Script 편집기에서 함수를 한 번 실행해 권한을 승인한 뒤, "
+        + "'배포 → 배포 관리 → ✏ 편집 → 버전: 새 버전 → 배포'로 다시 배포하세요. "
+        + "(이 배지를 눌러 '웹 앱 응답 직접 확인'으로 무엇이 오는지 볼 수 있습니다)"
+      )); }, 0); };
+      s.onerror=()=>{ if(done) return; cleanup(); reject(new Error("불러오기 실패 — 웹앱 URL과 '모든 사용자' 액세스 설정을 확인하세요")); };
       s.src=url+(url.indexOf("?")>=0?"&":"?")+"callback="+cb+"&_t="+Date.now();
       document.body.appendChild(s);
     });
@@ -1385,8 +1411,19 @@ function erpBlob_(){
   let erpAuto=null;                                    // {ver, folder, log} — 웹앱이 알려준 상태
   function erpVer(){ try{ return localStorage.getItem(ERPVERKEY)||""; }catch(e){ return ""; } }
   // 페이지를 열 때마다 400KB를 받아오지 않도록, 먼저 버전만 물어보고 바뀐 경우에만 내려받는다
-  async function syncErpFromSheet(){
+  const ERPCHECKKEY="erp_checked_at";
+  // 팀원 화면에서 페이지를 열 때마다 구글을 부르지 않도록, 확인은 한 시간에 한 번만.
+  // (ERP 데이터는 하루 한 번 갱신되므로 자주 볼 이유가 없다)
+  function erpCheckDue(){
+    // 데이터가 아직 없을 때도 마찬가지로 제한한다. 그렇지 않으면 설정 전까지
+    // 모든 팀원이 페이지를 열 때마다 구글을 한 번씩 더 부르게 된다.
+    try{ return Date.now()-(+localStorage.getItem(ERPCHECKKEY)||0) > (erp?3600000:1800000); }
+    catch(e){ return true; }
+  }
+  async function syncErpFromSheet(force){
     if(!isConnected()) return false;
+    if(!force && !erpCheckDue()) return false;
+    try{ localStorage.setItem(ERPCHECKKEY, String(Date.now())); }catch(e){}
     let meta;
     try{ meta=await jsonpGet(cfg.exec+"?erp=meta"); }catch(e){ return false; }
     if(!meta || !meta.ok) return false;
@@ -1402,8 +1439,14 @@ function erpBlob_(){
     if(saveErpLocal(erp)){ try{ localStorage.setItem(ERPVERKEY, erpAuto.ver); }catch(e){} }
     return true;
   }
+  // 갱신은 몇 분씩 걸리는 작업이다. 여러 번 누르면 그만큼 줄을 서서
+  // 그동안 구매요청 조회까지 느려지므로 5분에 한 번만 받는다.
+  let erpRunAt=0;
   async function requestErpRefresh(){
     if(!isConnected()) throw new Error("먼저 구글 시트에 연결해야 합니다");
+    if(Date.now()-erpRunAt < 300000)
+      throw new Error("이미 갱신이 돌고 있습니다 — 끝날 때까지 기다려 주세요(최대 3분)");
+    erpRunAt=Date.now();
     await fetch(cfg.exec,{ method:"POST", mode:"no-cors",
       headers:{"Content-Type":"text/plain;charset=utf-8"},
       body:JSON.stringify({action:"erprun"}) });
@@ -1928,7 +1971,7 @@ function erpBlob_(){
   async function pollErpAfterRefresh(tries){
     tries=tries||0;
     const before=erpAuto ? erpAuto.log : "";
-    const changed=await syncErpFromSheet();
+    const changed=await syncErpFromSheet(true);
     renderErpAuto();
     if(changed){ renderErpPanel(); renderTable(); toast("ERP 데이터가 갱신되었습니다"); return; }
     const log=(erpAuto && erpAuto.log)||"";
@@ -1942,7 +1985,7 @@ function erpBlob_(){
     renderErpAuto();
     $("#erpBg").classList.add("show");
     // 열 때마다 상태를 한 번 확인(자동 갱신이 돌았는지)
-    if(isConnected()) syncErpFromSheet().then(ch=>{
+    if(isConnected()) syncErpFromSheet(true).then(ch=>{
       renderErpAuto();
       if(ch){ renderErpPanel(); renderTable(); }
     });
@@ -2238,6 +2281,9 @@ function erpBlob_(){
     const o=$("#testOut"); o.textContent=""; o.className="test-out";
     $("#disconnectRow").style.display = isConnected()?"flex":"none";
     $("#shareRow").style.display = isConnected()?"flex":"none";
+    $("#diagRow").style.display = isConnected()?"flex":"none";
+    $("#diagHint").style.display = isConnected()?"":"none";
+    if(isConnected()) $("#diagBtn").href = cfg.exec;
     showKakao();
     $("#modalBg").classList.add("show");
   }
@@ -2441,15 +2487,18 @@ function erpBlob_(){
   applyCfg();
   refresh({quiet:true});
 
-  // ERP 데이터 — 저장본을 먼저 보여주고, 뒤이어 최신본이 있으면 갈아끼운다
-  //   ① 내 브라우저 저장본(즉시)  ② 구글 시트의 자동 갱신본  ③ 같은 폴더의 erp-data.json
+  // ERP 데이터 — 저장본을 먼저 보여주고, 뒤이어 최신본이 있으면 갈아끼운다.
+  // 구매요청 목록 조회가 우선이므로 구글 호출은 뒤로 미루고, 조회가 성공했을 때만 시도한다.
   (async function(){
     erp=loadErpLocal();
     renderErpPanel();
-    if(await syncErpFromSheet()){ renderErpPanel(); renderTable(); return; }
-    const shared=await fetchSharedErp();
+    const shared=await fetchSharedErp();          // 같은 폴더의 파일 — 구글 호출 아님
     if(shared && (!erp || String(shared.updatedAt||"") > String(erp.updatedAt||""))) erp=shared;
     renderErpPanel(); renderTable();
+    setTimeout(async ()=>{
+      if(failStreak>0 || syncing) return;         // 목록 조회가 불안하면 건드리지 않는다
+      try{ if(await syncErpFromSheet()){ renderErpPanel(); renderTable(); } }catch(e){}
+    }, 3000);
   })();
 })();
 </script>
