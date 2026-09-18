@@ -392,6 +392,52 @@
   .guide-body details[open] summary::before{content:"−"}
   .guide-body details .ans{padding:0 14px 12px 32px; font-size:13.5px}
 
+  /* ERP 품목 분석 */
+  .erp-hd{padding:13px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:9px}
+  .erp-hd h2{font-size:13.5px}
+  .erp-hd .linkbtn{margin-left:auto; padding:5px 9px; font-size:11.5px}
+  .erp-body{padding:14px 16px 16px}
+  .erp-hint{font-size:12.5px; color:var(--muted); line-height:1.65; margin:0}
+  .erp-code{font-size:11.5px; color:var(--faint); font-weight:800; letter-spacing:.02em; word-break:break-all}
+  .erp-item{font-size:14px; font-weight:800; color:var(--ink); line-height:1.4; margin-top:2px; word-break:break-all}
+  .erp-kind{display:inline-block; margin-left:6px; font-size:10.5px; font-weight:800; padding:1px 7px; border-radius:99px;
+            border:1px solid var(--border-strong); color:var(--muted); vertical-align:2px; white-space:nowrap}
+  .erp-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px}
+  .erp-cell{border:1px solid var(--border); border-radius:6px; padding:9px 11px 11px; background:var(--surface-2); position:relative; overflow:hidden}
+  .erp-cell.span{grid-column:1 / -1}
+  .erp-cell::before{content:""; position:absolute; inset:0 0 auto 0; height:3px; background:var(--tc,var(--accent))}
+  .erp-cl{font-size:10.5px; font-weight:800; letter-spacing:.06em; color:var(--faint)}
+  .erp-cl::before{content:"[ "} .erp-cl::after{content:" ]"}
+  .erp-cn{font-size:19px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:-.02em; margin-top:4px; line-height:1.15}
+  .erp-cs{font-size:11px; color:var(--muted); font-weight:600; margin-top:3px}
+  .erp-src{margin-top:11px; font-size:11.5px; color:var(--muted); line-height:1.7}
+  .erp-src b{color:var(--ink)}
+  .erp-top{margin-top:8px; display:flex; flex-wrap:wrap; gap:4px}
+  .erp-top span{font-size:11px; background:var(--accent-soft); color:var(--accent); border-radius:5px; padding:2px 7px; font-weight:700;
+                max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .erp-warn{margin-top:10px; font-size:11.5px; color:var(--s-late); font-weight:700; line-height:1.55}
+  .erp-meta{margin-top:12px; padding-top:10px; border-top:1px solid var(--border); font-size:11px; color:var(--faint); font-weight:600;
+            display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .erp-meta .linkbtn{margin-left:auto; padding:4px 8px; font-size:11px}
+  .stock-note{display:block; font-size:11px; font-weight:700; margin-top:3px; font-variant-numeric:tabular-nums}
+
+  /* ERP 업로드 모달 */
+  .erp-files{list-style:none; margin:12px 0 0; padding:0; display:flex; flex-direction:column; gap:6px}
+  .erp-files li{display:flex; align-items:center; gap:8px; font-size:12px; border:1px solid var(--border);
+                border-radius:6px; padding:7px 10px; background:var(--surface-2)}
+  .erp-files .nm{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink); font-weight:600}
+  .erp-files .tag{font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:99px; flex:none}
+  .erp-files .tag.bom{background:var(--accent-soft); color:var(--accent)}
+  .erp-files .tag.stock{background:color-mix(in srgb,var(--t-prod) 16%,transparent); color:var(--t-prod)}
+  .erp-files .tag.sales{background:color-mix(in srgb,var(--t-mat) 20%,transparent); color:var(--t-mat)}
+  .erp-files .tag.unknown{background:var(--border); color:var(--muted)}
+  .erp-files .rm{border:0; background:transparent; color:var(--faint); font-size:15px; line-height:1; cursor:pointer; flex:none}
+  .erp-files .rm:hover{color:var(--s-late)}
+  .erp-log{margin-top:12px; font-size:12px; color:var(--muted); line-height:1.75; white-space:pre-wrap;
+           font-variant-numeric:tabular-nums; max-height:190px; overflow:auto}
+  .erp-log:empty{display:none}
+  .erp-log b{color:var(--ink)}
+
   /* 토스트 */
   #toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px); opacity:0;
     background:var(--ink); color:var(--bg); padding:10px 18px; border-radius:10px; font-size:13px; font-weight:600;
@@ -629,7 +675,21 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
          • <b>찾기·정렬</b> — 검색창에 품목코드나 품명을 넣으면 바로 찾고, 표 제목을 누르면 그 기준으로 정렬됩니다.<br>
          • <b>엑셀로 받기</b> — 목록 아래 <b>⬇ CSV 내보내기</b>를 누르면 지금 보이는 목록을 파일로 받습니다.</p>
 
-      <h3><span class="n">5</span>주의사항</h3>
+      <h3><span class="n">5</span>재고 · 판매량 함께 보기</h3>
+      <p>품목코드를 입력하면 왼쪽 아래 <b>품목 분석</b>에 그 품목의 <b>현재고 · 월평균 소요 · 소진 예상</b>이 바로 나타납니다.
+         목록에서도 품명 아래에 같은 내용이 한 줄로 표시됩니다.</p>
+      <p>• <b>소진 예상</b> — 지금 재고로 몇 개월을 버틸 수 있는지입니다. <b style="color:var(--s-late)">1개월 미만은 빨간색</b>,
+         2개월 미만은 주황색으로 표시되니 수량을 정할 때 참고하세요. 요청 수량을 넣으면 <b>그 수량을 받은 뒤 몇 개월이 되는지</b>도 같이 보여줍니다.<br>
+         • <b>월평균 소요</b>가 어디서 나온 값인지도 아래에 적혀 있습니다.
+         <b>상품·제품</b>은 실제 판매량, <b>자재·반제품</b>은 그 부품이 들어가는 제품의 판매량에서 BOM으로 역산한 값이며,
+         둘 다 해당하면 <b>두 값을 더해</b> 보여줍니다.</p>
+      <div class="g-note info">
+        <span class="ic">i</span>
+        <span><b>이 정보는 구매 담당자가 월 1회 ERP에서 갱신합니다.</b> 화면 아래 <b>ERP 기준 날짜</b>를 확인하세요.
+          BOM이 아직 등록되지 않은 품목은 소요량이 비어 있을 수 있습니다 — 그대로 요청하셔도 됩니다.</span>
+      </div>
+
+      <h3><span class="n">6</span>주의사항</h3>
       <div class="g-note danger">
         <span class="ic">⚠</span>
         <span><b>삭제는 모두에게 적용됩니다.</b> 각 줄 끝의 <code>✕</code>를 누르면 그 요청이 <b>모든 사람의 화면에서</b> 사라집니다.
@@ -646,7 +706,7 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
           급한 건은 <b>기타사항에 “긴급”</b>이라고 적어주세요.</span>
       </div>
 
-      <h3><span class="n">6</span>자주 묻는 질문</h3>
+      <h3><span class="n">7</span>자주 묻는 질문</h3>
       <details><summary>휴대폰으로도 되나요?</summary>
         <div class="ans">됩니다. 링크를 열면 화면 크기에 맞춰 표시됩니다. 다만 <b>엑셀 파일 올리기는 PC가 편합니다.</b></div></details>
       <details><summary>품목코드를 모르면 어떻게 하나요?</summary>
@@ -657,6 +717,13 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
       <details><summary>올렸는데 목록에 안 보여요.</summary>
         <div class="ans">내가 올린 건 바로 보입니다. 안 보이면 오른쪽 위 <b>⟳ 새로고침</b>을 눌러주세요.
           그래도 없다면 연결 표시가 <b>초록색</b>인지 확인하고, 회색이면 담당자에게 알려주세요.</div></details>
+      <details><summary>재고·판매량이 “–” 로 나오거나 아예 안 보여요.</summary>
+        <div class="ans">세 가지 경우입니다. ① <b>ERP 데이터가 아직 안 올라온 경우</b> — 구매 담당자가 갱신하면 보입니다.
+          ② <b>ERP에 없는 품목코드</b> — 코드를 다시 확인해 주세요. ③ <b>BOM이 등록되지 않은 자재</b> — 소요량을 계산할 수 없습니다.
+          어느 경우든 <b>요청은 그대로 올리시면 됩니다.</b></div></details>
+      <details><summary>재고가 “0 (확인필요)” 라고 나와요.</summary>
+        <div class="ans">ERP 재고가 <b>음수</b>인 품목입니다. 마감 전에 수량을 맞추는 과정에서 생기는 일시적인 수치라
+          화면에는 0으로 표시하고 있습니다. 실제 수량은 <b>구매 담당자에게 확인</b>해 주세요.</div></details>
       <details><summary>수량을 아직 확정 못 했어요.</summary>
         <div class="ans">예상 수량을 적고 <b>기타사항에 “수량 확정 전”</b>이라고 남겨주세요. 확정되면 지우고 다시 올리시면 됩니다.</div></details>
       <details><summary>화면이 눈부셔요 / 어둡게 보고 싶어요.</summary>
@@ -667,6 +734,50 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
         <span><b style="color:var(--ink)">오정민</b> 매니저 <span style="color:var(--faint)">· 구매 담당</span></span>
         <a href="tel:010-6655-4706" style="margin-left:auto; color:var(--accent); font-weight:700; text-decoration:none; font-variant-numeric:tabular-nums">010-6655-4706</a>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ERP 데이터 불러오기 모달 -->
+<div class="modal-bg" id="erpBg">
+  <div class="modal">
+    <div class="mh">
+      <div>
+        <h2>ERP 데이터 불러오기</h2>
+        <p>ERP에서 내려받은 <b>재고현황 · 판매현황 · BOM</b> 파일을 한꺼번에 올리면 이 브라우저 안에서 바로 계산해
+        품목별 <b>재고 · 월평균 소요량 · 소진 예상</b>을 만들어 둡니다. 파일은 <b>어디에도 전송되지 않습니다.</b></p>
+      </div>
+      <button class="x" id="erpClose">×</button>
+    </div>
+    <div class="mb">
+      <div class="stage"><span class="n">1</span>ERP에서 파일 내보내기</div>
+      <ol class="steps">
+        <li><b>재고현황</b> — <code>품목코드 · 품명 · 품목구분 · 재고수량</code> 열이 포함되도록 내보내기<br>
+            <span style="color:var(--faint)">플로우텍·태성정밀 각각 따로 올려도 됩니다</span></li>
+        <li><b>판매현황내역</b> — 최근 2년치(예: 25년 · 26년)</li>
+        <li><b>BOM(소요량)현황</b> — 자재·반제품의 소요량을 역산하는 데 씁니다</li>
+      </ol>
+
+      <div class="stage" style="margin-top:16px"><span class="n">2</span>파일 올리기 (여러 개 한꺼번에)</div>
+      <label class="dropzone" id="erpZone" for="erpInput">
+        <input type="file" id="erpInput" accept=".xlsx,.csv,.tsv,.txt" multiple hidden>
+        <div class="dz-ic">🗂️</div>
+        <div class="dz-main">ERP 파일 선택 (여러 개 가능)</div>
+        <div class="dz-sub">또는 여기로 파일을 끌어다 놓기</div>
+      </label>
+      <ul class="erp-files" id="erpList"></ul>
+      <div class="erp-log" id="erpLog"></div>
+      <div class="row-btns">
+        <button class="btn" id="erpRun" disabled>분석 시작</button>
+        <button class="btn ghost" id="erpDownload" style="display:none">⬇ 팀 공유용 파일 저장</button>
+      </div>
+      <button class="linkbtn danger" id="erpClear" style="margin-top:10px; display:none">불러온 ERP 데이터 지우기</button>
+
+      <p class="erp-hint" style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border)">
+        분석 결과는 <b>내 브라우저에만</b> 저장됩니다. 팀원 모두에게 같은 정보를 보이게 하려면
+        <b>팀 공유용 파일 저장</b>으로 받은 <code>erp-data.json</code> 을 담당자에게 전달해
+        대시보드와 같은 폴더에 올려두면 됩니다.
+      </p>
     </div>
   </div>
 </div>
@@ -749,6 +860,15 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
         <button class="btn" type="submit" id="importBtn" style="margin-top:12px" disabled>인식된 항목 일괄 추가</button>
         <a class="btn ghost" id="templateBtn" style="margin-top:8px; text-decoration:none" download="구매요청_양식.csv">양식(CSV) 내려받기</a>
       </form>
+    </section>
+
+    <!-- 품목 분석 (ERP 재고·판매) -->
+    <section class="card" id="erpCard">
+      <div class="erp-hd">
+        <h2>품목 분석</h2>
+        <button class="linkbtn" id="erpOpen" title="ERP 재고·판매·BOM 파일 불러오기">⚙ ERP 데이터</button>
+      </div>
+      <div class="erp-body" id="erpBody"></div>
     </section>
   </aside>
 
@@ -1022,6 +1142,437 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
     return rows;
   }
 
+  /* ════════════════════════════════════════════════════════════════
+     ERP 품목 분석 — 재고 · 판매량 · BOM 전개 소요량
+     ERP에서 내려받은 엑셀을 이 브라우저 안에서만 계산한다(외부 전송 없음).
+     ════════════════════════════════════════════════════════════════ */
+  const ERPKEY="erp_dataset_v1";
+  let erp=null;          // {updatedAt, months, items:{코드:{n,k,s,d,ds,db,t}}}
+  let erpPick=[];        // 모달에서 고른 파일 목록
+
+  function loadErpLocal(){ try{ return JSON.parse(localStorage.getItem(ERPKEY)); }catch(e){ return null; } }
+  function saveErpLocal(o){
+    try{ localStorage.setItem(ERPKEY, JSON.stringify(o)); return true; }
+    catch(e){ toast("분석 결과가 너무 커서 브라우저에 저장하지 못했습니다 — 파일로 내려받아 주세요"); return false; }
+  }
+  async function fetchSharedErp(){
+    try{
+      const r=await fetch("erp-data.json",{cache:"no-store"});
+      if(!r.ok) return null;
+      const j=await r.json();
+      return (j && j.items && typeof j.items==="object") ? j : null;
+    }catch(e){ return null; }   // file:// 로 열었거나 파일이 없으면 무시
+  }
+
+  /* ---------- ERP 파일 읽기 ---------- */
+  // ERP CSV 셀에는 탭·제어문자가 섞여 나올 때가 있어 먼저 걷어낸다
+  function erpNorm(v){
+    const s=String(v==null?"":v);
+    let out="";
+    for(let i=0;i<s.length;i++) if(s.charCodeAt(i)>31) out+=s.charAt(i);
+    return out.replace(/^"+|"+$/g,"").trim();
+  }
+  function erpHdrKey(v){ return erpNorm(v).replace(/\s+/g,""); }
+  function erpNum(v){ const n=parseFloat(String(v==null?"":v).replace(/,/g,"").replace(/[^0-9.\-]/g,"")); return isFinite(n)?n:0; }
+  function erpKey(c){ return String(c==null?"":c).trim().toUpperCase().replace(/\s+/g,""); }
+  function erpYM(v){
+    const s=erpNorm(v).replace(/\//g,"-");
+    const m=s.match(/^(\d{4})-(\d{1,2})/);
+    if(m) return m[1]+"-"+String(m[2]).padStart(2,"0");
+    const n=parseFloat(s);
+    if(n>20000 && n<80000){ const d=new Date(Date.UTC(1899,11,30)+Math.round(n)*86400000);
+      return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0"); }
+    return "";
+  }
+  // ERP CSV 는 따옴표 안에 탭이 섞여 나오는 경우가 있어 따옴표 규칙을 먼저 적용한다
+  function erpParseText(text){
+    text=String(text).replace(/^﻿/,"").replace(/\r\n?/g,"\n");
+    const rows=[]; let row=[], cur="", q=false;
+    for(let i=0;i<text.length;i++){ const c=text[i];
+      if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+      else if(c==='"') q=true;
+      else if(c===','){ row.push(cur); cur=""; }
+      else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=""; }
+      else cur+=c;
+    }
+    if(cur!==""||row.length){ row.push(cur); rows.push(row); }
+    const wide=rows.reduce((m,r)=>Math.max(m,r.length),0);
+    if(wide>=2) return rows;
+    return text.split("\n").map(l=>l.split("\t"));   // 진짜 TSV
+  }
+  // 판매현황은 수천~수만 행이라 DOMParser 대신 가벼운 스캐너로 읽는다
+  function erpUnesc(s){
+    if(s.indexOf("&")<0) return s;
+    return s.replace(/&(lt|gt|amp|quot|apos|#\d+|#x[0-9a-fA-F]+);/g,(m,e)=>{
+      if(e==="lt") return "<"; if(e==="gt") return ">"; if(e==="amp") return "&";
+      if(e==="quot") return '"'; if(e==="apos") return "'";
+      if(e.charAt(0)==="#"){ const n = e.charAt(1)==="x" ? parseInt(e.slice(2),16) : +e.slice(1);
+        return isFinite(n) ? String.fromCodePoint(n) : m; }
+      return m;
+    });
+  }
+  async function erpReadXlsx(buf){
+    const files=await unzip(new Uint8Array(buf));
+    const td=new TextDecoder();
+    const dec=nm=> files[nm] ? td.decode(files[nm]) : "";
+
+    const shared=[]; const ssx=dec("xl/sharedStrings.xml");
+    if(ssx){
+      const siRe=/<si\b[^>]*>([\s\S]*?)<\/si>/g; let m;
+      while((m=siRe.exec(ssx))){
+        let s=""; const tRe=/<t\b[^>]*>([\s\S]*?)<\/t>/g; let t;
+        while((t=tRe.exec(m[1]))) s+=t[1];
+        shared.push(erpUnesc(s));
+      }
+    }
+    const dateStyle=[]; const stx=dec("xl/styles.xml");
+    if(stx){
+      const fmt={}; const fRe=/<numFmt\b[^>]*numFmtId="(\d+)"[^>]*formatCode="([^"]*)"/g; let f;
+      while((f=fRe.exec(stx))) fmt[f[1]]=erpUnesc(f[2]);
+      const isDate=id=>{ const k=+id; if((k>=14&&k<=22)||(k>=45&&k<=47)) return true;
+        const c=fmt[id]; return c ? /[dmy]/i.test(c.replace(/\[[^\]]*\]/g,"").replace(/"[^"]*"/g,"")) : false; };
+      const cx=stx.match(/<cellXfs\b[\s\S]*?<\/cellXfs>/);   // cellStyleXfs 가 아니라 cellXfs
+      if(cx){ const xRe=/<xf\b[^>]*>/g; let x, i=0;
+        while((x=xRe.exec(cx[0]))){ const id=(x[0].match(/numFmtId="(\d+)"/)||[])[1]||"0"; dateStyle[i++]=isDate(id); } }
+    }
+    const sheetNm=Object.keys(files).filter(n=>/^xl\/worksheets\/sheet\d+\.xml$/.test(n)).sort()[0];
+    if(!sheetNm) throw new Error("워크시트를 찾을 수 없습니다");
+    const xml=dec(sheetNm);
+    const rows=[]; const rowRe=/<row\b[^>]*>([\s\S]*?)<\/row>/g; let r;
+    const cellRe=/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;
+    while((r=rowRe.exec(xml))){
+      const cells=[]; let c; cellRe.lastIndex=0;
+      while((c=cellRe.exec(r[1]))){
+        const at=c[1]||"", body=c[2]||"";
+        const ref=(at.match(/r="([A-Z]+)/)||[])[1]||"";
+        const t=(at.match(/t="([^"]*)"/)||[])[1]||"";
+        const s=(at.match(/s="(\d+)"/)||[])[1];
+        let col; if(ref){ col=0; for(let i=0;i<ref.length;i++) col=col*26+(ref.charCodeAt(i)-64); col--; } else col=cells.length;
+        let val="";
+        if(t==="s"){ const v=(body.match(/<v>([\s\S]*?)<\/v>/)||[])[1]; val=shared[+v]||""; }
+        else if(t==="inlineStr"){ let s2=""; const tRe=/<t\b[^>]*>([\s\S]*?)<\/t>/g; let tm;
+          while((tm=tRe.exec(body))) s2+=tm[1]; val=erpUnesc(s2); }
+        else { const v=(body.match(/<v>([\s\S]*?)<\/v>/)||[])[1];
+          const raw=(v==null)?"":erpUnesc(v);
+          val=(raw!=="" && s!=null && dateStyle[+s]) ? serialToDate(+raw) : raw; }
+        cells[col]=val;
+      }
+      for(let i=0;i<cells.length;i++) if(cells[i]==null) cells[i]="";
+      rows.push(cells);
+    }
+    return rows;
+  }
+  async function erpFileRows(file){
+    const n=(file.name||"").toLowerCase();
+    if(n.endsWith(".xlsx")) return erpReadXlsx(await file.arrayBuffer());
+    if(n.endsWith(".xls")) throw new Error("옛 .xls 형식은 지원하지 않습니다");
+    return erpParseText(await file.text());
+  }
+
+  /* ---------- 표 머리글 찾기 ---------- */
+  function erpHeaderAt(rows, keys){
+    for(let i=0;i<Math.min(rows.length,15);i++){
+      const r=(rows[i]||[]).map(erpHdrKey);
+      if(keys.every(k=>r.indexOf(k)>=0)) return i;
+    }
+    return -1;
+  }
+  function erpCols(rows,hi){
+    const m={}; (rows[hi]||[]).forEach((c,i)=>{ const k=erpHdrKey(c); if(k && m[k]==null) m[k]=i; });
+    return m;
+  }
+  function erpCol(m, names){ for(const n of names) if(m[n]!=null) return m[n]; return null; }
+  function erpKind(rows){
+    if(erpHeaderAt(rows,["생산품목코드","소모품목코드"])>=0) return "bom";
+    if(erpHeaderAt(rows,["품목코드","재고수량"])>=0) return "stock";
+    if(erpHeaderAt(rows,["품목코드","수량"])>=0) return "sales";
+    return "";
+  }
+  function erpGuess(name){
+    const n=String(name||"");
+    if(/bom|소요/i.test(n)) return "bom";
+    if(/재고/.test(n)) return "stock";
+    if(/판매|매출|출고/.test(n)) return "sales";
+    return "unknown";
+  }
+  const ERPTAG={bom:"BOM", stock:"재고현황", sales:"판매현황", unknown:"자동 인식"};
+
+  /* ---------- 분석 ---------- */
+  async function erpBuild(files, log){
+    const stock={}, name={}, kind={}, bom={}, sales={}, monthSet={};
+    let nBom=0, nStock=0, nSales=0;
+
+    for(const f of files){
+      log(`읽는 중 · ${f.name}`);
+      await new Promise(r=>setTimeout(r,0));
+      let rows;
+      try{ rows=await erpFileRows(f); }
+      catch(e){ log(`  ⚠ 건너뜀 — ${e.message}`); continue; }
+
+      const type=erpKind(rows);
+      if(type==="bom"){
+        const hi=erpHeaderAt(rows,["생산품목코드","소모품목코드"]), m=erpCols(rows,hi);
+        const cP=m["생산품목코드"], cC=m["소모품목코드"], cPn=m["생산품목명"], cCn=m["소모품목명"],
+              cMake=erpCol(m,["생산수량"]), cUse=erpCol(m,["소요량"]);
+        let n=0;
+        for(let i=hi+1;i<rows.length;i++){
+          const r=rows[i]||[];
+          const p=erpNorm(r[cP]), c=erpNorm(r[cC]);
+          if(!p||!c) continue;
+          const make=erpNum(r[cMake])||1, use=erpNum(r[cUse]);
+          if(!use) continue;
+          (bom[p]=bom[p]||[]).push([c, use/make]);
+          const pn=erpNorm(r[cPn]), cn=erpNorm(r[cCn]);
+          if(pn && !name[p]) name[p]=pn;
+          if(cn && !name[c]) name[c]=cn;
+          n++;
+        }
+        nBom+=n; log(`  BOM ${n.toLocaleString()}건`);
+      }
+      else if(type==="stock"){
+        const hi=erpHeaderAt(rows,["품목코드","재고수량"]), m=erpCols(rows,hi);
+        const cCode=m["품목코드"], cQty=m["재고수량"],
+              cName=erpCol(m,["품명및규격","품목명[규격]","품목명","품명","품목명규격"]),
+              cKind=erpCol(m,["품목구분"]);
+        let n=0;
+        for(let i=hi+1;i<rows.length;i++){
+          const r=rows[i]||[]; const c=erpNorm(r[cCode]);
+          if(!c || /^합\s*계$/.test(c)) continue;
+          stock[c]=(stock[c]||0)+erpNum(r[cQty]);      // 두 회사 재고는 합산
+          const nm=cName!=null?erpNorm(r[cName]):"";
+          if(nm && !name[c]) name[c]=nm;
+          const kd=cKind!=null?erpNorm(r[cKind]):"";
+          if(kd && !kind[c]) kind[c]=kd;
+          n++;
+        }
+        nStock+=n; log(`  재고 ${n.toLocaleString()}품목${cKind==null?" (품목구분 열 없음)":""}`);
+      }
+      else if(type==="sales"){
+        const hi=erpHeaderAt(rows,["품목코드","수량"]), m=erpCols(rows,hi);
+        const cCode=m["품목코드"], cQty=m["수량"],
+              cName=erpCol(m,["품목명","품명"]), cDate=erpCol(m,["일자","일 자","날짜"]);
+        let n=0;
+        for(let i=hi+1;i<rows.length;i++){
+          const r=rows[i]||[]; const c=erpNorm(r[cCode]);
+          if(!c || /^합\s*계$/.test(c)) continue;
+          const q=erpNum(r[cQty]); if(!q) continue;
+          sales[c]=(sales[c]||0)+q;
+          const nm=cName!=null?erpNorm(r[cName]):"";
+          if(nm && !name[c]) name[c]=nm;
+          const ym=cDate!=null?erpYM(r[cDate]):"";
+          if(ym) monthSet[ym]=1;
+          n++;
+        }
+        nSales+=n; log(`  판매 ${n.toLocaleString()}건`);
+      }
+      else log(`  ⚠ 알 수 없는 형식 — 건너뜀`);
+    }
+
+    if(!nStock && !nSales && !nBom) throw new Error("읽을 수 있는 ERP 표를 찾지 못했습니다");
+
+    const months=Math.max(1, Object.keys(monthSet).length);
+    log(`\n집계 중 · 판매 기간 ${months}개월`);
+    await new Promise(r=>setTimeout(r,0));
+
+    // 1) 직접 판매 월평균
+    const ds={}; for(const c in sales) ds[c]=sales[c]/months;
+
+    // 2) BOM 전개 — 제품이 팔린 만큼 그 밑의 자재·반제품이 소요된다
+    //    원재료·상품에서 멈춘다(원재료 BOM은 합금비가 아니라 전부 1로 들어와 있음)
+    const stopAt=c=>{ const k=kind[c]; return k==="[원재료]" || k==="[상품]"; };
+    const db={}, contrib={};
+    let budget=400000;                               // 순환·다이아몬드 구조 안전장치
+    const roots=Object.keys(sales).filter(c=>bom[c] && !stopAt(c));
+    for(const root of roots){
+      const out={}, seen=new Set();
+      (function walk(code, qty, depth){
+        if(budget<=0 || depth>12 || seen.has(code) || stopAt(code)) return;
+        const kids=bom[code]; if(!kids) return;
+        seen.add(code);
+        for(let i=0;i<kids.length;i++){
+          if(--budget<=0) break;
+          const ch=kids[i][0], q=qty*kids[i][1];
+          out[ch]=(out[ch]||0)+q;
+          walk(ch, q, depth+1);
+        }
+        seen.delete(code);
+      })(root, sales[root], 0);
+      for(const c in out){
+        db[c]=(db[c]||0)+out[c];
+        (contrib[c]=contrib[c]||[]).push([root, out[c]]);
+      }
+    }
+    if(budget<=0) log("  ⚠ BOM 구조가 너무 깊어 일부는 생략했습니다");
+
+    // 3) 합치기 — 직접 판매 + 생산 투입을 더해야 실제 소요량이 나온다
+    const codes={};
+    [stock,ds,db,name,kind].forEach(o=>{ for(const c in o) codes[c]=1; });
+    const items={};
+    let both=0;
+    for(const c in codes){
+      const a=ds[c]||0, b=(db[c]||0)/months, d=a+b;
+      if(a>0 && b>0) both++;
+      const it={ n:name[c]||"" };
+      if(stock[c]!=null) it.s=Math.round(stock[c]*100)/100;
+      if(kind[c]) it.k=kind[c];
+      if(d>0){ it.d=Math.round(d*10)/10; it.ds=Math.round(a*10)/10; it.db=Math.round(b*10)/10; }
+      const ct=contrib[c];
+      if(ct && ct.length){
+        ct.sort((x,y)=>y[1]-x[1]);
+        it.t=ct.slice(0,3).map(x=>name[x[0]]||x[0]);
+      }
+      items[c]=it;
+    }
+    const n=Object.keys(items).length;
+    log(`\n✓ 완료 — 품목 ${n.toLocaleString()}개 · 재고 ${Object.keys(stock).length.toLocaleString()}개 · `
+      + `직접판매 ${Object.keys(ds).length.toLocaleString()}개 · BOM전개 ${Object.keys(db).length.toLocaleString()}개`);
+    if(both) log(`  · 직접 판매 + 생산 투입이 겹치는 품목 ${both.toLocaleString()}개는 두 수요를 합산했습니다`);
+    return { updatedAt:todayISO(), months, n, items };
+  }
+
+  /* ---------- 조회 ---------- */
+  function erpIndex(){
+    if(!erp) return null;
+    if(!erp._idx){
+      const m={}; for(const c in erp.items) m[erpKey(c)]={code:c, it:erp.items[c]};
+      Object.defineProperty(erp,"_idx",{value:m, enumerable:false});
+    }
+    return erp._idx;
+  }
+  function erpFind(code){
+    const idx=erpIndex(); if(!idx) return null;
+    const k=erpKey(code); if(!k) return null;
+    return idx[k] || idx[k+".0"] || (k.slice(-2)===".0" ? idx[k.slice(0,-2)] : null) || null;
+  }
+  function erpN(v){
+    if(v==null) return "–";
+    const a=Math.abs(v);
+    return (a>=100 ? Math.round(v) : Math.round(v*10)/10).toLocaleString();
+  }
+  // 소진 예상에 따른 색: 1개월 미만 위험 / 2개월 미만 주의 / 그 외 여유
+  function erpTone(m){ return m==null ? "var(--muted)" : (m<1 ? "var(--s-late)" : (m<2 ? "var(--s-new)" : "var(--s-done)")); }
+
+  /* ---------- 렌더: 품목 분석 패널 ---------- */
+  function erpMetaRow(){
+    if(!erp) return "";
+    return `<div class="erp-meta"><span>ERP 기준 ${esc(erp.updatedAt)} · 판매 ${erp.months}개월 · 품목 ${(erp.n||0).toLocaleString()}개</span>
+      <button class="linkbtn" data-erp="open">갱신</button></div>`;
+  }
+  function renderErpPanel(){
+    const body=$("#erpBody"); if(!body) return;
+
+    if(!erp){
+      body.innerHTML=`<p class="erp-hint">ERP의 <b>재고현황 · 판매현황 · BOM</b> 파일을 올려두면,
+        구매요청에 품목코드를 넣는 순간 <b>재고 · 월평균 소요량 · 소진 예상</b>이 여기에 나타납니다.</p>
+        <button class="btn ghost" data-erp="open" style="margin-top:12px">ERP 데이터 불러오기</button>`;
+      bindErpPanel(body); return;
+    }
+
+    const form=$("#manualForm");
+    const code=form ? (form.code.value||"").trim() : "";
+    if(!code){
+      body.innerHTML=`<p class="erp-hint">왼쪽에 <b>품목코드</b>를 입력하면 그 품목의 재고와 판매량이 여기에 표시됩니다.</p>`+erpMetaRow();
+      bindErpPanel(body); return;
+    }
+
+    const hit=erpFind(code);
+    if(!hit){
+      body.innerHTML=`<div class="erp-code">${esc(code)}</div>
+        <p class="erp-hint" style="margin-top:8px">ERP 데이터에 <b>없는 품목코드</b>입니다.
+        코드를 다시 확인해 주세요. 신규 품목이라면 그대로 요청하셔도 됩니다.</p>`+erpMetaRow();
+      bindErpPanel(body); return;
+    }
+
+    const it=hit.it;
+    const raw=(it.s==null?null:it.s);
+    const neg=(raw!=null && raw<0);
+    const stock=(raw==null?null:(neg?0:raw));        // 마감 전 마이너스 재고는 0으로 보고 따로 알림
+    const dem=it.d||0;
+    const left=(stock!=null && dem>0) ? stock/dem : null;
+    const q=form ? erpNum(form.qty.value) : 0;
+    const after=(stock!=null && dem>0 && q>0) ? (stock+q)/dem : null;
+    const tone=erpTone(left);
+
+    let src;
+    if(it.ds>0 && it.db>0)
+      src=`<b>직접 판매</b> 월 ${erpN(it.ds)} <span style="color:var(--faint)">＋</span> <b>생산 투입</b> 월 ${erpN(it.db)} 합산`;
+    else if(it.db>0) src=`<b>BOM 전개</b> — 이 품목이 들어가는 제품의 판매량으로 역산`;
+    else if(it.ds>0) src=`<b>직접 판매</b> 실적 기준`;
+    else src=`최근 ${erp.months}개월간 <b>판매 · 생산 실적 없음</b>`;
+
+    body.innerHTML=
+      `<div class="erp-code">${esc(hit.code)}</div>
+       <div class="erp-item">${esc(it.n||"(품명 없음)")}${it.k?`<span class="erp-kind">${esc(it.k)}</span>`:""}</div>
+       <div class="erp-grid">
+         <div class="erp-cell" style="--tc:${neg?"var(--s-late)":"var(--t-prod)"}">
+           <div class="erp-cl">현재고</div>
+           <div class="erp-cn"${neg?' style="color:var(--s-late)"':''}>${erpN(stock)}</div>
+           <div class="erp-cs">${neg?"확인 필요":"개"}</div>
+         </div>
+         <div class="erp-cell" style="--tc:var(--t-mat)">
+           <div class="erp-cl">월평균 소요</div>
+           <div class="erp-cn">${dem>0?erpN(dem):"–"}</div>
+           <div class="erp-cs">최근 ${erp.months}개월 평균</div>
+         </div>
+         <div class="erp-cell span" style="--tc:${tone}">
+           <div class="erp-cl">소진 예상</div>
+           <div class="erp-cn" style="color:${tone}">${left==null?"–":left.toFixed(1)+" 개월"}</div>
+           <div class="erp-cs">${
+             left==null ? (dem>0?"재고 정보 없음":"소요 실적이 없어 계산할 수 없습니다")
+             : (after!=null ? `요청 ${erpN(q)}개 반영 시 <b style="color:var(--ink)">${after.toFixed(1)}개월</b>`
+                            : (left<1?"1개월 이내 소진":(left<2?"2개월 이내 소진":"여유 있음")))}</div>
+         </div>
+       </div>
+       <div class="erp-src">${src}</div>
+       ${it.t&&it.t.length?`<div class="erp-top">${it.t.map(x=>`<span title="${esc(x)}">${esc(x)}</span>`).join("")}</div>`:""}
+       ${neg?`<div class="erp-warn">⚠ ERP 재고가 음수(${erpN(raw)})입니다 — 마감 전 수치일 수 있어 0으로 표시했습니다.</div>`:""}
+       ${(it.s==null)?`<div class="erp-warn">⚠ 재고현황에 없는 품목입니다.</div>`:""}
+       ${(dem===0 && it.s!=null)?`<div class="erp-warn" style="color:var(--muted)">판매·BOM 어디에도 실적이 없습니다 — BOM 미등록일 수 있습니다.</div>`:""}`
+      + erpMetaRow();
+    bindErpPanel(body);
+  }
+  function bindErpPanel(body){
+    body.querySelectorAll('[data-erp="open"]').forEach(b=>b.onclick=openErp);
+  }
+  // 목록 표의 품명 아래에 붙는 한 줄 요약
+  function erpRowNote(code){
+    const hit=erpFind(code); if(!hit) return "";
+    const it=hit.it;
+    const raw=(it.s==null?null:it.s), stock=(raw==null?null:Math.max(0,raw)), dem=it.d||0;
+    if(stock==null && !dem) return "";
+    const left=(stock!=null && dem>0) ? stock/dem : null;
+    const p=[];
+    if(stock!=null) p.push("재고 "+erpN(stock)+(raw<0?"(확인필요)":""));
+    if(dem>0) p.push("월 "+erpN(dem));
+    if(left!=null) p.push(left.toFixed(1)+"개월");
+    return `<span class="stock-note" style="color:${erpTone(left)}">${p.join(" · ")}</span>`;
+  }
+
+  /* ---------- ERP 모달 ---------- */
+  function renderErpList(){
+    const ul=$("#erpList");
+    ul.innerHTML=erpPick.map((f,i)=>{
+      const g=erpGuess(f.name);
+      return `<li><span class="tag ${g}">${ERPTAG[g]}</span><span class="nm" title="${esc(f.name)}">${esc(f.name)}</span>
+        <button class="rm" data-i="${i}" title="목록에서 빼기">×</button></li>`;
+    }).join("");
+    ul.querySelectorAll(".rm").forEach(b=>b.onclick=()=>{ erpPick.splice(+b.dataset.i,1); renderErpList(); });
+    $("#erpRun").disabled = erpPick.length===0;
+  }
+  function addErpFiles(list){
+    for(const f of list){
+      if(!/\.(xlsx|csv|tsv|txt)$/i.test(f.name)){ toast(`${f.name} — 지원하지 않는 형식입니다`); continue; }
+      if(!erpPick.some(x=>x.name===f.name && x.size===f.size)) erpPick.push(f);
+    }
+    renderErpList();
+  }
+  function openErp(){
+    $("#erpClear").style.display = erp ? "inline-flex" : "none";
+    $("#erpDownload").style.display = erp ? "" : "none";
+    $("#erpBg").classList.add("show");
+  }
+  function closeErp(){ $("#erpBg").classList.remove("show"); }
+
   /* ---------- 렌더: 스탯 ---------- */
   function renderStats(){
     const total=data.length;
@@ -1106,7 +1657,7 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
         <td class="num" style="color:var(--muted);white-space:nowrap">${fmtDate(d.createdAt)}${d._pending?'<span class="saving">저장 중</span>':''}</td>
         <td><span class="chip team-chip" style="--tc:var(${TEAMVAR[d.team]||'--accent'})"><span class="dot" style="background:var(${TEAMVAR[d.team]||'--accent'})"></span>${esc(d.team)}</span></td>
         <td class="code">${esc(d.code)}</td>
-        <td class="name">${esc(d.itemName)}${d.requester?`<span class="memo">요청: ${esc(d.requester)}</span>`:""}</td>
+        <td class="name">${esc(d.itemName)}${d.requester?`<span class="memo">요청: ${esc(d.requester)}</span>`:""}${erpRowNote(d.code)}</td>
         <td class="qty num">${esc(d.qty)}</td>
         <td class="duedate"><span style="white-space:nowrap">${fmtDate(d.dueDate)}</span></td>
         <td><span class="memo" title="${esc(d.note)}">${esc(d.note)||"–"}</span></td>
@@ -1325,8 +1876,70 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
   document.addEventListener("keydown",e=>{
     if(e.key!=="Escape") return;
     if($("#guideBg").classList.contains("show")) closeGuide();
+    else if($("#erpBg").classList.contains("show")) closeErp();
     else if($("#modalBg").classList.contains("show")) closeModal();
   });
+
+  /* ---------- 이벤트: ERP 품목 분석 ---------- */
+  $("#erpOpen").onclick=openErp;
+  $("#erpClose").onclick=closeErp;
+  $("#erpBg").addEventListener("click",e=>{ if(e.target===$("#erpBg")) closeErp(); });
+  $("#erpInput").addEventListener("change",e=>{ addErpFiles(e.target.files); e.target.value=""; });
+  (function(){
+    const z=$("#erpZone");
+    ["dragenter","dragover"].forEach(ev=>z.addEventListener(ev,e=>{ e.preventDefault(); z.classList.add("drag"); }));
+    ["dragleave","drop"].forEach(ev=>z.addEventListener(ev,e=>{ e.preventDefault(); z.classList.remove("drag"); }));
+    z.addEventListener("drop",e=>{ if(e.dataTransfer && e.dataTransfer.files) addErpFiles(e.dataTransfer.files); });
+  })();
+  $("#erpRun").onclick=async ()=>{
+    if(!erpPick.length) return;
+    const btn=$("#erpRun"), log=$("#erpLog");
+    const lines=[]; const put=s=>{ lines.push(s); log.textContent=lines.join("\n"); log.scrollTop=log.scrollHeight; };
+    btn.disabled=true; btn.textContent="분석 중…"; log.textContent="";
+    try{
+      const built=await erpBuild(erpPick, put);
+      erp=built; saveErpLocal(built);
+      erpPick=[]; renderErpList();
+      $("#erpClear").style.display="inline-flex";
+      $("#erpDownload").style.display="";
+      renderErpPanel(); renderTable();
+      toast(`ERP 분석 완료 — 품목 ${(built.n||0).toLocaleString()}개`);
+    }catch(e){
+      put("\n✕ 실패 — "+e.message);
+      toast("ERP 분석 실패: "+e.message);
+    }finally{ btn.disabled=erpPick.length===0; btn.textContent="분석 시작"; }
+  };
+  $("#erpDownload").onclick=()=>{
+    if(!erp) return;
+    const blob=new Blob([JSON.stringify({updatedAt:erp.updatedAt, months:erp.months, n:erp.n, items:erp.items})],
+      {type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob); a.download="erp-data.json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    toast("erp-data.json 을 저장했습니다");
+  };
+  $("#erpClear").onclick=()=>{
+    if(!confirm("불러온 ERP 데이터를 지울까요? 재고·판매량 표시가 사라집니다.")) return;
+    try{ localStorage.removeItem(ERPKEY); }catch(e){}
+    erp=null; erpPick=[]; renderErpList();
+    $("#erpClear").style.display="none"; $("#erpDownload").style.display="none";
+    $("#erpLog").textContent="";
+    renderErpPanel(); renderTable();
+    toast("ERP 데이터를 지웠습니다");
+  };
+  (function(){
+    const form=$("#manualForm"); if(!form) return;
+    let t=null;
+    const ping=()=>{ clearTimeout(t); t=setTimeout(()=>{
+      renderErpPanel();
+      // 품명이 비어 있으면 ERP 품명을 채워준다
+      const hit=erpFind(form.code.value);
+      if(hit && hit.it.n && !form.itemName.value.trim()) form.itemName.value=hit.it.n;
+    }, 180); };
+    form.code.addEventListener("input", ping);
+    form.qty.addEventListener("input", ping);
+  })();
 
   $("#connBtn").onclick=openModal;
   $("#bannerSetup").onclick=openModal;
@@ -1438,6 +2051,15 @@ function notify_(items){ const key=P.getProperty('KAKAO_KEY'), rt=P.getProperty(
   }
   applyCfg();
   refresh({quiet:true});
+
+  // ERP 데이터: 같은 폴더의 erp-data.json(팀 공용) 과 내 브라우저 저장본 중 최신을 쓴다
+  (async function(){
+    erp=loadErpLocal();
+    renderErpPanel();
+    const shared=await fetchSharedErp();
+    if(shared && (!erp || String(shared.updatedAt||"") > String(erp.updatedAt||""))) erp=shared;
+    renderErpPanel(); renderTable();
+  })();
 })();
 </script>
 </body>
