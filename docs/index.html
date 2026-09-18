@@ -463,7 +463,8 @@
   .erp-setup summary::-webkit-details-marker{display:none}
   .erp-setup summary::before{content:"+"; font-family:ui-monospace,Menlo,monospace; color:var(--accent); font-weight:800}
   .erp-setup[open] summary::before{content:"−"}
-  .erp-setup > *:not(summary){margin-left:14px; margin-right:14px}
+  /* 안쪽 요소에 좌우 여백을 주므로, 폭이 100%인 버튼이 상자를 넘지 않도록 함께 줄인다 */
+  .erp-setup > *:not(summary){margin-left:14px; margin-right:14px; max-width:calc(100% - 28px)}
   .erp-setup > *:last-child{margin-bottom:14px}
   .erp-sep{height:1px; background:var(--border); margin:20px 0 16px}
 
