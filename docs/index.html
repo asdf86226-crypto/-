@@ -420,6 +420,14 @@
             display:flex; align-items:center; gap:8px; flex-wrap:wrap}
   .erp-meta .linkbtn{margin-left:auto; padding:4px 8px; font-size:11px}
   .stock-note{display:block; font-size:11px; font-weight:700; margin-top:3px; font-variant-numeric:tabular-nums}
+  /* 품목코드 바로 아래에 붙는 한 줄 요약 — 스크롤하지 않아도 보이도록 */
+  .erp-inline{margin:-4px 0 12px; border:1px solid var(--border); border-left:3px solid var(--tc,var(--accent));
+              border-radius:6px; padding:8px 11px; background:var(--surface-2); font-size:12px; line-height:1.55}
+  .erp-inline .nums{font-weight:800; font-variant-numeric:tabular-nums; color:var(--tc,var(--ink))}
+  .erp-inline .sub{color:var(--muted); font-size:11px; margin-top:2px}
+  .erp-inline .sub b{color:var(--ink)}
+  .erp-inline.miss{border-left-color:var(--faint)}
+  .erp-inline.miss .nums{color:var(--muted); font-weight:700}
 
   /* ERP 업로드 모달 */
   .erp-files{list-style:none; margin:12px 0 0; padding:0; display:flex; flex-direction:column; gap:6px}
@@ -475,6 +483,7 @@
       <span class="brand-sub">개발 · 자재 · 생산 · 품질</span>
     </div>
     <button class="guide-btn" id="guideBtn" title="사용설명서 열기">📖 사용설명서</button>
+    <button class="sync-btn" id="erpTopBtn" title="ERP 재고·판매 데이터 상태 확인 / 불러오기">📦 <span id="erpTopLabel">ERP 데이터</span></button>
     <button class="conn local" id="connBtn" title="공유 연결 설정"><span class="dot"></span><span id="connLabel">로컬 저장</span></button>
     <button class="sync-btn" id="refreshBtn" title="구글 시트에서 최신 내용을 다시 불러옵니다" style="display:none">⟳ 새로고침</button>
     <button class="icon-btn" id="themeBtn" title="테마 전환">◑</button>
@@ -864,8 +873,8 @@ function erpBlob_(){
          • <b>엑셀로 받기</b> — 목록 아래 <b>⬇ CSV 내보내기</b>를 누르면 지금 보이는 목록을 파일로 받습니다.</p>
 
       <h3><span class="n">5</span>재고 · 판매량 함께 보기</h3>
-      <p>품목코드를 입력하면 왼쪽 아래 <b>품목 분석</b>에 그 품목의 <b>현재고 · 월평균 소요 · 소진 예상</b>이 바로 나타납니다.
-         목록에서도 품명 아래에 같은 내용이 한 줄로 표시됩니다.</p>
+      <p>품목코드를 입력하면 <b>바로 아래에</b> 그 품목의 <b>현재고 · 월평균 소요 · 소진 예상</b>이 한 줄로 나타납니다.
+         왼쪽 아래 <b>품목 분석</b> 칸에는 더 자세한 내용이, 오른쪽 목록에는 품명 아래에 같은 요약이 표시됩니다.</p>
       <p>• <b>소진 예상</b> — 지금 재고로 몇 개월을 버틸 수 있는지입니다. <b style="color:var(--s-late)">1개월 미만은 빨간색</b>,
          2개월 미만은 주황색으로 표시되니 수량을 정할 때 참고하세요. 요청 수량을 넣으면 <b>그 수량을 받은 뒤 몇 개월이 되는지</b>도 같이 보여줍니다.<br>
          • <b>월평균 소요</b>가 어디서 나온 값인지도 아래에 적혀 있습니다.
@@ -1019,6 +1028,7 @@ function erpBlob_(){
             <input name="qty" type="number" min="0" step="any" placeholder="0" required>
           </div>
         </div>
+        <div class="erp-inline" id="erpInline" style="display:none"></div>
         <div class="field">
           <label>품명 <span class="req">*</span></label>
           <input name="itemName" placeholder="예: 스테인리스 볼트 M4" required autocomplete="off">
@@ -1694,6 +1704,11 @@ function erpBlob_(){
       <button class="linkbtn" data-erp="open">갱신</button></div>`;
   }
   function renderErpPanel(){
+    renderErpPanelBody();
+    renderErpInline();
+    updateErpTop();
+  }
+  function renderErpPanelBody(){
     const body=$("#erpBody"); if(!body) return;
 
     if(!erp){
@@ -1768,6 +1783,44 @@ function erpBlob_(){
   }
   function bindErpPanel(body){
     body.querySelectorAll('[data-erp="open"]').forEach(b=>b.onclick=openErp);
+  }
+  // 품목코드 칸 바로 아래 한 줄 요약 (긴 패널은 아래로 밀려 안 보일 수 있어서)
+  function renderErpInline(){
+    const el=$("#erpInline"); if(!el) return;
+    const form=$("#manualForm");
+    const code=form ? (form.code.value||"").trim() : "";
+    if(!erp || !code){ el.style.display="none"; return; }
+    const hit=erpFind(code);
+    el.style.display="";
+    if(!hit){
+      el.className="erp-inline miss"; el.removeAttribute("style"); el.style.display="";
+      el.innerHTML=`<div class="nums">ERP에 없는 품목코드</div>
+        <div class="sub">코드를 확인해 주세요. 신규 품목이면 그대로 요청하셔도 됩니다.</div>`;
+      return;
+    }
+    const it=hit.it;
+    const raw=(it.s==null?null:it.s), stock=(raw==null?null:Math.max(0,raw)), dem=it.d||0;
+    const left=(stock!=null && dem>0) ? stock/dem : null;
+    const tone=erpTone(left);
+    const p=[];
+    p.push(stock==null?"재고 –":("재고 "+erpN(stock)+(raw<0?" (확인필요)":"")));
+    p.push(dem>0 ? "월 "+erpN(dem) : "월 –");
+    if(left!=null) p.push(left.toFixed(1)+"개월");
+    const q=form?erpNum(form.qty.value):0;
+    const after=(stock!=null && dem>0 && q>0) ? (stock+q)/dem : null;
+    el.className="erp-inline"; el.style.setProperty("--tc",tone); el.style.display="";
+    el.innerHTML=`<div class="nums">${p.join(" · ")}</div>
+      <div class="sub">${
+        after!=null ? `요청 ${erpN(q)}개를 받으면 <b>${after.toFixed(1)}개월</b>치가 됩니다`
+        : left!=null ? (left<1?"1개월 이내에 소진됩니다":(left<2?"2개월 이내에 소진됩니다":"재고에 여유가 있습니다"))
+        : (dem>0?"재고 정보가 없습니다":"최근 판매·생산 실적이 없습니다")}</div>`;
+  }
+  function updateErpTop(){
+    const l=$("#erpTopLabel"); if(!l) return;
+    l.textContent = erp ? ("ERP "+String(erp.updatedAt||"").slice(5).replace("-",".")) : "ERP 데이터";
+    const b=$("#erpTopBtn"); if(b) b.title = erp
+      ? `ERP 기준 ${erp.updatedAt} · 품목 ${(erp.n||0).toLocaleString()}개 — 눌러서 상태 확인/갱신`
+      : "ERP 재고·판매 데이터를 아직 불러오지 않았습니다 — 눌러서 설정";
   }
   // 목록 표의 품명 아래에 붙는 한 줄 요약
   function erpRowNote(code){
@@ -2205,6 +2258,7 @@ function erpBlob_(){
 
   /* ---------- 이벤트: ERP 품목 분석 ---------- */
   $("#erpOpen").onclick=openErp;
+  $("#erpTopBtn").onclick=openErp;
   $("#erpClose").onclick=closeErp;
   $("#erpBg").addEventListener("click",e=>{ if(e.target===$("#erpBg")) closeErp(); });
   $("#erpInput").addEventListener("change",e=>{ addErpFiles(e.target.files); e.target.value=""; });
