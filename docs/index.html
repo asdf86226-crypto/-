@@ -588,12 +588,18 @@ function erpRefreshOnce(){
   ScriptApp.getProjectTriggers().forEach(t=&gt;{ if(t.getHandlerFunction()==='erpRefreshOnce') ScriptApp.deleteTrigger(t); });
   erpRefresh(); }
 function erpRefresh(){
+  // 실패해도 원인이 대시보드에 보이도록 기록해 둔다
+  try{ return erpRun_(); }
+  catch(e){ P.setProperty('ERP_LOG','[실패] '+e.message+'\n'
+      +Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy-MM-dd HH:mm')); throw e; } }
+function erpRun_(){
   const id=P.getProperty('ERP_FOLDER'); if(!id) throw new Error('먼저 ERP설정 을 한 번 실행하세요');
   const t0=Date.now(), D={stock:{},name:{},kind:{},bom:{},sales:{},months:{}}, log=[];
   const it=DriveApp.getFolderById(id).getFiles();
   while(it.hasNext()){ const f=it.next(), nm=f.getName();
     if(nm.charAt(0)==='~') continue;
     try{ log.push('· '+nm+' — '+erpFile_(f,D)); }catch(e){ log.push('· '+nm+' ⚠ '+e.message); } }
+  if(!log.length) throw new Error('폴더가 비어 있습니다 — ERP 파일을 넣어주세요');
   const out=erpCompute_(D); erpSave_(out);
   const s='ERP 갱신 '+out.updatedAt+' · '+Math.round((Date.now()-t0)/1000)+'초 · 품목 '+out.n+'개 · 판매 '+out.months+'개월\n'+log.join('\n');
   P.setProperty('ERP_LOG', s.substring(0,8000)); Logger.log(s); return s; }
@@ -1374,8 +1380,10 @@ function erpBlob_(){
     let meta;
     try{ meta=await jsonpGet(cfg.exec+"?erp=meta"); }catch(e){ return false; }
     if(!meta || !meta.ok) return false;
-    erpAuto={ ver:meta.ver||"", folder:meta.folder||"", log:meta.log||"" };
-    if(!erpAuto.ver) return false;                     // 아직 자동 갱신을 설정하지 않음
+    // 예전 Apps Script 코드가 배포돼 있으면 erp 관련 값이 아예 오지 않는다
+    const known = ("folder" in meta) || ("ver" in meta);
+    erpAuto={ known:known, ver:meta.ver||"", folder:meta.folder||"", log:meta.log||"" };
+    if(!erpAuto.ver) return false;                     // 아직 한 번도 계산되지 않음
     if(erpAuto.ver===erpVer() && erp) return false;    // 이미 최신
     let got;
     try{ got=await jsonpGet(cfg.exec+"?erp=data"); }catch(e){ return false; }
@@ -1802,40 +1810,78 @@ function erpBlob_(){
           오른쪽 위 <b>연결 배지</b>를 눌러 먼저 시트에 연결해 주세요.</div>`;
       return;
     }
-    if(!erpAuto || !erpAuto.ver){
-      box.className="erp-auto off";
-      box.innerHTML=`<div class="st"><span class="dot"></span>아직 설정되지 않았습니다</div>
-        <div class="sub">아래 <b>최초 1회 설정 방법</b>을 따라 한 번만 해두면,
-          그 뒤로는 <b>폴더에 파일을 덮어쓰기만</b> 하면 됩니다.</div>`;
+    if(!erpAuto){
+      box.className="erp-auto";
+      box.innerHTML=`<div class="st"><span class="dot"></span>상태를 확인하는 중…</div>`;
       return;
     }
+    // ① 새 코드가 아직 배포되지 않음 — 웹앱이 erp 관련 응답을 전혀 주지 않는다
+    if(!erpAuto.known){
+      box.className="erp-auto off";
+      box.innerHTML=`<div class="st"><span class="dot"></span>Apps Script 코드가 아직 예전 것입니다</div>
+        <div class="sub">아래 <b>최초 1회 설정 방법</b>의 <b>1~3번</b>을 마쳐야 합니다.
+          코드를 붙여넣고 저장까지 했더라도, <b>3번 “배포 → 배포 관리 → ✏ 편집 → 버전: 새 버전 → 배포”</b>를
+          하지 않으면 예전 코드가 그대로 돌아갑니다. 가장 흔한 원인이니 먼저 확인해 주세요.</div>`;
+      return;
+    }
+    // ② 코드는 올라갔지만 ERP설정 을 아직 실행하지 않음 — 폴더가 없다
+    if(!erpAuto.folder){
+      box.className="erp-auto off";
+      box.innerHTML=`<div class="st"><span class="dot"></span>코드는 준비됐습니다 — <b>ERP설정</b> 실행만 남았어요</div>
+        <div class="sub">Apps Script 편집기 위쪽 함수 목록에서 <b>ERP설정</b> 을 고르고 <b>▷ 실행</b> 해 주세요.
+          실행 로그에 ERP 파일을 넣을 <b>폴더 주소</b>가 나옵니다.</div>`;
+      return;
+    }
+    // ③ 폴더까지 준비됐지만 아직 한 번도 계산하지 않음
+    if(!erpAuto.ver){
+      box.className="erp-auto off";
+      box.innerHTML=`<div class="st"><span class="dot"></span>폴더 준비 완료 — 첫 계산만 남았습니다</div>
+        <div class="sub">아래 폴더에 ERP 파일을 넣은 다음 <b>⟳ 지금 갱신</b>을 눌러주세요.
+          넣어두기만 해도 <b>내일 새벽 4시</b>에 저절로 계산됩니다.</div>
+        ${erpActs()}${erpLogBox()}`;
+      bindErpNow(); return;
+    }
+    // ④ 정상 작동 중
     const v=String(erpAuto.ver).split("|");
     box.className="erp-auto on";
     box.innerHTML=`<div class="st"><span class="dot"></span>자동 갱신 중 · 매일 새벽 4시</div>
       <div class="sub">마지막 갱신 <b>${esc(v[0]||"–")}</b>${v[1]?` · 품목 <b>${(+v[1]).toLocaleString()}개</b>`:""}</div>
-      <div class="acts">
-        ${erpAuto.folder?`<a class="linkbtn" href="${esc(erpAuto.folder)}" target="_blank" rel="noopener">📂 ERP 파일 폴더 열기</a>`:""}
-        <button class="linkbtn" id="erpNow">⟳ 지금 갱신</button>
-      </div>
-      ${erpAuto.log?`<pre>${esc(erpAuto.log)}</pre>`:""}`;
-    const nb=$("#erpNow");
-    if(nb) nb.onclick=async ()=>{
+      ${erpActs()}${erpLogBox()}`;
+    bindErpNow();
+  }
+  function erpActs(){
+    return `<div class="acts">
+      ${erpAuto.folder?`<a class="linkbtn" href="${esc(erpAuto.folder)}" target="_blank" rel="noopener">📂 ERP 파일 폴더 열기</a>`:""}
+      <button class="linkbtn" id="erpNow">⟳ 지금 갱신</button>
+    </div>`;
+  }
+  function erpLogBox(){ return erpAuto.log?`<pre>${esc(erpAuto.log)}</pre>`:""; }
+  function bindErpNow(){
+    const nb=$("#erpNow"); if(!nb) return;
+    nb.onclick=async ()=>{
       nb.disabled=true; nb.textContent="⟳ 갱신 요청 중…";
       try{
         await requestErpRefresh();
         toast("갱신을 시작했습니다 — 1~3분 뒤 자동으로 반영됩니다");
-        setTimeout(pollErpAfterRefresh, 60000);
-      }catch(e){ toast("갱신 요청 실패: "+e.message); }
-      nb.disabled=false; nb.textContent="⟳ 지금 갱신";
+        nb.textContent="⟳ 계산 중… (최대 3분)";
+        setTimeout(()=>pollErpAfterRefresh(0), 45000);
+      }catch(e){
+        toast("갱신 요청 실패: "+e.message);
+        nb.disabled=false; nb.textContent="⟳ 지금 갱신";
+      }
     };
   }
   // '지금 갱신' 후 완료를 기다렸다가 화면에 반영 (최대 5분)
   async function pollErpAfterRefresh(tries){
     tries=tries||0;
+    const before=erpAuto ? erpAuto.log : "";
     const changed=await syncErpFromSheet();
     renderErpAuto();
     if(changed){ renderErpPanel(); renderTable(); toast("ERP 데이터가 갱신되었습니다"); return; }
+    const log=(erpAuto && erpAuto.log)||"";
+    if(log!==before && /\[실패\]/.test(log)){ toast("갱신에 실패했습니다 — 아래 기록을 확인하세요"); return; }
     if(tries<8) setTimeout(()=>pollErpAfterRefresh(tries+1), 30000);
+    else toast("아직 결과가 없습니다 — 폴더에 파일이 들어 있는지 확인해 주세요");
   }
   function openErp(){
     $("#erpClear").style.display = erp ? "inline-flex" : "none";
