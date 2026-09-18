@@ -76,8 +76,11 @@ python -m http.server -d docs 8080
 
 동작 방식
 - `ERP설정` 이 Drive 폴더 생성 + 매일 04:00 시간 기반 트리거 설치
-- `erpRefresh` 가 폴더의 파일을 읽어(`.xlsx` 는 Drive API로 구글시트 변환 후 읽고 즉시 휴지통 이동)
-  계산한 뒤, 결과 JSON을 `erp_blob` 탭에 40,000자씩 나눠 저장
+- `erpRefresh` 가 폴더의 파일을 읽어 계산한 뒤, 결과 JSON을 `erp_blob` 탭에 40,000자씩 나눠 저장
+  - `.xlsx` 는 `Utilities.unzip` 으로 직접 풀어 `sheet1.xml` 을 읽습니다(Drive API 변환을 쓰지 않음 —
+    v3 `files.copy` 는 `mimeType` 변환을 지원하지 않아 400을 돌려줍니다). 8개 파일 3만여 행에 1초 미만
+  - CSV 는 `Utilities.parseCsv`, 구글 시트로 저장된 파일은 그대로 읽습니다
+  - 구매요청 스프레드시트가 같은 폴더에 있어도 알아서 건너뜁니다
 - 대시보드는 `?erp=meta` 로 **버전만** 먼저 확인하고, 바뀐 경우에만 `?erp=data` 로 본문을 받아
   localStorage에 캐시합니다 (매번 400KB를 받지 않음)
 - 모달의 **⟳ 지금 갱신** 은 `erpRefreshOnce` 일회성 트리거를 걸어 5초 뒤 백그라운드로 실행합니다

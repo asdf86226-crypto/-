@@ -604,26 +604,87 @@ function erpRefresh(){
 function erpRun_(){
   const id=P.getProperty('ERP_FOLDER'); if(!id) throw new Error('먼저 ERP설정 을 한 번 실행하세요');
   const t0=Date.now(), D={stock:{},name:{},kind:{},bom:{},sales:{},months:{}}, log=[];
+  const self=SpreadsheetApp.getActiveSpreadsheet().getId();
   const it=DriveApp.getFolderById(id).getFiles();
   while(it.hasNext()){ const f=it.next(), nm=f.getName();
-    if(nm.charAt(0)==='~') continue;
+    if(nm.charAt(0)==='~' || f.getId()===self) continue;
     try{ log.push('· '+nm+' — '+erpFile_(f,D)); }catch(e){ log.push('· '+nm+' ⚠ '+e.message); } }
   if(!log.length) throw new Error('폴더가 비어 있습니다 — ERP 파일을 넣어주세요');
   const out=erpCompute_(D); erpSave_(out);
   const s='ERP 갱신 '+out.updatedAt+' · '+Math.round((Date.now()-t0)/1000)+'초 · 품목 '+out.n+'개 · 판매 '+out.months+'개월\n'+log.join('\n');
   P.setProperty('ERP_LOG', s.substring(0,8000)); Logger.log(s); return s; }
 function erpRows_(f){
-  const nm=f.getName().toLowerCase();
-  if(/\.(csv|tsv|txt)$/.test(nm)) return Utilities.parseCsv(f.getBlob().getDataAsString('UTF-8').replace(/^﻿/,''));
-  if(!/\.xlsx$/.test(nm)) return null;
-  const r=UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/'+f.getId()+'/copy?supportsAllDrives=true',{
-    method:'post', contentType:'application/json', muteHttpExceptions:true,
-    headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},
-    payload:JSON.stringify({name:'~tmp '+f.getName(), mimeType:'application/vnd.google-apps.spreadsheet'})});
-  const o=JSON.parse(r.getContentText()||'{}');
-  if(!o.id) throw new Error('엑셀 변환 실패 '+r.getResponseCode());
-  try{ return SpreadsheetApp.openById(o.id).getSheets()[0].getDataRange().getDisplayValues(); }
-  finally{ try{ DriveApp.getFileById(o.id).setTrashed(true); }catch(e){} } }
+  const mt=f.getMimeType(), nm=f.getName(), low=nm.toLowerCase();
+  // 구글 시트로 저장돼 있으면 그대로 읽는다 (구매요청 시트 자신은 건너뜀)
+  if(mt==='application/vnd.google-apps.spreadsheet'){
+    if(f.getId()===SpreadsheetApp.getActiveSpreadsheet().getId()) return null;
+    return SpreadsheetApp.openById(f.getId()).getSheets()[0].getDataRange().getDisplayValues(); }
+  if(/\.(csv|tsv|txt)$/.test(low) || mt==='text/csv' || mt==='text/plain')
+    return Utilities.parseCsv(f.getBlob().getDataAsString('UTF-8').replace(/^﻿/,''));
+  if(/\.xlsx$/.test(low) || mt==='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    return erpXlsx_(f.getBlob());
+  if(/\.xls$/.test(low)) throw new Error('옛 .xls 형식입니다 — .xlsx 나 CSV 로 저장해 주세요');
+  return null; }
+// .xlsx 는 zip 이다. 구글 드라이브 변환을 거치지 않고 여기서 바로 풀어 읽는다.
+function erpXlsx_(blob){
+  let parts;
+  try{ parts=Utilities.unzip(blob.setContentType('application/zip')); }
+  catch(e){ throw new Error('엑셀 파일을 여는 데 실패했습니다 — CSV 로 저장해 올려주세요'); }
+  const map={};
+  for(let i=0;i&lt;parts.length;i++) map[parts[i].getName()]=parts[i];
+  const get=n=&gt; map[n] ? map[n].getDataAsString('UTF-8') : '';
+  // 공유 문자열
+  const shared=[], ssx=get('xl/sharedStrings.xml');
+  if(ssx){ const si=/&lt;si\b[^&gt;]*&gt;([\s\S]*?)&lt;\/si&gt;/g; let m;
+    while((m=si.exec(ssx))){ let s=''; const t=/&lt;t\b[^&gt;]*&gt;([\s\S]*?)&lt;\/t&gt;/g; let x;
+      while((x=t.exec(m[1]))) s+=x[1];
+      shared.push(erpUnesc_(s)); } }
+  // 날짜 서식 (cellStyleXfs 가 아니라 cellXfs 안의 xf 만)
+  const dateStyle=[], stx=get('xl/styles.xml');
+  if(stx){ const fmt={}, fr=/&lt;numFmt\b[^&gt;]*numFmtId="(\d+)"[^&gt;]*formatCode="([^"]*)"/g; let f2;
+    while((f2=fr.exec(stx))) fmt[f2[1]]=erpUnesc_(f2[2]);
+    const isDate=id=&gt;{ const k=+id; if((k&gt;=14&amp;&amp;k&lt;=22)||(k&gt;=45&amp;&amp;k&lt;=47)) return true;
+      const c=fmt[id]; return c ? /[dmy]/i.test(c.replace(/\[[^\]]*\]/g,'').replace(/"[^"]*"/g,'')) : false; };
+    const cx=stx.match(/&lt;cellXfs\b[\s\S]*?&lt;\/cellXfs&gt;/);
+    if(cx){ const xr=/&lt;xf\b[^&gt;]*&gt;/g; let x, i=0;
+      while((x=xr.exec(cx[0]))){ const id=(x[0].match(/numFmtId="(\d+)"/)||[])[1]||'0'; dateStyle[i++]=isDate(id); } } }
+  const names=[];
+  for(const k in map) if(/^xl\/worksheets\/sheet\d+\.xml$/.test(k)) names.push(k);
+  if(!names.length) throw new Error('워크시트를 찾을 수 없습니다');
+  names.sort();
+  const xml=get(names[0]), rows=[];
+  const rr=/&lt;row\b[^&gt;]*&gt;([\s\S]*?)&lt;\/row&gt;/g, cr=/&lt;c\b([^&gt;]*?)(?:\/&gt;|&gt;([\s\S]*?)&lt;\/c&gt;)/g;
+  let r;
+  while((r=rr.exec(xml))){
+    const cells=[]; let c; cr.lastIndex=0;
+    while((c=cr.exec(r[1]))){
+      const at=c[1]||'', body=c[2]||'';
+      const ref=(at.match(/r="([A-Z]+)/)||[])[1]||'';
+      const t=(at.match(/t="([^"]*)"/)||[])[1]||'';
+      const st=(at.match(/s="(\d+)"/)||[])[1];
+      let col; if(ref){ col=0; for(let i=0;i&lt;ref.length;i++) col=col*26+(ref.charCodeAt(i)-64); col--; } else col=cells.length;
+      let val='';
+      if(t==='s'){ const v=(body.match(/&lt;v&gt;([\s\S]*?)&lt;\/v&gt;/)||[])[1]; val=shared[+v]||''; }
+      else if(t==='inlineStr'){ let s2=''; const tr=/&lt;t\b[^&gt;]*&gt;([\s\S]*?)&lt;\/t&gt;/g; let tm;
+        while((tm=tr.exec(body))) s2+=tm[1]; val=erpUnesc_(s2); }
+      else { const v=(body.match(/&lt;v&gt;([\s\S]*?)&lt;\/v&gt;/)||[])[1];
+        const raw=(v==null)?'':erpUnesc_(v);
+        val=(raw!=='' &amp;&amp; st!=null &amp;&amp; dateStyle[+st]) ? erpSerial_(+raw) : raw; }
+      cells[col]=val; }
+    for(let i=0;i&lt;cells.length;i++) if(cells[i]==null) cells[i]='';
+    rows.push(cells); }
+  return rows; }
+function erpUnesc_(s){
+  if(s.indexOf('&amp;')&lt;0) return s;
+  return s.replace(/&amp;(lt|gt|amp|quot|apos|#\d+|#x[0-9a-fA-F]+);/g,(m,e)=&gt;{
+    if(e==='lt') return '&lt;'; if(e==='gt') return '&gt;'; if(e==='amp') return '&amp;';
+    if(e==='quot') return '"'; if(e==='apos') return "'";
+    if(e.charAt(0)==='#'){ const n = e.charAt(1)==='x' ? parseInt(e.slice(2),16) : +e.slice(1);
+      return isFinite(n) ? String.fromCharCode(n) : m; }
+    return m; }); }
+function erpSerial_(n){
+  const d=new Date(Date.UTC(1899,11,30)+Math.round(n)*86400000);
+  return d.getUTCFullYear()+'-'+('0'+(d.getUTCMonth()+1)).slice(-2)+'-'+('0'+d.getUTCDate()).slice(-2); }
 function erpNorm_(v){
   if(v instanceof Date) return Utilities.formatDate(v,Session.getScriptTimeZone(),'yyyy-MM-dd');
   let s=String(v==null?'':v).trim(); if(!s) return '';
@@ -654,7 +715,9 @@ function erpCols_(rows,hi){ const m={};
   (rows[hi]||[]).forEach((c,i)=&gt;{ const k=erpHdr_(c); if(k&amp;&amp;m[k]==null) m[k]=i; }); return m; }
 function erpCol_(m,names){ for(let i=0;i&lt;names.length;i++) if(m[names[i]]!=null) return m[names[i]]; return null; }
 function erpFile_(f,D){
-  const rows=erpRows_(f); if(!rows||!rows.length) return '읽을 내용 없음';
+  const rows=erpRows_(f);
+  if(rows===null) return '건너뜀 (엑셀·CSV·구글시트가 아님)';
+  if(!rows.length) return '내용이 비어 있음';
   let hi=erpHead_(rows,['생산품목코드','소모품목코드']); if(hi&gt;=0) return erpBom_(rows,hi,D);
   hi=erpHead_(rows,['품목코드','재고수량']); if(hi&gt;=0) return erpStock_(rows,hi,D);
   hi=erpHead_(rows,['품목코드','수량']); if(hi&gt;=0) return erpSales_(rows,hi,D);
