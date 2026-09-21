@@ -17,6 +17,8 @@
     --t-dev:#3d5a80; --t-mat:#b8762f; --t-prod:#2f7d5c; --t-qa:#7d5aa0;
     /* 상태 */
     --s-new:#b8862f; --s-prog:#3d5a80; --s-done:#2f7d5c; --s-late:#b8562f;
+    /* 소진 예상 위험도: 1개월 미만 빨강 · 2개월 미만 주황 · 그 외 초록 */
+    --risk-1:#c0342c; --risk-2:#c9791f; --risk-3:#2f7d5c;
     --shadow:0 1px 2px rgba(21,27,34,.04), 0 4px 14px rgba(21,27,34,.05);
     --radius:8px;
   }
@@ -30,6 +32,7 @@
       --ring:rgba(95,169,186,.4);
       --t-dev:#7fa6d4; --t-mat:#e0a85c; --t-prod:#5cba92; --t-qa:#b294d4;
       --s-new:#d9ad5c; --s-prog:#7fa6d4; --s-done:#5cba92; --s-late:#e08a62;
+      --risk-1:#f5776a; --risk-2:#e0a252; --risk-3:#5cba92;
       --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
     }
   }
@@ -42,6 +45,7 @@
     --ring:rgba(95,169,186,.4);
     --t-dev:#7fa6d4; --t-mat:#e0a85c; --t-prod:#5cba92; --t-qa:#b294d4;
     --s-new:#d9ad5c; --s-prog:#7fa6d4; --s-done:#5cba92; --s-late:#e08a62;
+    --risk-1:#f5776a; --risk-2:#e0a252; --risk-3:#5cba92;
     --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
   }
 
@@ -429,6 +433,13 @@
             display:flex; align-items:center; gap:8px; flex-wrap:wrap}
   .erp-meta .linkbtn{margin-left:auto; padding:4px 8px; font-size:11px}
   .stock-note{display:block; font-size:11px; font-weight:700; margin-top:3px; font-variant-numeric:tabular-nums}
+  .qty-note{display:block; font-size:11px; font-weight:700; margin-top:3px; color:var(--accent);
+            font-variant-numeric:tabular-nums; white-space:nowrap}
+  .legend{display:inline-flex; align-items:center; gap:12px; font-size:11.5px; color:var(--muted); font-weight:600}
+  .legend span{display:inline-flex; align-items:center; gap:5px; white-space:nowrap}
+  .legend i{width:8px; height:8px; border-radius:2px; flex:none}
+  .legend .lg-note{color:var(--faint); font-weight:600}
+  .legend .lg-note::before{content:"← "}
   /* 품목코드 바로 아래에 붙는 한 줄 요약 — 스크롤하지 않아도 보이도록 */
   .erp-inline{margin:-4px 0 12px; border:1px solid var(--border); border-left:3px solid var(--tc,var(--accent));
               border-radius:6px; padding:8px 11px; background:var(--surface-2); font-size:12px; line-height:1.55}
@@ -1227,6 +1238,12 @@ function erpBlob_(){
     </div>
     <div class="foot">
       <span class="info" id="footInfo"></span>
+      <span class="legend" id="legend" style="display:none">
+        <span><i style="background:var(--risk-1)"></i>1개월 미만</span>
+        <span><i style="background:var(--risk-2)"></i>2개월 미만</span>
+        <span><i style="background:var(--risk-3)"></i>여유</span>
+        <span class="lg-note">소진 예상</span>
+      </span>
       <button class="linkbtn" id="exportBtn">⬇ CSV 내보내기</button>
       <button class="linkbtn danger" id="clearBtn">전체 삭제</button>
     </div>
@@ -1834,8 +1851,9 @@ function erpBlob_(){
     const a=Math.abs(v);
     return (a>=100 ? Math.round(v) : Math.round(v*10)/10).toLocaleString();
   }
-  // 소진 예상에 따른 색: 1개월 미만 위험 / 2개월 미만 주의 / 그 외 여유
-  function erpTone(m){ return m==null ? "var(--muted)" : (m<1 ? "var(--s-late)" : (m<2 ? "var(--s-new)" : "var(--s-done)")); }
+  // 소진 예상에 따른 색: 1개월 미만 빨강(위험) / 2개월 미만 주황(주의) / 그 외 초록(여유)
+  function erpTone(m){ return m==null ? "var(--muted)" : (m<1 ? "var(--risk-1)" : (m<2 ? "var(--risk-2)" : "var(--risk-3)")); }
+  function erpToneWord(m){ return m==null ? "" : (m<1 ? "1개월 이내 — 시급" : (m<2 ? "2개월 이내 — 주의" : "여유")); }
 
   /* ---------- 렌더: 품목 분석 패널 ---------- */
   function erpMetaRow(){
@@ -1992,6 +2010,19 @@ function erpBlob_(){
       ? `ERP 기준 ${erp.updatedAt} · 품목 ${(erp.n||0).toLocaleString()}개 — 눌러서 상태 확인/갱신`
       : "ERP 재고·판매 데이터를 아직 불러오지 않았습니다 — 눌러서 설정";
   }
+  // 목록 표에서 수량 아래에 붙는 '이번 요청 = 몇 개월치'
+  function erpQtyNote(d){
+    const hit=erpFind(d.code); if(!hit) return "";
+    const it=hit.it, dem=it.d||0; if(!dem) return "";
+    const q=parseFloat(String(d.qty).replace(/[^\d.\-]/g,""))||0;
+    if(q<=0) return "";
+    const add=q/dem;
+    const raw=(it.s==null?null:it.s), stock=(raw==null?null:Math.max(0,raw));
+    const after=(stock!=null)?(stock+q)/dem:null;
+    const tip = "요청 "+erpN(q)+"개 ÷ 월평균 소요 "+erpN(dem)+"개 = "+add.toFixed(1)+"개월치"
+      + (after!=null ? " · 입고하면 "+after.toFixed(1)+"개월분 보유" : "");
+    return `<span class="qty-note" title="${esc(tip)}">+${add.toFixed(1)}개월</span>`;
+  }
   // 목록 표의 품명 아래에 붙는 한 줄 요약
   function erpRowNote(code){
     const hit=erpFind(code); if(!hit) return "";
@@ -2003,7 +2034,9 @@ function erpBlob_(){
     if(stock!=null) p.push("재고 "+erpN(stock)+(raw<0?"(확인필요)":""));
     if(dem>0) p.push("월 "+erpN(dem));
     if(left!=null) p.push(left.toFixed(1)+"개월");
-    return `<span class="stock-note" style="color:${erpTone(left)}">${p.join(" · ")}</span>`;
+    const tip = (it.n ? it.n+" · " : "")
+      + (left!=null ? "소진 예상 "+left.toFixed(1)+"개월 ("+erpToneWord(left)+")" : "소진 예상을 계산할 수 없습니다");
+    return `<span class="stock-note" style="color:${erpTone(left)}" title="${esc(tip)}">${p.join(" · ")}</span>`;
   }
 
   /* ---------- ERP 모달 ---------- */
@@ -2215,7 +2248,7 @@ function erpBlob_(){
         <td><span class="chip team-chip" style="--tc:var(${TEAMVAR[d.team]||'--accent'})"><span class="dot" style="background:var(${TEAMVAR[d.team]||'--accent'})"></span>${esc(d.team)}</span></td>
         <td class="code">${esc(d.code)}</td>
         <td class="name">${esc(d.itemName)}${d.requester?`<span class="memo">요청: ${esc(d.requester)}</span>`:""}${erpRowNote(d.code)}</td>
-        <td class="qty num">${esc(d.qty)}</td>
+        <td class="qty num">${esc(d.qty)}${erpQtyNote(d)}</td>
         <td class="duedate"><span style="white-space:nowrap">${fmtDate(d.dueDate)}</span></td>
         <td><span class="memo" title="${esc(d.note)}">${esc(d.note)||"–"}</span></td>
         <td><div class="rowbtns">
@@ -2232,6 +2265,8 @@ function erpBlob_(){
       await refresh();
     });
     $("#footInfo").textContent = data.length ? `${rows.length}건 표시 · 총 ${data.length}건` : "";
+    const lg=$("#legend");
+    if(lg) lg.style.display = (data.length && erp) ? "" : "none";
     document.querySelectorAll("thead th").forEach(th=>{
       th.classList.toggle("sorted", th.dataset.sort===sortKey);
       const a=th.querySelector(".arw"); if(a) a.textContent = th.dataset.sort===sortKey ? (sortDir===1?"▲":"▼") : "▾";
