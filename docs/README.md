@@ -148,6 +148,9 @@ python -m http.server -d docs 8080
 - 읽기: JSONP(`<script>`)로 웹앱 `doGet` 호출 → 목록 수신
 - 쓰기: `fetch(..., mode:'no-cors')` 로 `doPost` 에 add/update/remove/clear 전송 후 재조회
 - 데이터는 시트의 `requests` 탭에 `id, createdAt, team, code, itemName, qty, dueDate, requester, note` 열로 저장
+- 저장 시 해당 행을 **텍스트 서식(`@`)** 으로 고정합니다. 그렇게 하지 않으면 구글 시트가
+  `717062.0` 같은 품목코드를 숫자로 인식해 `717062` 로 바꿔버립니다
+  (ERP에는 `11058.0`=도금품 / `11058`=미도금품 처럼 **끝자리 `.0` 유무로 구분되는 품목이 532개** 있습니다)
 
 ## 데이터 저장 위치
 

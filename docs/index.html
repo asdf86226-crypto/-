@@ -527,6 +527,12 @@ const COLS = ['id','createdAt','team','code','itemName','qty','dueDate','request
 const P = PropertiesService.getScriptProperties();
 function sh_(){ const ss=SpreadsheetApp.getActiveSpreadsheet(); let s=ss.getSheetByName(SHEET);
   if(!s){ s=ss.insertSheet(SHEET); } if(s.getLastRow()===0){ s.appendRow(COLS); } return s; }
+// 품목코드 '717062.0' 을 시트가 숫자 717062 로 바꿔버리지 않도록 텍스트 서식으로 고정한다.
+// 열 전체를 한 번 고쳐두면 다음부터는 그대로 들어간다.
+function fixFormat_(s){
+  if(P.getProperty('TEXT_FMT')==='1') return;
+  try{ s.getRange(1,1,Math.max(s.getMaxRows(),1),COLS.length).setNumberFormat('@');
+       P.setProperty('TEXT_FMT','1'); }catch(e){} }
 function read_(){ const s=sh_(); const v=s.getDataRange().getValues(); const h=v[0];
   return v.slice(1).map(r=&gt;{ const o={}; h.forEach((k,i)=&gt;{ let c=r[i];
     if(c instanceof Date) c=Utilities.formatDate(c,Session.getScriptTimeZone(),'yyyy-MM-dd'); o[k]=c; }); return o; })
@@ -546,9 +552,13 @@ function doGet(e){ const p=e.parameter||{};
   return jsonp_(p.callback,{ok:true,rows:read_()}); }
 function doPost(e){ const b=JSON.parse(e.postData.contents||'{}'); const s=sh_();
   const v=s.getDataRange().getValues(), h=v[0], idc=h.indexOf('id');
-  if(b.action==='add'){ (b.items||[]).forEach(it=&gt;{ const id=Utilities.getUuid();
-    const cd=Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy-MM-dd');
-    s.appendRow(COLS.map(k=&gt; k==='id'?id : k==='createdAt'?cd : (it[k]!=null?it[k]:''))); });
+  if(b.action==='add'){ fixFormat_(s);
+    (b.items||[]).forEach(it=&gt;{ const id=Utilities.getUuid();
+      const cd=Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy-MM-dd');
+      const row=COLS.map(k=&gt; k==='id'?id : k==='createdAt'?cd : (it[k]!=null?String(it[k]):''));
+      const r=s.getLastRow()+1, rng=s.getRange(r,1,1,COLS.length);
+      rng.setNumberFormats([COLS.map(()=&gt;'@')]);   // 숫자·날짜로 바뀌지 않게
+      rng.setValues([row]); });
     try{ notify_(b.items||[]); }catch(err){} }
   else if(b.action==='remove'){ for(let i=1;i&lt;v.length;i++){ if(v[i][idc]===b.id){ s.deleteRow(i+1); break; } } }
   else if(b.action==='clear'){ if(s.getLastRow()&gt;1) s.deleteRows(2,s.getLastRow()-1); }
@@ -948,7 +958,10 @@ function erpBlob_(){
       <h3><span class="n">5</span>재고 · 판매량 함께 보기</h3>
       <p>품목코드를 입력하면 <b>바로 아래에</b> 그 품목의 <b>현재고 · 월평균 소요 · 소진 예상</b>이 한 줄로 나타납니다.
          왼쪽 아래 <b>품목 분석</b> 칸에는 더 자세한 내용이, 오른쪽 목록에는 품명 아래에 같은 요약이 표시됩니다.</p>
-      <p>• <b>품명은 자동으로 채워집니다.</b> 품목코드를 바꾸면 품명도 그 품목의 것으로 따라 바뀝니다.
+      <p>• <b>품목코드는 끝자리까지 그대로</b> 적어주세요. <code>717062.0</code> 처럼 끝에 <code>.0</code> 이 붙은 코드와
+         <code>717062</code> 는 <b>서로 다른 품목</b>입니다. 코드가 ERP와 다르면 요약줄에 알려드리니
+         <b>코드 적용</b>을 누르시면 됩니다.<br>
+         • <b>품명은 자동으로 채워집니다.</b> 품목코드를 바꾸면 품명도 그 품목의 것으로 따라 바뀝니다.
          직접 고쳐 쓰신 품명은 그대로 두고, 대신 <b>ERP 품명</b>을 알려드리니 필요하면 <b>품명 적용</b>을 누르세요.<br>
          • <b>소진 예상</b> — 지금 재고로 몇 개월을 버틸 수 있는지입니다. <b style="color:var(--s-late)">1개월 미만은 빨간색</b>,
          2개월 미만은 주황색으로 표시되니 수량을 정할 때 참고하세요. 요청 수량을 넣으면 <b>그 수량을 받은 뒤 몇 개월이 되는지</b>도 같이 보여줍니다.<br>
@@ -1934,15 +1947,23 @@ function erpBlob_(){
     // 품명을 직접 고쳐서 ERP 품명과 달라졌다면, 한 번에 되돌릴 수 있게 알려준다
     const typed=form?form.itemName.value:"";
     const diff = it.n && typed.trim() && typed!==it.n;
+    // 적어 넣은 코드와 ERP 코드가 다르면(예: 끝의 .0 이 빠진 경우) 바로잡을 수 있게 한다
+    const typedCode=(form?form.code.value:"").trim();
+    const codeDiff = hit.code!==typedCode;
     el.className="erp-inline"; el.style.setProperty("--tc",tone); el.style.display="";
     el.innerHTML=`<div class="nums">${p.join(" · ")}</div>
       <div class="sub">${
         after!=null ? `요청 ${erpN(q)}개를 받으면 <b>${after.toFixed(1)}개월</b>치가 됩니다`
         : left!=null ? (left<1?"1개월 이내에 소진됩니다":(left<2?"2개월 이내에 소진됩니다":"재고에 여유가 있습니다"))
         : (dem>0?"재고 정보가 없습니다":"최근 판매·생산 실적이 없습니다")}</div>
+      ${codeDiff?`<div class="sub" style="margin-top:6px; display:flex; align-items:center; gap:6px; flex-wrap:wrap">
+        <span>ERP 코드는 <b>${esc(hit.code)}</b> 입니다</span>
+        <button class="linkbtn" id="erpFillCode" style="padding:2px 8px; font-size:11px">코드 적용</button></div>`:""}
       ${diff?`<div class="sub" style="margin-top:6px; display:flex; align-items:center; gap:6px; flex-wrap:wrap">
         <span>ERP 품명 <b>${esc(it.n)}</b></span>
         <button class="linkbtn" id="erpFillName" style="padding:2px 8px; font-size:11px">품명 적용</button></div>`:""}`;
+    const cbn=$("#erpFillCode");
+    if(cbn) cbn.onclick=()=>{ form.code.value=hit.code; applyErpName(); renderErpPanel(); };
     const fb=$("#erpFillName");
     if(fb) fb.onclick=()=>{ form.itemName.value=it.n; erpAutoName=it.n; renderErpInline(); };
   }
