@@ -221,6 +221,15 @@
 
   .table-wrap{overflow-x:auto}
   table{width:100%; border-collapse:collapse; font-size:13px; min-width:860px}
+  /* 열 너비를 정해둔다. 정하지 않으면 품명이 남는 공간을 다 먹어
+     수량·입고요청일이 화면 오른쪽 끝으로 밀려난다. */
+  thead th:nth-child(1){width:92px}    /* 접수일 */
+  thead th:nth-child(2){width:96px}    /* 요청팀 */
+  thead th:nth-child(3){width:140px}   /* 품목코드 */
+  thead th:nth-child(4){width:34%}     /* 품명 */
+  thead th:nth-child(5){width:84px}    /* 수량 */
+  thead th:nth-child(6){width:112px}   /* 입고요청일 */
+  thead th:nth-child(8){width:44px}    /* 삭제 */
   thead th{
     text-align:left; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em;
     padding:10px 14px; border-bottom:1px solid var(--border); white-space:nowrap; position:sticky; top:0; background:var(--surface); cursor:pointer; user-select:none;
