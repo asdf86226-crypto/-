@@ -17,8 +17,8 @@
     --t-dev:#3d5a80; --t-mat:#b8762f; --t-prod:#2f7d5c; --t-qa:#7d5aa0;
     /* 상태 */
     --s-new:#b8862f; --s-prog:#3d5a80; --s-done:#2f7d5c; --s-late:#b8562f;
-    /* 소진 예상 위험도: 1개월 미만 빨강 · 2개월 미만 주황 · 그 외 초록 */
-    --risk-1:#c0342c; --risk-2:#c9791f; --risk-3:#2f7d5c;
+    /* 소진 예상 위험도: 2개월 미만 빨강 · 4개월 미만 갈색 · 4개월 이상 초록 */
+    --risk-1:#c0342c; --risk-2:#b8862f; --risk-3:#2f7d5c;
     --shadow:0 1px 2px rgba(21,27,34,.04), 0 4px 14px rgba(21,27,34,.05);
     --radius:8px;
   }
@@ -987,9 +987,9 @@ function erpBlob_(){
          • <b>품명은 자동으로 채워집니다.</b> 품목코드를 바꾸면 품명도 그 품목의 것으로 따라 바뀝니다.
          직접 고쳐 쓰신 품명은 그대로 두고, 대신 <b>ERP 품명</b>을 알려드리니 필요하면 <b>품명 적용</b>을 누르세요.<br>
          • <b>소진 예상</b> — 지금 재고로 몇 개월을 버틸 수 있는지입니다. 색으로 급한 정도를 표시합니다.<br>
-         &nbsp;&nbsp;<b style="color:var(--risk-1)">■ 빨강 — 1개월 미만</b> ·
-         <b style="color:var(--risk-2)">■ 주황 — 2개월 미만</b> ·
-         <b style="color:var(--risk-3)">■ 초록 — 여유</b> <span style="color:var(--faint)">(목록 아래에도 같은 설명이 있습니다)</span><br>
+         &nbsp;&nbsp;<b style="color:var(--risk-1)">■ 빨강 — 2개월 미만</b> ·
+         <b style="color:var(--risk-2)">■ 갈색 — 4개월 미만</b> ·
+         <b style="color:var(--risk-3)">■ 초록 — 4개월 이상(여유)</b> <span style="color:var(--faint)">(목록 아래에도 같은 설명이 있습니다)</span><br>
          • 수량을 넣으면 <b>그 수량을 받은 뒤 몇 개월이 되는지</b>를 왼쪽에 알려주고,
          목록에서는 수량 아래에 <b style="color:var(--accent)">+1.0개월</b> 처럼
          <b>이번 요청이 몇 개월치인지</b>를 보여줍니다. 숫자에 마우스를 올리면 계산 근거가 나옵니다.<br>
@@ -1244,9 +1244,9 @@ function erpBlob_(){
     <div class="foot">
       <span class="info" id="footInfo"></span>
       <span class="legend" id="legend" style="display:none">
-        <span><i style="background:var(--risk-1)"></i>1개월 미만</span>
-        <span><i style="background:var(--risk-2)"></i>2개월 미만</span>
-        <span><i style="background:var(--risk-3)"></i>여유</span>
+        <span><i style="background:var(--risk-1)"></i>2개월 미만</span>
+        <span><i style="background:var(--risk-2)"></i>4개월 미만</span>
+        <span><i style="background:var(--risk-3)"></i>4개월 이상</span>
         <span class="lg-note">소진 예상</span>
       </span>
       <button class="linkbtn" id="exportBtn">⬇ CSV 내보내기</button>
@@ -1856,9 +1856,9 @@ function erpBlob_(){
     const a=Math.abs(v);
     return (a>=100 ? Math.round(v) : Math.round(v*10)/10).toLocaleString();
   }
-  // 소진 예상에 따른 색: 1개월 미만 빨강(위험) / 2개월 미만 주황(주의) / 그 외 초록(여유)
-  function erpTone(m){ return m==null ? "var(--muted)" : (m<1 ? "var(--risk-1)" : (m<2 ? "var(--risk-2)" : "var(--risk-3)")); }
-  function erpToneWord(m){ return m==null ? "" : (m<1 ? "1개월 이내 — 시급" : (m<2 ? "2개월 이내 — 주의" : "여유")); }
+  // 소진 예상에 따른 색: 2개월 미만 빨강(시급) / 4개월 미만 갈색(주의) / 4개월 이상 초록(여유)
+  function erpTone(m){ return m==null ? "var(--muted)" : (m<2 ? "var(--risk-1)" : (m<4 ? "var(--risk-2)" : "var(--risk-3)")); }
+  function erpToneWord(m){ return m==null ? "" : (m<2 ? "2개월 이내 — 시급" : (m<4 ? "4개월 이내 — 주의" : "여유")); }
 
   /* ---------- 렌더: 품목 분석 패널 ---------- */
   function erpMetaRow(){
@@ -1933,7 +1933,7 @@ function erpBlob_(){
            <div class="erp-cs">${
              left==null ? (dem>0?"재고 정보 없음":"소요 실적이 없어 계산할 수 없습니다")
              : (after!=null ? `요청 ${erpN(q)}개 반영 시 <b style="color:var(--ink)">${after.toFixed(1)}개월</b>`
-                            : (left<1?"1개월 이내 소진":(left<2?"2개월 이내 소진":"여유 있음")))}</div>
+                            : (left<2?"2개월 이내 소진":(left<4?"4개월 이내 소진":"여유 있음")))}</div>
          </div>
        </div>
        <div class="erp-src">${src}</div>
@@ -1995,7 +1995,7 @@ function erpBlob_(){
     el.innerHTML=`<div class="nums">${p.join(" · ")}</div>
       <div class="sub">${
         after!=null ? `요청 ${erpN(q)}개를 받으면 <b>${after.toFixed(1)}개월</b>치가 됩니다`
-        : left!=null ? (left<1?"1개월 이내에 소진됩니다":(left<2?"2개월 이내에 소진됩니다":"재고에 여유가 있습니다"))
+        : left!=null ? (left<2?"2개월 이내에 소진됩니다":(left<4?"4개월 이내에 소진됩니다":"재고에 여유가 있습니다"))
         : (dem>0?"재고 정보가 없습니다":"최근 판매·생산 실적이 없습니다")}</div>
       ${codeDiff?`<div class="sub" style="margin-top:6px; display:flex; align-items:center; gap:6px; flex-wrap:wrap">
         <span>ERP 코드는 <b>${esc(hit.code)}</b> 입니다</span>
