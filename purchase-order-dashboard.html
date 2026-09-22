@@ -2176,9 +2176,9 @@ function renderDashboard(){
     if(!isDepositDone(p)) return s;
     return s + toKrwCur(computeAmounts(p).deposit, p.currency);
   }, 0);
-  // 남은 잔금액: 아직 지급하지 않은 잔금만 합산
+  // 남은 잔금액: 아직 지급하지 않은 잔금만 합산 (선금 100%면 잔금 자체가 없으므로 제외)
   const balanceLeftKrwTotal = pos.reduce((s,p)=>{
-    if(p.balanceDate) return s;
+    if(p.balanceDate || isDepositFull(p)) return s;
     return s + toKrwCur(computeAmounts(p).balance, p.currency);
   }, 0);
   // 완료 금액 합계: ERP입력완료 건만, CI금액이 있으면 CI금액(최종금액) 기준
@@ -2945,12 +2945,16 @@ const FIELDSET_KEY_FIELDS = {
   fs4: ['etaDate','warehouseDate','qcDate','erpDate'],
 };
 function updateFieldsetFillState(){
+  // 선금 100% 건은 잔금 자체가 없어서 잔금지급일이 절대 채워지지 않음 — 이 경우 섹션 완료 판정에서 잔금일 요건은 이미 충족된 것으로 본다.
+  const depositPctVal = parseFloat(poForm.elements['depositPct'] && poForm.elements['depositPct'].value) || 0;
+  const depositIs100 = depositPctVal >= 100;
   Object.entries(FIELDSET_KEY_FIELDS).forEach(([fsId, keys])=>{
     const fs = document.getElementById(fsId);
     if(!fs) return;
     const allFilled = keys.every(k=>{
       if(k === 'depositDate' && poForm.elements['depositDeferred'] && poForm.elements['depositDeferred'].checked) return true;
       if(k === 'balanceDate' && poForm.elements['balanceDeferred'] && poForm.elements['balanceDeferred'].checked) return true;
+      if(k === 'balanceDate' && depositIs100) return true;
       const el = poForm.elements[k];
       return el && el.value && el.value.trim() !== '';
     });
