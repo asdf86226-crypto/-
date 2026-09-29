@@ -839,6 +839,7 @@ function erpWriteBlob_(o){
 
 // ===== PC가 이카운트에서 받아 보내주는 재고 =====
 const STOCKSHEET='erp_stock';
+const ECTYPE={'0':'[원재료]','1':'[제품]','2':'[반제품]','3':'[상품]'};
 function erpStockSave_(items, at){
   const ss=SpreadsheetApp.getActiveSpreadsheet();
   let s=ss.getSheetByName(STOCKSHEET); if(!s) s=ss.insertSheet(STOCKSHEET);
@@ -869,8 +870,11 @@ function erpApplyStock_(){
     const it=items[c] || (items[c]={n:''});
     it.s=Math.round((+x.q||0)*100)/100;
     if(!it.n &amp;&amp; x.n) it.n=String(x.n);
-    if(!it.k &amp;&amp; x.t){ const t=String(x.t).trim();
-      if(t) it.k = (t.charAt(0)==='[') ? t : '['+t+']'; }
+    if(!it.k &amp;&amp; x.t!=null &amp;&amp; x.t!==''){
+      const raw=String(x.t).trim();
+      // 이카운트 PROD_TYPE 은 숫자 코드로 온다. 0·1·2·3 외에는 뜻을 몰라 비워 둔다.
+      const k = ECTYPE[raw] || (raw.charAt(0)==='[' ? raw : (/^\d+$/.test(raw) ? '' : '['+raw+']'));
+      if(k) it.k=k; }
     n++; });
   o.items=items; o.n=Object.keys(items).length; o.stockAt=st.at||'';
   erpWriteBlob_(o);
