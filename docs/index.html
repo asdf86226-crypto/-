@@ -625,7 +625,7 @@ function ERP설정(){
   ScriptApp.getProjectTriggers().forEach(t=&gt;{ if(t.getHandlerFunction().indexOf('erpRefresh')===0) ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('erpRefresh').timeBased().atHour(4).everyDays(1).create();
   const m='[준비 끝] ERP 파일을 넣을 폴더 ↓\n'+f.getUrl()
-    +'\n\n이 폴더에 재고현황·판매현황·BOM 파일을 넣어두세요.\n매일 새벽 4시에 자동으로 다시 계산합니다.';
+    +'\n\n이 폴더에 품목등록(기준정보)·판매현황·BOM 파일을 넣어두세요.\n재고수량은 이카운트에서 매일 받아옵니다.\n매일 새벽 4시에 자동으로 다시 계산합니다.';
   Logger.log(m); return m; }
 function erpFolderUrl_(){ const id=P.getProperty('ERP_FOLDER'); if(!id) return '';
   try{ return DriveApp.getFolderById(id).getUrl(); }catch(e){ return ''; } }
@@ -758,7 +758,22 @@ function erpFile_(f,D){
   let hi=erpHead_(rows,['생산품목코드','소모품목코드']); if(hi&gt;=0) return erpBom_(rows,hi,D);
   hi=erpHead_(rows,['품목코드','재고수량']); if(hi&gt;=0) return erpStock_(rows,hi,D);
   hi=erpHead_(rows,['품목코드','수량']); if(hi&gt;=0) return erpSales_(rows,hi,D);
+  hi=erpHead_(rows,['품목코드','품목구분']); if(hi&gt;=0) return erpMaster_(rows,hi,D);
   return '형식을 알 수 없어 건너뜀'; }
+// 품목등록(기준정보) 파일 — 재고 없이 품명·품목구분만 준다.
+// 재고는 매일 이카운트 API 가 채우므로, 파일은 이것만 있으면 된다.
+function erpKind_(v){ const s=erpNorm_(v); if(!s) return '';
+  return s.charAt(0)==='[' ? s : '['+s+']'; }
+function erpMaster_(rows,hi,D){
+  const m=erpCols_(rows,hi), cC=m['품목코드'], cK=m['품목구분'],
+        cN=erpCol_(m,['품명및규격','품목명[규격]','품목명(규격)','품목명','품명']);
+  let n=0, k=0;
+  for(let i=hi+1;i&lt;rows.length;i++){ const r=rows[i]||[]; const c=erpNorm_(r[cC]);
+    if(!c||c==='합계'||c==='합 계') continue;
+    const nm=cN!=null?erpNorm_(r[cN]):''; if(nm&amp;&amp;!D.name[c]) D.name[c]=nm;
+    const kd=erpKind_(r[cK]); if(kd&amp;&amp;!D.kind[c]){ D.kind[c]=kd; k++; }
+    n++; }
+  return '기준정보 '+n+'품목 (품목구분 '+k+'건)'; }
 function erpBom_(rows,hi,D){
   const m=erpCols_(rows,hi), cP=m['생산품목코드'], cC=m['소모품목코드'],
         cPn=m['생산품목명'], cCn=m['소모품목명'], cM=erpCol_(m,['생산수량']), cU=erpCol_(m,['소요량']);
@@ -1150,10 +1165,13 @@ function erpBlob_(){
       <p class="erp-hint">자동 갱신을 기다리지 않고 <b>이 자리에서 바로</b> 계산합니다.
         결과는 <b>내 브라우저에만</b> 저장되고 팀원에게는 가지 않습니다.</p>
       <ol class="steps" style="margin-top:10px">
-        <li><b>재고현황</b> — <code>품목코드 · 품명 · 품목구분 · 재고수량</code> 열 포함<br>
-            <span style="color:var(--faint)">플로우텍·태성정밀 각각 따로 올려도 됩니다</span></li>
+        <li><b>품목등록(기준정보)</b> — <code>품목코드 · 품목명 · 품목구분</code> 열 포함<br>
+            <span style="color:var(--faint)">품목구분(제품·반제품·원재료·상품)은 BOM 전개를 어디서 멈출지 정하는 기준입니다.
+            <b>재고현황</b> 파일에 이 열이 있으면 그걸 올리셔도 됩니다</span></li>
         <li><b>판매현황내역</b> — 최근 2년치(예: 25년 · 26년)</li>
         <li><b>BOM(소요량)현황</b> — 자재·반제품의 소요량을 역산하는 데 씁니다</li>
+        <li><span style="color:var(--faint)"><b>재고수량</b>은 이카운트 API가 매일 채우므로 파일로 올리지 않아도 됩니다.
+            직접 올리기(B)로만 쓰실 때는 재고현황 파일도 함께 올려주세요</span></li>
       </ol>
       <label class="dropzone" id="erpZone" for="erpInput">
         <input type="file" id="erpInput" accept=".xlsx,.csv,.tsv,.txt" multiple hidden>
@@ -1748,25 +1766,30 @@ function erpBlob_(){
     return m;
   }
   function erpCol(m, names){ for(const n of names) if(m[n]!=null) return m[n]; return null; }
+  // 품목구분이 '원재료' 처럼 대괄호 없이 올 수도 있다 — 전개 중단 판정과 맞춘다
+  function erpBracket(v){ const s=erpNorm(v); if(!s) return "";
+    return s.charAt(0)==="[" ? s : "["+s+"]"; }
   function erpKind(rows){
     if(erpHeaderAt(rows,["생산품목코드","소모품목코드"])>=0) return "bom";
     if(erpHeaderAt(rows,["품목코드","재고수량"])>=0) return "stock";
     if(erpHeaderAt(rows,["품목코드","수량"])>=0) return "sales";
+    if(erpHeaderAt(rows,["품목코드","품목구분"])>=0) return "master";
     return "";
   }
   function erpGuess(name){
     const n=String(name||"");
     if(/bom|소요/i.test(n)) return "bom";
+    if(/품목등록|기준정보|품목마스터/.test(n)) return "master";
     if(/재고/.test(n)) return "stock";
     if(/판매|매출|출고/.test(n)) return "sales";
     return "unknown";
   }
-  const ERPTAG={bom:"BOM", stock:"재고현황", sales:"판매현황", unknown:"자동 인식"};
+  const ERPTAG={bom:"BOM", stock:"재고현황", sales:"판매현황", master:"품목 기준정보", unknown:"자동 인식"};
 
   /* ---------- 분석 ---------- */
   async function erpBuild(files, log){
     const stock={}, name={}, kind={}, bom={}, sales={}, monthSet={};
-    let nBom=0, nStock=0, nSales=0;
+    let nBom=0, nStock=0, nSales=0, nMaster=0;
 
     for(const f of files){
       log(`읽는 중 · ${f.name}`);
@@ -1831,10 +1854,27 @@ function erpBlob_(){
         }
         nSales+=n; log(`  판매 ${n.toLocaleString()}건`);
       }
+      else if(type==="master"){
+        // 품목등록(기준정보) — 재고 없이 품명·품목구분만 준다
+        const hi=erpHeaderAt(rows,["품목코드","품목구분"]), m=erpCols(rows,hi);
+        const cCode=m["품목코드"], cKind=m["품목구분"],
+              cName=erpCol(m,["품명및규격","품목명[규격]","품목명(규격)","품목명","품명","품목명규격"]);
+        let n=0, nk=0;
+        for(let i=hi+1;i<rows.length;i++){
+          const r=rows[i]||[]; const c=erpNorm(r[cCode]);
+          if(!c || /^합\s*계$/.test(c)) continue;
+          const nm=cName!=null?erpNorm(r[cName]):"";
+          if(nm && !name[c]) name[c]=nm;
+          const kd=erpBracket(r[cKind]);
+          if(kd && !kind[c]){ kind[c]=kd; nk++; }
+          n++;
+        }
+        nMaster+=n; log(`  기준정보 ${n.toLocaleString()}품목 (품목구분 ${nk.toLocaleString()}건)`);
+      }
       else log(`  ⚠ 알 수 없는 형식 — 건너뜀`);
     }
 
-    if(!nStock && !nSales && !nBom) throw new Error("읽을 수 있는 ERP 표를 찾지 못했습니다");
+    if(!nStock && !nSales && !nBom && !nMaster) throw new Error("읽을 수 있는 ERP 표를 찾지 못했습니다");
 
     const months=Math.max(1, Object.keys(monthSet).length);
     log(`\n집계 중 · 판매 기간 ${months}개월`);
