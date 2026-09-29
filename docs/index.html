@@ -2590,7 +2590,24 @@ function erpBlob_(){
   };
   $("#clearBtn").onclick=async ()=>{
     if(!data.length) return;
-    if(confirm(`전체 ${data.length}건을 삭제할까요? 되돌릴 수 없습니다.`)){
+    // 전체 삭제는 '화면에 보이는 것'이 아니라 '시트의 모든 행'을 지운다.
+    // 조회가 실패한 상태에서는 화면 목록이 실제 시트와 다르므로, 그때는 막는다.
+    if(store.mode==="sheet"){
+      if(failStreak>0){
+        toast("시트 연결이 불안정합니다 — 화면 목록이 실제와 다를 수 있어 삭제를 막았습니다. 새로고침 후 다시 시도하세요");
+        return;
+      }
+      if(data.some(d=>d._pending)){
+        toast("아직 저장 중인 요청이 있습니다 — 잠시 뒤 다시 시도하세요");
+        return;
+      }
+    }
+    const msg = store.mode==="sheet"
+      ? `구글 시트에 저장된 구매요청을 전부 지웁니다.\n`
+        + `지금 화면에 보이는 ${data.length}건뿐 아니라 시트의 모든 행이 삭제됩니다.\n\n`
+        + `실수로 지우셨다면 구글 시트의 '파일 → 버전 기록'에서만 되돌릴 수 있습니다.\n\n계속할까요?`
+      : `전체 ${data.length}건을 삭제할까요? 되돌릴 수 없습니다.`;
+    if(confirm(msg)){
       try{ await store.clear(); }catch(e){ toast("삭제 실패: "+e.message); return; }
       await refresh(); toast("전체 삭제되었습니다");
     }
