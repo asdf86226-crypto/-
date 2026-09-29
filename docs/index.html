@@ -840,23 +840,31 @@ function erpWriteBlob_(o){
 // ===== PC가 이카운트에서 받아 보내주는 재고 =====
 const STOCKSHEET='erp_stock';
 const ECTYPE={'0':'[원재료]','1':'[제품]','2':'[반제품]','3':'[상품]'};
-function erpStockSave_(items, at){
+// PC 가 재고를 여러 조각으로 나눠 보낸다. seq 0 이면 비우고, last 면 반영한다.
+function erpApplyStockFrom_(b){
   const ss=SpreadsheetApp.getActiveSpreadsheet();
   let s=ss.getSheetByName(STOCKSHEET); if(!s) s=ss.insertSheet(STOCKSHEET);
-  s.clear();
-  const js=JSON.stringify({at:at||Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy-MM-dd HH:mm'),
-                           n:items.length, items:items});
-  const rows=[];
-  for(let i=0;i&lt;js.length;i+=ERPCHUNK) rows.push([js.substr(i,ERPCHUNK)]);
-  if(!rows.length) rows.push(['']);
-  s.getRange(1,1,rows.length,1).setNumberFormat('@').setValues(rows); }
-function erpApplyStockFrom_(b){ erpStockSave_(b.items||[], b.at); return erpApplyStock_(); }
+  if(Number(b.seq||0)===0) s.clear();
+  const items=b.items||[];
+  if(items.length){
+    const r=Math.max(s.getLastRow(),0)+1;
+    s.getRange(r,1,1,1).setNumberFormat('@').setValues([[JSON.stringify(items)]]);
+  }
+  if(b.last){
+    P.setProperty('ERP_STOCK_AT', String(b.at||Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy-MM-dd HH:mm')));
+    return erpApplyStock_();
+  }
+  return items.length; }
 function erpStockLoad_(){
   const s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STOCKSHEET);
   if(!s || s.getLastRow()&lt;1) return null;
-  const t=s.getRange(1,1,s.getLastRow(),1).getValues().map(r=&gt;r[0]).join('');
-  if(!t) return null;
-  try{ return JSON.parse(t); }catch(e){ return null; } }
+  const rows=s.getRange(1,1,s.getLastRow(),1).getValues();
+  let all=[];
+  for(let i=0;i&lt;rows.length;i++){
+    const t=rows[i][0]; if(!t) continue;
+    try{ const a=JSON.parse(t); if(a &amp;&amp; a.length) all=all.concat(a); }catch(e){}
+  }
+  return all.length ? {at:P.getProperty('ERP_STOCK_AT')||'', items:all} : null; }
 // 파일로 계산해 둔 결과에 '오늘 재고'를 덮어씌운다.
 // 재고는 항상 API 값이 이기고, 품명·품목구분은 비어 있을 때만 채운다.
 function erpApplyStock_(){
