@@ -1003,7 +1003,7 @@ function erpBlob_(){
           <tr><td>수량<span class="g-req">필수</span></td><td>숫자만 입력</td></tr>
           <tr><td>품명<span class="g-req">필수</span></td><td>규격이 있으면 함께 (예: 스테인리스 볼트 M4)</td></tr>
           <tr><td>입고요청일<span class="g-req">필수</span></td><td>언제까지 들어와야 하는 날짜</td></tr>
-          <tr><td>요청자<span class="g-opt">선택</span></td><td>본인 이름. 문의가 필요할 때 담당자가 연락합니다</td></tr>
+          <tr><td>요청자<span class="g-req">필수</span></td><td>본인 이름. 문의가 필요할 때 담당자가 연락합니다</td></tr>
           <tr><td>기타사항<span class="g-opt">선택</span></td><td>표면처리 · 납품처 · 긴급 여부 등 참고사항</td></tr>
         </tbody>
       </table>
@@ -1233,8 +1233,8 @@ function erpBlob_(){
             <input name="dueDate" type="date" required>
           </div>
           <div class="field">
-            <label>요청자</label>
-            <input name="requester" placeholder="이름 (선택)" autocomplete="off">
+            <label>요청자 <span class="req">*</span></label>
+            <input name="requester" id="reqName" placeholder="이름" required autocomplete="off">
           </div>
         </div>
         <div class="field">
@@ -1249,7 +1249,7 @@ function erpBlob_(){
         <p class="paste-help">
           엑셀(<code>.xlsx</code>) 또는 CSV 파일을 올리면 자동으로 읽어 등록합니다.
           열 순서: <b>품목코드 · 품명 · 수량 · 입고요청일 · 기타사항</b><br>
-          맨 윗줄 헤더는 자동 인식하며, 요청팀은 아래에서 지정합니다.
+          맨 윗줄 헤더는 자동 인식하며, 요청팀·요청자는 아래에서 지정합니다.
         </p>
         <p class="paste-help" style="border-left:3px solid var(--s-new); padding-left:9px; margin-top:-4px">
           <b>품목코드 열은 '텍스트' 서식으로</b> 해주세요. 그냥 두면 엑셀이
@@ -1257,14 +1257,20 @@ function erpBlob_(){
           <span style="color:var(--faint)">열 전체 선택 → 마우스 오른쪽 → 셀 서식 → 텍스트.
           ERP에서 찾을 수 있는 코드는 올릴 때 자동으로 맞춰드립니다.</span>
         </p>
-        <div class="field">
-          <label>요청팀 <span class="req">*</span></label>
-          <select id="excelTeam">
-            <option value="개발">개발</option>
-            <option value="자재">자재</option>
-            <option value="생산">생산</option>
-            <option value="품질">품질</option>
-          </select>
+        <div class="row2">
+          <div class="field">
+            <label>요청팀 <span class="req">*</span></label>
+            <select id="excelTeam">
+              <option value="개발">개발</option>
+              <option value="자재">자재</option>
+              <option value="생산">생산</option>
+              <option value="품질">품질</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>요청자 <span class="req">*</span></label>
+            <input id="excelRequester" placeholder="이름" required autocomplete="off">
+          </div>
         </div>
         <label class="dropzone" id="dropzone" for="fileInput">
           <input type="file" id="fileInput" accept=".xlsx,.csv,.tsv,.txt" hidden>
@@ -2477,11 +2483,12 @@ function erpBlob_(){
     return { items:out, fixed:fixed };
   }
 
-  async function addItems(items, team){
+  async function addItems(items, team, requester){
     let norm=items.filter(it=>it.code||it.itemName).map(it=>({
       team, code:(it.code||"").trim(), itemName:(it.itemName||"").trim(),
       qty:(it.qty!==""&&it.qty!=null)?String(it.qty).trim():"0",
-      dueDate:it.dueDate||"", note:(it.note||"").trim(), requester:(it.requester||"").trim(), status:"접수"
+      dueDate:it.dueDate||"", note:(it.note||"").trim(),
+      requester:((it.requester||requester||"")+"").trim(), status:"접수"
     }));
     if(!norm.length) return 0;
     const fx=fixCodesByErp(norm); norm=fx.items;
@@ -2505,21 +2512,36 @@ function erpBlob_(){
     return norm.length;
   }
 
+  /* ---------- 요청자 이름 기억 (이 브라우저에만 저장) ---------- */
+  const REQKEY="pr_requester";
+  function saveRequester(v){ try{ localStorage.setItem(REQKEY, v); }catch(e){} }
+  function loadRequester(){ try{ return localStorage.getItem(REQKEY)||""; }catch(e){ return ""; } }
+  function fillRequester(){
+    const v=loadRequester(); if(!v) return;
+    const a=$("#reqName"), b=$("#excelRequester");
+    if(a && !a.value) a.value=v;
+    if(b && !b.value) b.value=v;
+  }
+
   /* ---------- 이벤트: 직접 입력 ---------- */
   $("#manualForm").addEventListener("submit",async e=>{
     e.preventDefault();
     const f=e.target, fd=new FormData(f);
     const team=fd.get("team");
     if(!team){ toast("요청팀을 선택하세요"); return; }
+    const who=String(fd.get("requester")||"").trim();
+    if(!who){ toast("요청자를 입력하세요"); f.querySelector('[name=requester]').focus(); return; }
+    saveRequester(who);
     const teamId=f.querySelector('input[name=team]:checked')?.id;
     const n=await addItems([{
       code:fd.get("code"), itemName:fd.get("itemName"),
       qty:fd.get("qty"), dueDate:fd.get("dueDate"),
-      note:fd.get("note"), requester:fd.get("requester")
+      note:fd.get("note"), requester:who
     }], team);
     if(n){ toast("구매요청이 추가되었습니다");
       f.reset(); if(teamId) f.querySelector("#"+teamId).checked=true;
       const dd=f.querySelector('input[name="dueDate"]'); if(dd) dd.value=todayISO();
+      fillRequester();                       // 이름은 지우지 않고 그대로 둔다
       resetErpName(); renderErpPanel();
     }
   });
@@ -2566,7 +2588,10 @@ function erpBlob_(){
   $("#excelForm").addEventListener("submit",async e=>{
     e.preventDefault();
     if(!pendingItems.length){ toast("먼저 파일을 선택하세요"); return; }
-    const n=await addItems(pendingItems, $("#excelTeam").value);
+    const who=$("#excelRequester").value.trim();
+    if(!who){ toast("요청자를 입력하세요"); $("#excelRequester").focus(); return; }
+    saveRequester(who);
+    const n=await addItems(pendingItems, $("#excelTeam").value, who);
     if(n){ toast(`${n}건이 추가되었습니다`); resetFile(); }
   });
   // 양식(CSV) 내려받기 링크
@@ -2811,6 +2836,7 @@ function erpBlob_(){
       return ex?{exec:ex}:null; }catch(e){ return null; }
   }
   const dd=document.querySelector('input[name="dueDate"]'); if(dd) dd.value=todayISO();
+  fillRequester();          // 지난번에 쓴 이름을 그대로 채워 둔다
   // 이 브라우저에서 처음 열었다면 사용설명서를 한 번 보여줌
   try{
     if(!localStorage.getItem("guide_seen_v1")){
