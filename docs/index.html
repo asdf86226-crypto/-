@@ -759,13 +759,14 @@ function erpFile_(f,D){
   hi=erpHead_(rows,['품목코드','재고수량']); if(hi&gt;=0) return erpStock_(rows,hi,D);
   hi=erpHead_(rows,['품목코드','수량']); if(hi&gt;=0) return erpSales_(rows,hi,D);
   hi=erpHead_(rows,['품목코드','품목구분']); if(hi&gt;=0) return erpMaster_(rows,hi,D);
+  hi=erpHead_(rows,['품목코드','품구분']);   if(hi&gt;=0) return erpMaster_(rows,hi,D);
   return '형식을 알 수 없어 건너뜀'; }
 // 품목등록(기준정보) 파일 — 재고 없이 품명·품목구분만 준다.
 // 재고는 매일 이카운트 API 가 채우므로, 파일은 이것만 있으면 된다.
 function erpKind_(v){ const s=erpNorm_(v); if(!s) return '';
   return s.charAt(0)==='[' ? s : '['+s+']'; }
 function erpMaster_(rows,hi,D){
-  const m=erpCols_(rows,hi), cC=m['품목코드'], cK=m['품목구분'],
+  const m=erpCols_(rows,hi), cC=m['품목코드'], cK=erpCol_(m,['품목구분','품구분','품목유형']),
         cN=erpCol_(m,['품명및규격','품목명[규격]','품목명(규격)','품목명','품명']);
   let n=0, k=0;
   for(let i=hi+1;i&lt;rows.length;i++){ const r=rows[i]||[]; const c=erpNorm_(r[cC]);
@@ -1165,7 +1166,7 @@ function erpBlob_(){
       <p class="erp-hint">자동 갱신을 기다리지 않고 <b>이 자리에서 바로</b> 계산합니다.
         결과는 <b>내 브라우저에만</b> 저장되고 팀원에게는 가지 않습니다.</p>
       <ol class="steps" style="margin-top:10px">
-        <li><b>품목등록(기준정보)</b> — <code>품목코드 · 품목명 · 품목구분</code> 열 포함<br>
+        <li><b>품목등록(기준정보)</b> — <code>품목코드 · 품목명 · 품구분</code> 열 포함<br>
             <span style="color:var(--faint)">품목구분(제품·반제품·원재료·상품)은 BOM 전개를 어디서 멈출지 정하는 기준입니다.
             <b>재고현황</b> 파일에 이 열이 있으면 그걸 올리셔도 됩니다</span></li>
         <li><b>판매현황내역</b> — 최근 2년치(예: 25년 · 26년)</li>
@@ -1774,6 +1775,7 @@ function erpBlob_(){
     if(erpHeaderAt(rows,["품목코드","재고수량"])>=0) return "stock";
     if(erpHeaderAt(rows,["품목코드","수량"])>=0) return "sales";
     if(erpHeaderAt(rows,["품목코드","품목구분"])>=0) return "master";
+    if(erpHeaderAt(rows,["품목코드","품구분"])>=0) return "master";
     return "";
   }
   function erpGuess(name){
@@ -1856,8 +1858,10 @@ function erpBlob_(){
       }
       else if(type==="master"){
         // 품목등록(기준정보) — 재고 없이 품명·품목구분만 준다
-        const hi=erpHeaderAt(rows,["품목코드","품목구분"]), m=erpCols(rows,hi);
-        const cCode=m["품목코드"], cKind=m["품목구분"],
+        let hi=erpHeaderAt(rows,["품목코드","품목구분"]);
+        if(hi<0) hi=erpHeaderAt(rows,["품목코드","품구분"]);
+        const m=erpCols(rows,hi);
+        const cCode=m["품목코드"], cKind=erpCol(m,["품목구분","품구분","품목유형"]),
               cName=erpCol(m,["품명및규격","품목명[규격]","품목명(규격)","품목명","품명","품목명규격"]);
         let n=0, nk=0;
         for(let i=hi+1;i<rows.length;i++){
