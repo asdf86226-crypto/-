@@ -1425,7 +1425,11 @@ function erpBlob_(){
     async list(){
       const res=await jsonpGet(cfg.exec);
       if(!res||!res.ok) throw new Error((res&&res.error)||"응답 형식 오류");
-      return (res.rows||[]).map(r=>({
+      // rows 가 없는 응답(ERP 데이터 등)을 '목록이 비었다'로 잘못 읽으면
+      // 요청이 전부 사라진 것처럼 보인다. 그건 오류로 처리해 직전 목록을 지킨다.
+      if(!Array.isArray(res.rows))
+        throw new Error("목록 대신 다른 응답이 왔습니다 ("+Object.keys(res).join(",")+") — 새로고침해 주세요");
+      return res.rows.map(r=>({
         id:String(r.id||""),
         team:(r.team&&String(r.team))||"미지정",
         code:r.code!=null?String(r.code):"",
