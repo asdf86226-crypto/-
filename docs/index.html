@@ -1919,10 +1919,37 @@ function erpBlob_(){
   function erpTone(m){ return m==null ? "var(--muted)" : (m<2 ? "var(--risk-1)" : (m<4 ? "var(--risk-2)" : "var(--risk-3)")); }
   function erpToneWord(m){ return m==null ? "" : (m<2 ? "2개월 이내 — 시급" : (m<4 ? "4개월 이내 — 주의" : "여유")); }
 
+  /* ---------- ERP 연동 상태 점검 ---------- */
+  // 재고는 사무실 PC가 매일 아침 이카운트에서 받아 보낸다. 그 PC가 꺼져 있거나
+  // 인증키가 만료되면 조용히 멈추기만 하므로, 눈에 보이게 알려준다.
+  const ECOUNT_KEY_EXP = "2027-09-28";   // 이카운트 인증키 만료일
+  const STOCK_STALE_DAYS = 3;            // 며칠 멈추면 경고할지
+  function daysTo(a,b){ return Math.floor((b-a)/86400000); }
+  function erpHealth(){
+    const out=[];
+    if(erp && erp.stockAt){
+      const d=new Date(String(erp.stockAt).replace(" ","T")+":00");
+      if(!isNaN(d)){
+        const gap=daysTo(d, new Date());
+        if(gap>=STOCK_STALE_DAYS) out.push(`재고가 <b>${gap}일째</b> 갱신되지 않았습니다 `
+          +`(마지막 ${esc(String(erp.stockAt))}). 사무실 PC가 켜져 있는지 확인해 주세요.`);
+      }
+    }
+    const today=new Date(); today.setHours(0,0,0,0);
+    const left=daysTo(today, new Date(ECOUNT_KEY_EXP+"T00:00:00"));
+    const renew=`이카운트에서 새 키를 발급받아 사무실 PC의 <b>ecount_daily.ps1</b> 에 넣어 주세요.`;
+    if(left<0) out.push(`이카운트 인증키가 <b>${ECOUNT_KEY_EXP}</b>에 만료됐습니다 — 재고 자동 갱신이 멈춥니다. `+renew);
+    else if(left===0) out.push(`이카운트 인증키가 <b>오늘(${ECOUNT_KEY_EXP})</b> 만료됩니다. `+renew);
+    else if(left<=60) out.push(`이카운트 인증키가 <b>${left}일 뒤(${ECOUNT_KEY_EXP})</b> 만료됩니다 — 미리 새 키를 발급받아 두세요.`);
+    return out;
+  }
+
   /* ---------- 렌더: 품목 분석 패널 ---------- */
   function erpMetaRow(){
     if(!erp) return "";
-    return `<div class="erp-meta"><span>ERP 기준 ${esc(erp.updatedAt)} · 판매 ${erp.months}개월 · 품목 ${(erp.n||0).toLocaleString()}개</span>
+    const warn=erpHealth().map(w=>`<div class="erp-warn">⚠ ${w}</div>`).join("");
+    const st=erp.stockAt ? ` · 재고 ${esc(String(erp.stockAt).slice(5,16))}` : "";
+    return warn+`<div class="erp-meta"><span>ERP 기준 ${esc(erp.updatedAt)}${st} · 판매 ${erp.months}개월 · 품목 ${(erp.n||0).toLocaleString()}개</span>
       <button class="linkbtn" data-erp="open">갱신</button></div>`;
   }
   function renderErpPanel(){
@@ -2069,9 +2096,12 @@ function erpBlob_(){
   }
   function updateErpTop(){
     const l=$("#erpTopLabel"); if(!l) return;
-    l.textContent = erp ? ("ERP "+String(erp.updatedAt||"").slice(5).replace("-",".")) : "ERP 데이터";
+    const h = erp ? erpHealth() : [];
+    l.textContent = erp ? ((h.length?"⚠ ":"")+"ERP "+String(erp.updatedAt||"").slice(5).replace("-",".")) : "ERP 데이터";
     const b=$("#erpTopBtn"); if(b) b.title = erp
-      ? `ERP 기준 ${erp.updatedAt} · 품목 ${(erp.n||0).toLocaleString()}개 — 눌러서 상태 확인/갱신`
+      ? `ERP 기준 ${erp.updatedAt}${erp.stockAt?" · 재고 "+erp.stockAt:""} · 품목 ${(erp.n||0).toLocaleString()}개`
+        + (h.length ? "\n⚠ "+h.map(x=>x.replace(/<[^>]+>/g,"")).join("\n⚠ ") : "")
+        + "\n— 눌러서 상태 확인/갱신"
       : "ERP 재고·판매 데이터를 아직 불러오지 않았습니다 — 눌러서 설정";
   }
   // 목록 표에서 수량 아래에 붙는 '이번 요청 = 몇 개월치'
