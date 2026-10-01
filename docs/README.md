@@ -19,8 +19,13 @@ python -m http.server -d docs 8080
 - **Source**: `Deploy from a branch`
 - **Branch**: `claude/purchase-request-dashboard-9xcp9x` , 폴더: `/docs` → **Save**
 
-1~2분 뒤 주소가 생성됩니다: `https://asdf86226-crypto.github.io/-/`
+1~2분 뒤 주소가 생성됩니다: `https://asdf86226-crypto.github.io/pr-dashboard/`
 이 주소를 팀원에게 공유하면 됩니다(설정 창의 '🔗 팀원 공유용 링크 복사'로 시트 연결까지 담아 전달 가능).
+
+> 저장소 이름을 바꾸면 Pages 주소도 같이 바뀝니다(`.../<저장소이름>/`).
+> 구글 Apps Script 웹 앱 주소는 GitHub 과 무관하므로 영향받지 않습니다 — 이름을 바꿔도
+> 구매요청 저장·조회·ERP 연동은 그대로 동작합니다. 바꾼 뒤에는 팀원 북마크만 새 주소로
+> 갱신해 주세요.
 
 > `docs/.nojekyll` 파일은 Pages가 파일을 그대로 서빙하도록(변환 없이) 하기 위한 것입니다.
 
