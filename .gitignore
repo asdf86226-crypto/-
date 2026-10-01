@@ -1,32 +1,25 @@
-# Secrets & credentials
+# 전달용 안내 파일 (받아보기만 하고 저장소에는 두지 않음)
+1단계_PC스크립트_교체.txt
+2단계_AppsScript_새코드.txt
+3단계_매일자동실행.txt
+맨아래에_붙여넣기.txt
+맨아래에_붙여넣기2.txt
+맨아래에_붙여넣기3.txt
+품목구분_확인.txt
+판매API_찾기.txt
+
+# 비밀값 — 인증키는 절대 커밋하지 않습니다
 .env
-gemini_key.txt
+*_key.txt
 client_secret*.json
 token.json
-*.pickle
-
-# Generated outputs
-output/
-assets/generated/
-*.mp4
-*.png
-*.jpg
-!assets/bgm/*  # allow user-provided BGM to be tracked if they want
 
 # Python
 __pycache__/
 *.pyc
 .venv/
 venv/
-.python-version
 
 # OS
 .DS_Store
-1단계_PC스크립트_교체.txt
-2단계_AppsScript_새코드.txt
-맨아래에_붙여넣기.txt
-3단계_매일자동실행.txt
-품목구분_확인.txt
-맨아래에_붙여넣기2.txt
-판매API_찾기.txt
-맨아래에_붙여넣기3.txt
+Thumbs.db
