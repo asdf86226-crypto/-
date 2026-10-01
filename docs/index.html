@@ -2292,14 +2292,26 @@ function erpBlob_(){
       <button class="linkbtn" id="erpNow">⟳ 지금 갱신</button>
     </div>`;
   }
-  // '재고 …품목 반영' 은 매일 바뀌는 값이라 맨 위로 올려 보여준다.
-  // (서버는 갱신 기록 뒤에 붙여 보내는데, 스크롤해야 보여서 잘 안 읽힌다)
+  // 갱신 기록을 읽기 좋게 재배열한다.
+  // 순서: 머리글 → 재고 반영 → 경고 → 회사별·종류별 파일.
+  // 내부 처리 줄(품목정보 보충 / PC 재고 다시 반영)은 숨긴다 — 경고는 절대 숨기지 않는다.
   function erpLogBox(){
     if(!erpAuto.log) return "";
-    const lines=String(erpAuto.log).split("\n");
-    const i=lines.findIndex(l=>/^재고\s[\d,]+\s*품목\s*반영/.test(l.trim()));
-    if(i>0) lines.unshift(lines.splice(i,1)[0]);
-    return `<pre>${esc(lines.join("\n"))}</pre>`;
+    const HIDE=/^·\s*(이카운트 품목정보로|PC에서 받아둔 재고)/;
+    const head=[], stock=[], warn=[], files=[], rest=[];
+    String(erpAuto.log).split("\n").forEach(l=>{
+      const t=l.trim(); if(!t) return;
+      if(/^ERP 갱신/.test(t)) head.push(t);
+      else if(/^재고\s[\d,]+\s*품목\s*반영/.test(t)) stock.push(t);
+      else if(/⚠|\[실패\]/.test(t)) warn.push(t);     // 경고는 맨 위로
+      else if(HIDE.test(t)) return;
+      else if(t.charAt(0)==="·") files.push(t);
+      else rest.push(t);
+    });
+    const co=x=>/태성/.test(x)?0:(/플로우/.test(x)?1:2);   // 태성 → 플로우텍 → 그 외
+    const ty=x=>/판매/.test(x)?0:(/BOM/i.test(x)?1:2);     // 판매량 → BOM → 그 외
+    files.sort((a,b)=> co(a)-co(b) || ty(a)-ty(b) || a.localeCompare(b,"ko"));
+    return `<pre>${esc(head.concat(stock,warn,files,rest).join("\n"))}</pre>`;
   }
   // 어느 코드가 배포됐는지 눈으로 확인할 수 있게
   function erpProbe(){
