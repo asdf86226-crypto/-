@@ -640,7 +640,6 @@ function erpRefresh(){
 function erpRun_(){
   const id=P.getProperty('ERP_FOLDER'); if(!id) throw new Error('먼저 ERP설정 을 한 번 실행하세요');
   const t0=Date.now(), D={stock:{},name:{},kind:{},bom:{},sales:{},months:{}}, log=[];
-  try{ erpMailFetch_(log); }catch(e){ log.push('· 메일 확인 실패 — '+e.message); }
   const self=SpreadsheetApp.getActiveSpreadsheet().getId();
   const it=DriveApp.getFolderById(id).getFiles();
   // 같은 이름의 파일이 둘 이상이면 판매량이 중복 합산된다. 한 번만 읽는다.
@@ -859,48 +858,6 @@ function erpWriteBlob_(o){
   if(!rows.length) rows.push(['']);
   s.getRange(1,1,rows.length,1).setNumberFormat('@').setValues(rows);
   P.setProperty('ERP_VER', (o.updatedAt||'')+'|'+o.n+'|'+js.length+(o.stockAt?'|'+o.stockAt:'')); }
-
-// ===== 메일로 온 ERP 파일을 폴더에 자동으로 갈아끼운다 =====
-// 이카운트에 판매현황 조회 API 가 없어서(공식 목록 확인), 메일 첨부로 받는다.
-// 안전장치: 폴더에 '같은 이름'의 파일이 이미 있을 때만 교체한다.
-// 새 이름이면 저장하지 않는다 — 파일이 쌓여 판매량이 두 배로 잡히는 걸 막는다.
-const MAILLABEL='ERP자료';
-function 메일자동저장설정(){
-  let lb=GmailApp.getUserLabelByName(MAILLABEL);
-  if(!lb) lb=GmailApp.createLabel(MAILLABEL);
-  const m='[준비 끝] 지메일에 라벨 "'+MAILLABEL+'" 을 만들었습니다.\n\n'
-    +'1) 이카운트에서 판매현황을 메일로 보냅니다.\n'
-    +'2) 그 메일에 이 라벨을 붙입니다. (지메일 필터로 자동으로 붙게 해두면 손댈 일이 없습니다)\n'
-    +'3) 매일 새벽 4시 갱신 때 첨부파일을 ERP 폴더에 갈아끼웁니다.\n\n'
-    +'※ 폴더에 같은 이름의 파일이 이미 있을 때만 교체합니다.\n'
-    +'   이름이 다르면 저장하지 않고 갱신 기록에 첨부파일 이름을 적어둡니다.\n'
-    +'   그 이름에 맞춰 폴더 파일 이름을 한 번만 바꿔주시면 그다음부터 자동입니다.';
-  Logger.log(m); return m; }
-function erpMailFetch_(log){
-  // 메일 기능을 안 쓰면(라벨이 없거나 지메일 권한을 승인하지 않았으면) 조용히 넘어간다.
-  let lb=null;
-  try{ lb=GmailApp.getUserLabelByName(MAILLABEL); }catch(e){ return; }
-  if(!lb) return;
-  const id=P.getProperty('ERP_FOLDER'); if(!id) return;
-  const folder=DriveApp.getFolderById(id);
-  const threads=lb.getThreads(0,20);
-  for(let i=0;i&lt;threads.length;i++){
-    const th=threads[i], msgs=th.getMessages(); let done=0;
-    for(let j=0;j&lt;msgs.length;j++){
-      const atts=msgs[j].getAttachments();
-      for(let k=0;k&lt;atts.length;k++){
-        const a=atts[k], nm=a.getName();
-        if(!/\.(xlsx|csv|tsv|txt)$/i.test(nm)) continue;     // 서명 이미지 등은 무시
-        const fi=folder.getFilesByName(nm);
-        if(!fi.hasNext()){
-          log.push('· 메일 첨부 '+nm+' ⚠ 폴더에 같은 이름의 파일이 없어 저장하지 않았습니다');
-          continue; }
-        const olds=[]; while(fi.hasNext()) olds.push(fi.next());
-        folder.createFile(a.copyBlob().setName(nm));           // 먼저 새 파일을 만들고
-        olds.forEach(function(f){ try{ f.setTrashed(true); }catch(e){} });  // 그다음 옛 파일을 버린다
-        log.push('· 메일 첨부 '+nm+' — 폴더 파일을 갈아끼웠습니다');
-        done++; } }
-    if(done) th.removeLabel(lb); } }
 
 // ===== PC가 이카운트에서 받아 보내주는 재고 =====
 const STOCKSHEET='erp_stock';
