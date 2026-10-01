@@ -2292,7 +2292,15 @@ function erpBlob_(){
       <button class="linkbtn" id="erpNow">⟳ 지금 갱신</button>
     </div>`;
   }
-  function erpLogBox(){ return erpAuto.log?`<pre>${esc(erpAuto.log)}</pre>`:""; }
+  // '재고 …품목 반영' 은 매일 바뀌는 값이라 맨 위로 올려 보여준다.
+  // (서버는 갱신 기록 뒤에 붙여 보내는데, 스크롤해야 보여서 잘 안 읽힌다)
+  function erpLogBox(){
+    if(!erpAuto.log) return "";
+    const lines=String(erpAuto.log).split("\n");
+    const i=lines.findIndex(l=>/^재고\s[\d,]+\s*품목\s*반영/.test(l.trim()));
+    if(i>0) lines.unshift(lines.splice(i,1)[0]);
+    return `<pre>${esc(lines.join("\n"))}</pre>`;
+  }
   // 어느 코드가 배포됐는지 눈으로 확인할 수 있게
   function erpProbe(){
     if(!isConnected()) return "";
