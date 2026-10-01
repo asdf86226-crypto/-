@@ -1552,12 +1552,22 @@ async function pullPurchaseRequests(){
       console.log('[재고] 매칭:', matched.length, '건 / 미매칭:', unmatched.length, '건');
       if(unmatched.length) console.log('[재고] 미매칭 품목코드 샘플:', unmatched.slice(0,10));
     }
+    // 한번 pull 을 성공했으면, 매칭이 안 된 건은 "ERP 미등록"으로 표시해 사용자가 0인지 미등록인지 구분할 수 있게 한다.
+    //   - 숫자 : 현재 재고 N개
+    //   - null : "미등록" 라벨 표시 (조회는 했으나 ERP에 재고 데이터 없음)
+    //   - ''/undefined : 아예 아무것도 표시 안 함 (조회조차 안 된 상태)
     let stockUpdated = 0;
-    if(Object.keys(stockByCode).length){
+    const haveAny = Object.keys(stockByCode).length > 0;
+    if(haveAny){
       const applyStock = list => list.forEach(p => {
         if(!p.itemCode) return;
         const st = stockByCode[p.itemCode];
-        if(st != null && p.stock !== st){ p.stock = st; stockUpdated++; }
+        if(st != null){
+          if(p.stock !== st){ p.stock = st; stockUpdated++; }
+        }else{
+          // ERP에서 조회해봤지만 이 코드에는 재고가 없음 — "미등록" 표시용 센티넬(null)
+          if(p.stock !== null){ p.stock = null; stockUpdated++; }
+        }
       });
       applyStock(pos);
       applyStock(domesticPos);
@@ -2113,9 +2123,14 @@ function fmtQty(n){
   if(n===null || n===undefined || n==='' || isNaN(n)) return '-';
   return Number(n).toLocaleString();
 }
-// 품목코드 셀 아래에 붙는 "현재 재고: N개" 작은 글씨 — ERP에서 받아온 stock 값만 표시(없으면 공란)
+// 품목코드 셀 아래에 붙는 "현재 재고: N개" 작은 글씨.
+//   stock === number        → "현재 재고: N개"
+//   stock === null          → "현재 재고: 미등록" (ERP 조회는 했으나 매칭 안 됨 — 0과 구분)
+//   stock === undefined/''  → 공란 (아직 pull 한 번도 안 함)
 function stockSubCell(p){
-  if(!p || p.stock === undefined || p.stock === null || p.stock === '') return '';
+  if(!p) return '';
+  if(p.stock === undefined || p.stock === '') return '';
+  if(p.stock === null) return `<div style="font-size:10.5px; color:#b7b2a3; font-weight:600; margin-top:2px;">현재 재고: <span style="color:#dc2626;">미등록</span></div>`;
   const n = parseFloat(p.stock);
   if(isNaN(n)) return '';
   return `<div style="font-size:10.5px; color:var(--ink-soft); font-weight:600; margin-top:2px;">현재 재고: ${Number(n).toLocaleString()}개</div>`;
