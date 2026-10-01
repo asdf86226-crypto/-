@@ -877,7 +877,10 @@ function 메일자동저장설정(){
     +'   그 이름에 맞춰 폴더 파일 이름을 한 번만 바꿔주시면 그다음부터 자동입니다.';
   Logger.log(m); return m; }
 function erpMailFetch_(log){
-  const lb=GmailApp.getUserLabelByName(MAILLABEL); if(!lb) return;
+  // 메일 기능을 안 쓰면(라벨이 없거나 지메일 권한을 승인하지 않았으면) 조용히 넘어간다.
+  let lb=null;
+  try{ lb=GmailApp.getUserLabelByName(MAILLABEL); }catch(e){ return; }
+  if(!lb) return;
   const id=P.getProperty('ERP_FOLDER'); if(!id) return;
   const folder=DriveApp.getFolderById(id);
   const threads=lb.getThreads(0,20);
