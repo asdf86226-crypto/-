@@ -651,6 +651,8 @@ function erpRun_(){
     seen[nm]=1;
     try{ log.push('· '+nm+' — '+erpFile_(f,D)); }catch(e){ log.push('· '+nm+' ⚠ '+e.message); } }
   if(!log.length) throw new Error('폴더가 비어 있습니다 — ERP 파일을 넣어주세요');
+  const mn=erpMergeMaster_(D);
+  if(mn) log.push('· 이카운트 품목정보로 품목구분 '+mn+'건을 보충(계산 전)');
   const out=erpCompute_(D); erpSave_(out);
   const sn=erpApplyStock_(); if(sn) log.push('· PC에서 받아둔 재고 '+sn+'품목을 다시 반영');
   const s='ERP 갱신 '+out.updatedAt+' · '+Math.round((Date.now()-t0)/1000)+'초 · 품목 '+out.n+'개 · 판매 '+out.months+'개월\n'+log.join('\n');
@@ -899,7 +901,10 @@ function erpMailFetch_(log){
 
 // ===== PC가 이카운트에서 받아 보내주는 재고 =====
 const STOCKSHEET='erp_stock';
-const ECTYPE={'0':'[원재료]','1':'[제품]','2':'[반제품]','3':'[상품]'};
+// 이카운트 품목조회의 PROD_TYPE 숫자 → 품목구분.
+// 품목구분을 아는 품목으로 대조해 확정했다(2026-10-01).
+// 7(15품목, 정삭·황삭 툴)은 아직 확인 전이라 비워 둔다 — 파일 값이 그대로 쓰인다.
+const ECTYPE={'0':'[원재료]','1':'[제품]','2':'[반제품]','3':'[상품]','4':'[부재료]'};
 // PC 가 재고를 여러 조각으로 나눠 보낸다. seq 0 이면 비우고, last 면 반영한다.
 function erpApplyStockFrom_(b){
   const ss=SpreadsheetApp.getActiveSpreadsheet();
@@ -925,6 +930,20 @@ function erpStockLoad_(){
     try{ const a=JSON.parse(t); if(a &amp;&amp; a.length) all=all.concat(a); }catch(e){}
   }
   return all.length ? {at:P.getProperty('ERP_STOCK_AT')||'', items:all} : null; }
+// PC 가 이카운트에서 받아온 품명·품목구분을 계산 '전에' 합친다.
+// 품목구분은 BOM 전개를 어디서 멈출지 정하므로, 계산이 끝난 뒤 넣으면 소용이 없다.
+// 파일(기준정보)이 우선이고, 비어 있는 칸만 API 값으로 채운다.
+function erpMergeMaster_(D){
+  const st=erpStockLoad_(); if(!st || !st.items) return 0;
+  let n=0;
+  st.items.forEach(function(x){
+    const c=String(x.c||'').trim(); if(!c) return;
+    if(x.n &amp;&amp; !D.name[c]) D.name[c]=String(x.n);
+    if(!D.kind[c] &amp;&amp; x.t!=null &amp;&amp; x.t!==''){
+      const k=ECTYPE[String(x.t).trim()];
+      if(k){ D.kind[c]=k; n++; } } });
+  return n; }
+
 // 파일로 계산해 둔 결과에 '오늘 재고'를 덮어씌운다.
 // 재고는 항상 API 값이 이기고, 품명·품목구분은 비어 있을 때만 채운다.
 function erpApplyStock_(){
@@ -936,7 +955,7 @@ function erpApplyStock_(){
   st.items.forEach(function(x){
     const c=String(x.c||'').trim(); if(!c) return;
     const it=items[c] || (items[c]={n:''});
-    it.s=Math.round((+x.q||0)*100)/100;
+    if(x.q!=null &amp;&amp; x.q!=='') it.s=Math.round((+x.q||0)*100)/100;
     if(!it.n &amp;&amp; x.n) it.n=String(x.n);
     if(!it.k &amp;&amp; x.t!=null &amp;&amp; x.t!==''){
       const raw=String(x.t).trim();
