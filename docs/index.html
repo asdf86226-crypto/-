@@ -664,7 +664,8 @@ function erpRun_(){
   if(mn) log.push('· 이카운트 품목정보로 품목구분 '+mn+'건을 보충(계산 전)');
   const out=erpCompute_(D); erpSave_(out);
   const sn=erpApplyStock_(); if(sn) log.push('· PC에서 받아둔 재고 '+sn+'품목을 다시 반영');
-  const s='ERP 갱신 '+out.updatedAt+' · '+Math.round((Date.now()-t0)/1000)+'초 · 품목 '+out.n+'개 · 판매 '+out.months+'개월\n'+log.join('\n');
+  const now=Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'HH:mm');
+  const s='ERP 갱신 '+out.updatedAt+' '+now+' · '+Math.round((Date.now()-t0)/1000)+'초 · 품목 '+out.n+'개 · 판매 '+out.months+'개월\n'+log.join('\n');
   P.setProperty('ERP_LOG', s.substring(0,8000)); Logger.log(s); return s; }
 function erpRows_(f){
   const mt=f.getMimeType(), nm=f.getName(), low=nm.toLowerCase();
@@ -945,7 +946,7 @@ function erpApplyStock_(){
     n++; });
   o.items=items; o.n=Object.keys(items).length; o.stockAt=st.at||'';
   erpWriteBlob_(o);
-  P.setProperty('ERP_STOCK_LOG','재고 '+n+'품목 반영 · '+(st.at||''));
+  P.setProperty('ERP_STOCK_LOG','이카운트 재고 '+n+'품목 · 받아온 시각 '+(st.at||''));
   return n; }
 function erpBlob_(){
   const s=SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ERPSHEET);
@@ -2322,7 +2323,7 @@ function erpBlob_(){
     String(erpAuto.log).split("\n").forEach(l=>{
       const t=l.trim(); if(!t) return;
       if(/^ERP 갱신/.test(t)) head.push(t);
-      else if(/^재고\s[\d,]+\s*품목\s*반영/.test(t)) stock.push(t);
+      else if(/^(이카운트\s)?재고\s[\d,]+\s*품목/.test(t)) stock.push(t);
       else if(/⚠|\[실패\]/.test(t)) warn.push(t);     // 경고는 맨 위로
       else if(HIDE.test(t)) return;
       else if(t.charAt(0)==="·") files.push(t);
