@@ -625,7 +625,7 @@ function ERP설정(){
   ScriptApp.getProjectTriggers().forEach(t=&gt;{ if(t.getHandlerFunction().indexOf('erpRefresh')===0) ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('erpRefresh').timeBased().atHour(4).everyDays(1).create();
   const m='[준비 끝] ERP 파일을 넣을 폴더 ↓\n'+f.getUrl()
-    +'\n\n이 폴더에 품목등록(기준정보)·판매현황·BOM 파일을 넣어두세요.\n재고수량은 이카운트에서 매일 받아옵니다.\n매일 새벽 4시에 자동으로 다시 계산합니다.';
+    +'\n\n이 폴더에 판매현황·BOM 파일을 넣어두세요. 하위 폴더로 나눠 정리해도 됩니다.\n품명·품목구분·재고는 이카운트에서 매일 받아옵니다.\n매일 새벽 4시에 자동으로 다시 계산합니다.';
   Logger.log(m); return m; }
 function erpFolderUrl_(){ const id=P.getProperty('ERP_FOLDER'); if(!id) return '';
   try{ return DriveApp.getFolderById(id).getUrl(); }catch(e){ return ''; } }
@@ -637,19 +637,29 @@ function erpRefresh(){
   try{ return erpRun_(); }
   catch(e){ P.setProperty('ERP_LOG','[실패] '+e.message+'\n'
       +Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy-MM-dd HH:mm')); throw e; } }
+// 폴더 안의 하위 폴더까지 훑는다. 판매량·BOM 처럼 나눠 정리해 두어도 읽히도록.
+function erpWalk_(folder, out, depth){
+  if(depth&gt;4) return;                       // 혹시 모를 깊은 중첩 방지
+  const fi=folder.getFiles();
+  while(fi.hasNext()) out.push([fi.next(), depth?folder.getName():'']);
+  const fo=folder.getFolders();
+  while(fo.hasNext()) erpWalk_(fo.next(), out, depth+1); }
 function erpRun_(){
   const id=P.getProperty('ERP_FOLDER'); if(!id) throw new Error('먼저 ERP설정 을 한 번 실행하세요');
   const t0=Date.now(), D={stock:{},name:{},kind:{},bom:{},sales:{},months:{}}, log=[];
   const self=SpreadsheetApp.getActiveSpreadsheet().getId();
-  const it=DriveApp.getFolderById(id).getFiles();
+  const list=[]; erpWalk_(DriveApp.getFolderById(id), list, 0);
   // 같은 이름의 파일이 둘 이상이면 판매량이 중복 합산된다. 한 번만 읽는다.
   const seen={};
-  while(it.hasNext()){ const f=it.next(), nm=f.getName();
+  let n=0;
+  for(let i=0;i&lt;list.length;i++){
+    const f=list[i][0], sub=list[i][1], nm=f.getName();
     if(nm.charAt(0)==='~' || f.getId()===self) continue;
-    if(seen[nm]){ log.push('· '+nm+' ⚠ 같은 이름이 둘 이상입니다 — 중복 합산을 막기 위해 건너뛰었습니다'); continue; }
-    seen[nm]=1;
-    try{ log.push('· '+nm+' — '+erpFile_(f,D)); }catch(e){ log.push('· '+nm+' ⚠ '+e.message); } }
-  if(!log.length) throw new Error('폴더가 비어 있습니다 — ERP 파일을 넣어주세요');
+    const tag=sub?sub+' / '+nm:nm;
+    if(seen[nm]){ log.push('· '+tag+' ⚠ 같은 이름이 둘 이상입니다 — 중복 합산을 막기 위해 건너뛰었습니다'); continue; }
+    seen[nm]=1; n++;
+    try{ log.push('· '+tag+' — '+erpFile_(f,D)); }catch(e){ log.push('· '+tag+' ⚠ '+e.message); } }
+  if(!n) throw new Error('폴더가 비어 있습니다 — ERP 파일을 넣어주세요 (하위 폴더도 함께 읽습니다)');
   const mn=erpMergeMaster_(D);
   if(mn) log.push('· 이카운트 품목정보로 품목구분 '+mn+'건을 보충(계산 전)');
   const out=erpCompute_(D); erpSave_(out);
