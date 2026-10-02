@@ -815,18 +815,28 @@ function erpStock_(rows,hi,D){
     const kd=cK!=null?erpNorm_(r[cK]):''; if(kd&amp;&amp;!D.kind[c]) D.kind[c]=kd;
     n++; }
   return '재고 '+n+'품목'+(cK==null?' (품목구분 열 없음)':''); }
+// 월평균 소요량을 몇 개월치로 볼지. 폴더에 오래된 연도 파일이 함께 있어도
+// 이 기간 밖의 판매는 세지 않는다. 그래야 최근 수요가 묽어지지 않는다.
+const SALESMONTHS = 24;
+function erpCutYM_(){
+  const d=new Date(); d.setDate(1);                 // 말일 넘침 방지
+  d.setMonth(d.getMonth()-(SALESMONTHS-1));
+  return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2); }
 function erpSales_(rows,hi,D){
   const m=erpCols_(rows,hi), cC=m['품목코드'], cQ=m['수량'],
         cN=erpCol_(m,['품목명','품명']), cD=erpCol_(m,['일자','날짜']);
-  let n=0;
+  const cut=erpCutYM_();
+  let n=0, old=0;
   for(let i=hi+1;i&lt;rows.length;i++){ const r=rows[i]||[]; const c=erpNorm_(r[cC]);
     if(!c||c==='합계'||c==='합 계') continue;
     const q=erpNum_(r[cQ]); if(!q) continue;
+    const ym=cD!=null?erpYM_(r[cD]):'';
+    if(ym &amp;&amp; ym&lt;cut){ old++; continue; }             // 기간 밖 — 품명도 쓰지 않는다
     D.sales[c]=(D.sales[c]||0)+q;
     const nm=cN!=null?erpNorm_(r[cN]):''; if(nm&amp;&amp;!D.name[c]) D.name[c]=nm;
-    const ym=cD!=null?erpYM_(r[cD]):''; if(ym) D.months[ym]=1;
+    if(ym) D.months[ym]=1;
     n++; }
-  return '판매 '+n+'건'; }
+  return '판매 '+n+'건'+(old?' (기간 밖 '+old+'건 제외)':''); }
 function erpCompute_(D){
   const months=Math.max(1, Object.keys(D.months).length);
   const ds={}; for(const c in D.sales) ds[c]=D.sales[c]/months;
